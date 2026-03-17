@@ -167,15 +167,7 @@
                 "events": [
                     {
                         "introduced": "0:10.19.0~dfsg-3ubuntu1",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
+                        "fixed": "0:12.22.9~dfsg-1ubuntu3"
                     }
                 ]
             },
@@ -821,71 +813,6 @@
                     }
                 ]
             },
-            "CVE-2024-4603": {
-                "cve_id": "CVE-2024-4603",
-                "title": "Issue summary: Checking excessively long DSA keys or parameters m ...",
-                "description": "Issue summary: Checking excessively long DSA keys or parameters may be very\nslow.\n\nImpact summary: Applications that use the functions EVP_PKEY_param_check()\nor EVP_PKEY_public_check() to check a DSA public key or DSA parameters may\nexperience long delays. Where the key or parameters that are being checked\nhave been obtained from an untrusted source this may lead to a Denial of\nService.\n\nThe functions EVP_PKEY_param_check() or EVP_PKEY_public_check() perform\nvarious checks on DSA parameters. Some of those computations take a long time\nif the modulus (`p` parameter) is too large.\n\nTrying to use a very large modulus is slow and OpenSSL will not allow using\npublic keys with a modulus which is over 10,000 bits in length for signature\nverification. However the key and parameter check functions do not limit\nthe modulus size when performing the checks.\n\nAn application that calls EVP_PKEY_param_check() or EVP_PKEY_public_check()\nand supplies a key or parameters obtained from an untrusted source could be\nvulnerable to a Denial of Service attack.\n\nThese functions are not called by OpenSSL itself on untrusted DSA keys so\nonly applications that directly call these functions may be vulnerable.\n\nAlso vulnerable are the OpenSSL pkey and pkeyparam command line applications\nwhen using the `-check` option.\n\nThe OpenSSL SSL/TLS implementation is not affected by this issue.\n\nThe OpenSSL 3.0 and 3.1 FIPS providers are affected by this issue.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-4741": {
-                "cve_id": "CVE-2024-4741",
-                "title": "Issue summary: Calling the OpenSSL API function SSL_free_buffers  ...",
-                "description": "Issue summary: Calling the OpenSSL API function SSL_free_buffers may cause\nmemory to be accessed that was previously freed in some situations\n\nImpact summary: A use after free can have a range of potential consequences such\nas the corruption of valid data, crashes or execution of arbitrary code.\nHowever, only applications that directly call the SSL_free_buffers function are\naffected by this issue. Applications that do not call this function are not\nvulnerable. Our investigations indicate that this function is rarely used by\napplications.\n\nThe SSL_free_buffers function is used to free the internal OpenSSL buffer used\nwhen processing an incoming record from the network. The call is only expected\nto succeed if the buffer is not currently in use. However, two scenarios have\nbeen identified where the buffer is freed even when still in use.\n\nThe first scenario occurs where a record header has been received from the\nnetwork and processed by OpenSSL, but the full record body has not yet arrived.\nIn this case calling SSL_free_buffers will succeed even though a record has only\nbeen partially processed and the buffer is still in use.\n\nThe second scenario occurs where a full record containing application data has\nbeen received and processed by OpenSSL but the application has only read part of\nthis data. Again a call to SSL_free_buffers will succeed even though the buffer\nis still in use.\n\nWhile these scenarios could occur accidentally during normal operation a\nmalicious attacker could attempt to engineer a stituation where this occurs.\nWe are not aware of this issue being actively exploited.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-5535": {
-                "cve_id": "CVE-2024-5535",
-                "title": "Issue summary: Calling the OpenSSL API function SSL_select_next_p ...",
-                "description": "Issue summary: Calling the OpenSSL API function SSL_select_next_proto with an\nempty supported client protocols buffer may cause a crash or memory contents to\nbe sent to the peer.\n\nImpact summary: A buffer overread can have a range of potential consequences\nsuch as unexpected application beahviour or a crash. In particular this issue\ncould result in up to 255 bytes of arbitrary private data from memory being sent\nto the peer leading to a loss of confidentiality. However, only applications\nthat directly call the SSL_select_next_proto function with a 0 length list of\nsupported client protocols are affected by this issue. This would normally never\nbe a valid scenario and is typically not under attacker control but may occur by\naccident in the case of a configuration or programming error in the calling\napplication.\n\nThe OpenSSL API function SSL_select_next_proto is typically used by TLS\napplications that support ALPN (Application Layer Protocol Negotiation) or NPN\n(Next Protocol Negotiation). NPN is older, was never standardised and\nis deprecated in favour of ALPN. We believe that ALPN is significantly more\nwidely deployed than NPN. The SSL_select_next_proto function accepts a list of\nprotocols from the server and a list of protocols from the client and returns\nthe first protocol that appears in the server list that also appears in the\nclient list. In the case of no overlap between the two lists it returns the\nfirst item in the client list. In either case it will signal whether an overlap\nbetween the two lists was found. In the case where SSL_select_next_proto is\ncalled with a zero length client list it fails to notice this condition and\nreturns the memory immediately following the client list pointer (and reports\nthat there was no overlap in the lists).\n\nThis function is typically called from a server side application callback for\nALPN or a client side application callback for NPN. In the case of ALPN the list\nof protocols supplied by the client is guaranteed by libssl to never be zero in\nlength. The list of server protocols comes from the application and should never\nnormally be expected to be of zero length. In this case if the\nSSL_select_next_proto function has been called as expected (with the list\nsupplied by the client passed in the client/client_len parameters), then the\napplication will not be vulnerable to this issue. If the application has\naccidentally been configured with a zero length server list, and has\naccidentally passed that zero length server list in the client/client_len\nparameters, and has additionally failed to correctly handle a \"no overlap\"\nresponse (which would normally result in a handshake failure in ALPN) then it\nwill be vulnerable to this problem.\n\nIn the case of NPN, the protocol permits the client to opportunistically select\na protocol when there is no overlap. OpenSSL returns the first client protocol\nin the no overlap case in support of this. The list of client protocols comes\nfrom the application and should never normally be expected to be of zero length.\nHowever if the SSL_select_next_proto function is accidentally called with a\nclient_len of 0 then an invalid memory pointer will be returned instead. If the\napplication uses this output as the opportunistic protocol then the loss of\nconfidentiality will occur.\n\nThis issue has been assessed as Low severity because applications are most\nlikely to be vulnerable if they are using NPN instead of ALPN - but NPN is not\nwidely used. It also requires an application configuration or programming error.\nFinally, this issue would not typically be under attacker control making active\nexploitation unlikely.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.\n\nDue to the low severity of this issue we are not issuing new releases of\nOpenSSL at this time. The fix will be included in the next releases when they\nbecome available.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-6119": {
-                "cve_id": "CVE-2024-6119",
-                "title": "Issue summary: Applications performing certificate name checks (e ...",
-                "description": "Issue summary: Applications performing certificate name checks (e.g., TLS\nclients checking server certificates) may attempt to read an invalid memory\naddress resulting in abnormal termination of the application process.\n\nImpact summary: Abnormal termination of an application can a cause a denial of\nservice.\n\nApplications performing certificate name checks (e.g., TLS clients checking\nserver certificates) may attempt to read an invalid memory address when\ncomparing the expected name with an `otherName` subject alternative name of an\nX.509 certificate. This may result in an exception that terminates the\napplication program.\n\nNote that basic certificate chain validation (signatures, dates, ...) is not\naffected, the denial of service can occur only when the application also\nspecifies an expected DNS name, Email address or IP address.\n\nTLS servers rarely solicit client certificates, and even when they do, they\ngenerally don't perform a name check against a reference identifier (expected\nidentity), but rather extract the presented identity after checking the\ncertificate chain.  So TLS servers are generally not affected and the severity\nof the issue is Moderate.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-9143": {
-                "cve_id": "CVE-2024-9143",
-                "title": "Issue summary: Use of the low-level GF(2^m) elliptic curve APIs w ...",
-                "description": "Issue summary: Use of the low-level GF(2^m) elliptic curve APIs with untrusted\nexplicit values for the field polynomial can lead to out-of-bounds memory reads\nor writes.\n\nImpact summary: Out of bound memory writes can lead to an application crash or\neven a possibility of a remote code execution, however, in all the protocols\ninvolving Elliptic Curve Cryptography that we're aware of, either only \"named\ncurves\" are supported, or, if explicit curve parameters are supported, they\nspecify an X9.62 encoding of binary (GF(2^m)) curves that can't represent\nproblematic input values. Thus the likelihood of existence of a vulnerable\napplication is low.\n\nIn particular, the X9.62 encoding is used for ECC keys in X.509 certificates,\nso problematic inputs cannot occur in the context of processing X.509\ncertificates.  Any problematic use-cases would have to be using an \"exotic\"\ncurve encoding.\n\nThe affected APIs include: EC_GROUP_new_curve_GF2m(), EC_GROUP_new_from_params(),\nand various supporting BN_GF2m_*() functions.\n\nApplications working with \"exotic\" explicit binary (GF(2^m)) curve parameters,\nthat make it possible to represent invalid field polynomials with a zero\nconstant term, via the above or similar APIs, may terminate abruptly as a\nresult of reading or writing outside of array bounds.  Remote code execution\ncannot easily be ruled out.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
             "CVE-2025-11187": {
                 "cve_id": "CVE-2025-11187",
                 "title": "Issue summary: PBMAC1 parameters in PKCS#12 files are missing val ...",
@@ -994,117 +921,7 @@
                 "events": [
                     {
                         "introduced": "0:10.19.0~dfsg-3ubuntu1",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-55130": {
-                "cve_id": "CVE-2025-55130",
-                "title": "A flaw in Node.js\u2019s Permissions model allows attackers to bypass  ...",
-                "description": "A flaw in Node.js\u2019s Permissions model allows attackers to bypass `--allow-fs-read` and `--allow-fs-write` restrictions using crafted relative symlink paths. By chaining directories and symlinks, a script granted access only to the current directory can escape the allowed path and read sensitive files. This breaks the expected isolation guarantees and enables arbitrary file read/write, leading to potential system compromise.\nThis vulnerability affects users of the permission model on Node.js v20,  v22,  v24, and v25.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-55131": {
-                "cve_id": "CVE-2025-55131",
-                "title": "A flaw in Node.js's buffer allocation logic can expose uninitiali ...",
-                "description": "A flaw in Node.js's buffer allocation logic can expose uninitialized memory when allocations are interrupted, when using the `vm` module with the timeout option. Under specific timing conditions, buffers allocated with `Buffer.alloc` and other `TypedArray` instances like `Uint8Array` may contain leftover data from previous operations, allowing in-process secrets like tokens or passwords to leak or causing data corruption. While exploitation typically requires precise timing or in-process code execution, it can become remotely exploitable when untrusted input influences workload and timeouts, leading to potential confidentiality and integrity impact.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-55132": {
-                "cve_id": "CVE-2025-55132",
-                "title": "A flaw in Node.js's permission model allows a file's access and m ...",
-                "description": "A flaw in Node.js's permission model allows a file's access and modification timestamps to be changed via `futimes()` even when the process has only read permissions. Unlike `utimes()`, `futimes()` does not apply the expected write-permission checks, which means file metadata can be modified in read-only directories. This behavior could be used to alter timestamps in ways that obscure activity, reducing the reliability of logs. This vulnerability affects users of the permission model on Node.js v20,  v22,  v24, and v25.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-59464": {
-                "cve_id": "CVE-2025-59464",
-                "title": "A memory leak in Node.js\u2019s OpenSSL integration occurs when conver ...",
-                "description": "A memory leak in Node.js\u2019s OpenSSL integration occurs when converting `X.509` certificate fields to UTF-8 without freeing the allocated buffer. When applications call `socket.getPeerCertificate(true)`, each certificate field leaks memory, allowing remote clients to trigger steady memory growth through repeated TLS connections. Over time this can lead to resource exhaustion and denial of service.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-59465": {
-                "cve_id": "CVE-2025-59465",
-                "title": "A malformed `HTTP/2 HEADERS` frame with oversized, invalid `HPACK ...",
-                "description": "A malformed `HTTP/2 HEADERS` frame with oversized, invalid `HPACK` data can cause Node.js to crash by triggering an unhandled `TLSSocket` error `ECONNRESET`. Instead of safely closing the connection, the process crashes, enabling a remote denial of service. This primarily affects applications that do not attach explicit error handlers to secure sockets, for example:\n```\nserver.on('secureConnection', socket => {\n  socket.on('error', err => {\n    console.log(err)\n  })\n})\n```",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-59466": {
-                "cve_id": "CVE-2025-59466",
-                "title": "We have identified a bug in Node.js error handling where \"Maximum ...",
-                "description": "We have identified a bug in Node.js error handling where \"Maximum call stack size exceeded\" errors become uncatchable when `async_hooks.createHook()` is enabled. Instead of reaching `process.on('uncaughtException')`, the process terminates, making the crash unrecoverable. Applications that rely on `AsyncLocalStorage` (v22, v20) or `async_hooks.createHook()` (v24, v22, v20) become vulnerable to denial-of-service crashes triggered by deep recursion under specific conditions.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
+                        "fixed": "0:12.22.9~dfsg-1ubuntu3"
                     }
                 ]
             },
@@ -1222,40 +1039,6 @@
                     {
                         "introduced": "0:12.22.9~dfsg-1ubuntu3",
                         "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2026-21636": {
-                "cve_id": "CVE-2026-21636",
-                "title": "A flaw in Node.js's permission model allows Unix Domain Socket (U ...",
-                "description": "A flaw in Node.js's permission model allows Unix Domain Socket (UDS) connections to bypass network restrictions when `--permission` is enabled. Even without `--allow-net`, attacker-controlled inputs (such as URLs or socketPath options) can connect to arbitrary local sockets via net, tls, or undici/fetch. This breaks the intended security boundary of the permission model and enables access to privileged local services, potentially leading to privilege escalation, data exposure, or local code execution.\n\n* The issue affects users of the Node.js permission model on version v25.\n\nIn the moment of this vulnerability, network permissions (`--allow-net`) are still in the experimental phase.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2026-21637": {
-                "cve_id": "CVE-2026-21637",
-                "title": "A flaw in Node.js TLS error handling allows remote attackers to c ...",
-                "description": "A flaw in Node.js TLS error handling allows remote attackers to crash or exhaust resources of a TLS server when `pskCallback` or `ALPNCallback` are in use. Synchronous exceptions thrown during these callbacks bypass standard TLS error handling paths (tlsClientError and error), causing either immediate process termination or silent file descriptor leaks that eventually lead to denial of service. Because these callbacks process attacker-controlled input during the TLS handshake, a remote client can repeatedly trigger the issue. This vulnerability affects TLS servers using PSK or ALPN callbacks across Node.js versions where these callbacks throw without being safely wrapped.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
                     }
                 ]
             },
@@ -1452,15 +1235,7 @@
                 "events": [
                     {
                         "introduced": "0:10.19.0~dfsg-3ubuntu1",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
+                        "fixed": "0:12.22.9~dfsg-1ubuntu3"
                     }
                 ]
             },
@@ -2106,71 +1881,6 @@
                     }
                 ]
             },
-            "CVE-2024-4603": {
-                "cve_id": "CVE-2024-4603",
-                "title": "Issue summary: Checking excessively long DSA keys or parameters m ...",
-                "description": "Issue summary: Checking excessively long DSA keys or parameters may be very\nslow.\n\nImpact summary: Applications that use the functions EVP_PKEY_param_check()\nor EVP_PKEY_public_check() to check a DSA public key or DSA parameters may\nexperience long delays. Where the key or parameters that are being checked\nhave been obtained from an untrusted source this may lead to a Denial of\nService.\n\nThe functions EVP_PKEY_param_check() or EVP_PKEY_public_check() perform\nvarious checks on DSA parameters. Some of those computations take a long time\nif the modulus (`p` parameter) is too large.\n\nTrying to use a very large modulus is slow and OpenSSL will not allow using\npublic keys with a modulus which is over 10,000 bits in length for signature\nverification. However the key and parameter check functions do not limit\nthe modulus size when performing the checks.\n\nAn application that calls EVP_PKEY_param_check() or EVP_PKEY_public_check()\nand supplies a key or parameters obtained from an untrusted source could be\nvulnerable to a Denial of Service attack.\n\nThese functions are not called by OpenSSL itself on untrusted DSA keys so\nonly applications that directly call these functions may be vulnerable.\n\nAlso vulnerable are the OpenSSL pkey and pkeyparam command line applications\nwhen using the `-check` option.\n\nThe OpenSSL SSL/TLS implementation is not affected by this issue.\n\nThe OpenSSL 3.0 and 3.1 FIPS providers are affected by this issue.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-4741": {
-                "cve_id": "CVE-2024-4741",
-                "title": "Issue summary: Calling the OpenSSL API function SSL_free_buffers  ...",
-                "description": "Issue summary: Calling the OpenSSL API function SSL_free_buffers may cause\nmemory to be accessed that was previously freed in some situations\n\nImpact summary: A use after free can have a range of potential consequences such\nas the corruption of valid data, crashes or execution of arbitrary code.\nHowever, only applications that directly call the SSL_free_buffers function are\naffected by this issue. Applications that do not call this function are not\nvulnerable. Our investigations indicate that this function is rarely used by\napplications.\n\nThe SSL_free_buffers function is used to free the internal OpenSSL buffer used\nwhen processing an incoming record from the network. The call is only expected\nto succeed if the buffer is not currently in use. However, two scenarios have\nbeen identified where the buffer is freed even when still in use.\n\nThe first scenario occurs where a record header has been received from the\nnetwork and processed by OpenSSL, but the full record body has not yet arrived.\nIn this case calling SSL_free_buffers will succeed even though a record has only\nbeen partially processed and the buffer is still in use.\n\nThe second scenario occurs where a full record containing application data has\nbeen received and processed by OpenSSL but the application has only read part of\nthis data. Again a call to SSL_free_buffers will succeed even though the buffer\nis still in use.\n\nWhile these scenarios could occur accidentally during normal operation a\nmalicious attacker could attempt to engineer a stituation where this occurs.\nWe are not aware of this issue being actively exploited.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-5535": {
-                "cve_id": "CVE-2024-5535",
-                "title": "Issue summary: Calling the OpenSSL API function SSL_select_next_p ...",
-                "description": "Issue summary: Calling the OpenSSL API function SSL_select_next_proto with an\nempty supported client protocols buffer may cause a crash or memory contents to\nbe sent to the peer.\n\nImpact summary: A buffer overread can have a range of potential consequences\nsuch as unexpected application beahviour or a crash. In particular this issue\ncould result in up to 255 bytes of arbitrary private data from memory being sent\nto the peer leading to a loss of confidentiality. However, only applications\nthat directly call the SSL_select_next_proto function with a 0 length list of\nsupported client protocols are affected by this issue. This would normally never\nbe a valid scenario and is typically not under attacker control but may occur by\naccident in the case of a configuration or programming error in the calling\napplication.\n\nThe OpenSSL API function SSL_select_next_proto is typically used by TLS\napplications that support ALPN (Application Layer Protocol Negotiation) or NPN\n(Next Protocol Negotiation). NPN is older, was never standardised and\nis deprecated in favour of ALPN. We believe that ALPN is significantly more\nwidely deployed than NPN. The SSL_select_next_proto function accepts a list of\nprotocols from the server and a list of protocols from the client and returns\nthe first protocol that appears in the server list that also appears in the\nclient list. In the case of no overlap between the two lists it returns the\nfirst item in the client list. In either case it will signal whether an overlap\nbetween the two lists was found. In the case where SSL_select_next_proto is\ncalled with a zero length client list it fails to notice this condition and\nreturns the memory immediately following the client list pointer (and reports\nthat there was no overlap in the lists).\n\nThis function is typically called from a server side application callback for\nALPN or a client side application callback for NPN. In the case of ALPN the list\nof protocols supplied by the client is guaranteed by libssl to never be zero in\nlength. The list of server protocols comes from the application and should never\nnormally be expected to be of zero length. In this case if the\nSSL_select_next_proto function has been called as expected (with the list\nsupplied by the client passed in the client/client_len parameters), then the\napplication will not be vulnerable to this issue. If the application has\naccidentally been configured with a zero length server list, and has\naccidentally passed that zero length server list in the client/client_len\nparameters, and has additionally failed to correctly handle a \"no overlap\"\nresponse (which would normally result in a handshake failure in ALPN) then it\nwill be vulnerable to this problem.\n\nIn the case of NPN, the protocol permits the client to opportunistically select\na protocol when there is no overlap. OpenSSL returns the first client protocol\nin the no overlap case in support of this. The list of client protocols comes\nfrom the application and should never normally be expected to be of zero length.\nHowever if the SSL_select_next_proto function is accidentally called with a\nclient_len of 0 then an invalid memory pointer will be returned instead. If the\napplication uses this output as the opportunistic protocol then the loss of\nconfidentiality will occur.\n\nThis issue has been assessed as Low severity because applications are most\nlikely to be vulnerable if they are using NPN instead of ALPN - but NPN is not\nwidely used. It also requires an application configuration or programming error.\nFinally, this issue would not typically be under attacker control making active\nexploitation unlikely.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.\n\nDue to the low severity of this issue we are not issuing new releases of\nOpenSSL at this time. The fix will be included in the next releases when they\nbecome available.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-6119": {
-                "cve_id": "CVE-2024-6119",
-                "title": "Issue summary: Applications performing certificate name checks (e ...",
-                "description": "Issue summary: Applications performing certificate name checks (e.g., TLS\nclients checking server certificates) may attempt to read an invalid memory\naddress resulting in abnormal termination of the application process.\n\nImpact summary: Abnormal termination of an application can a cause a denial of\nservice.\n\nApplications performing certificate name checks (e.g., TLS clients checking\nserver certificates) may attempt to read an invalid memory address when\ncomparing the expected name with an `otherName` subject alternative name of an\nX.509 certificate. This may result in an exception that terminates the\napplication program.\n\nNote that basic certificate chain validation (signatures, dates, ...) is not\naffected, the denial of service can occur only when the application also\nspecifies an expected DNS name, Email address or IP address.\n\nTLS servers rarely solicit client certificates, and even when they do, they\ngenerally don't perform a name check against a reference identifier (expected\nidentity), but rather extract the presented identity after checking the\ncertificate chain.  So TLS servers are generally not affected and the severity\nof the issue is Moderate.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-9143": {
-                "cve_id": "CVE-2024-9143",
-                "title": "Issue summary: Use of the low-level GF(2^m) elliptic curve APIs w ...",
-                "description": "Issue summary: Use of the low-level GF(2^m) elliptic curve APIs with untrusted\nexplicit values for the field polynomial can lead to out-of-bounds memory reads\nor writes.\n\nImpact summary: Out of bound memory writes can lead to an application crash or\neven a possibility of a remote code execution, however, in all the protocols\ninvolving Elliptic Curve Cryptography that we're aware of, either only \"named\ncurves\" are supported, or, if explicit curve parameters are supported, they\nspecify an X9.62 encoding of binary (GF(2^m)) curves that can't represent\nproblematic input values. Thus the likelihood of existence of a vulnerable\napplication is low.\n\nIn particular, the X9.62 encoding is used for ECC keys in X.509 certificates,\nso problematic inputs cannot occur in the context of processing X.509\ncertificates.  Any problematic use-cases would have to be using an \"exotic\"\ncurve encoding.\n\nThe affected APIs include: EC_GROUP_new_curve_GF2m(), EC_GROUP_new_from_params(),\nand various supporting BN_GF2m_*() functions.\n\nApplications working with \"exotic\" explicit binary (GF(2^m)) curve parameters,\nthat make it possible to represent invalid field polynomials with a zero\nconstant term, via the above or similar APIs, may terminate abruptly as a\nresult of reading or writing outside of array bounds.  Remote code execution\ncannot easily be ruled out.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
             "CVE-2025-11187": {
                 "cve_id": "CVE-2025-11187",
                 "title": "Issue summary: PBMAC1 parameters in PKCS#12 files are missing val ...",
@@ -2279,117 +1989,7 @@
                 "events": [
                     {
                         "introduced": "0:10.19.0~dfsg-3ubuntu1",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-55130": {
-                "cve_id": "CVE-2025-55130",
-                "title": "A flaw in Node.js\u2019s Permissions model allows attackers to bypass  ...",
-                "description": "A flaw in Node.js\u2019s Permissions model allows attackers to bypass `--allow-fs-read` and `--allow-fs-write` restrictions using crafted relative symlink paths. By chaining directories and symlinks, a script granted access only to the current directory can escape the allowed path and read sensitive files. This breaks the expected isolation guarantees and enables arbitrary file read/write, leading to potential system compromise.\nThis vulnerability affects users of the permission model on Node.js v20,  v22,  v24, and v25.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-55131": {
-                "cve_id": "CVE-2025-55131",
-                "title": "A flaw in Node.js's buffer allocation logic can expose uninitiali ...",
-                "description": "A flaw in Node.js's buffer allocation logic can expose uninitialized memory when allocations are interrupted, when using the `vm` module with the timeout option. Under specific timing conditions, buffers allocated with `Buffer.alloc` and other `TypedArray` instances like `Uint8Array` may contain leftover data from previous operations, allowing in-process secrets like tokens or passwords to leak or causing data corruption. While exploitation typically requires precise timing or in-process code execution, it can become remotely exploitable when untrusted input influences workload and timeouts, leading to potential confidentiality and integrity impact.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-55132": {
-                "cve_id": "CVE-2025-55132",
-                "title": "A flaw in Node.js's permission model allows a file's access and m ...",
-                "description": "A flaw in Node.js's permission model allows a file's access and modification timestamps to be changed via `futimes()` even when the process has only read permissions. Unlike `utimes()`, `futimes()` does not apply the expected write-permission checks, which means file metadata can be modified in read-only directories. This behavior could be used to alter timestamps in ways that obscure activity, reducing the reliability of logs. This vulnerability affects users of the permission model on Node.js v20,  v22,  v24, and v25.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-59464": {
-                "cve_id": "CVE-2025-59464",
-                "title": "A memory leak in Node.js\u2019s OpenSSL integration occurs when conver ...",
-                "description": "A memory leak in Node.js\u2019s OpenSSL integration occurs when converting `X.509` certificate fields to UTF-8 without freeing the allocated buffer. When applications call `socket.getPeerCertificate(true)`, each certificate field leaks memory, allowing remote clients to trigger steady memory growth through repeated TLS connections. Over time this can lead to resource exhaustion and denial of service.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-59465": {
-                "cve_id": "CVE-2025-59465",
-                "title": "A malformed `HTTP/2 HEADERS` frame with oversized, invalid `HPACK ...",
-                "description": "A malformed `HTTP/2 HEADERS` frame with oversized, invalid `HPACK` data can cause Node.js to crash by triggering an unhandled `TLSSocket` error `ECONNRESET`. Instead of safely closing the connection, the process crashes, enabling a remote denial of service. This primarily affects applications that do not attach explicit error handlers to secure sockets, for example:\n```\nserver.on('secureConnection', socket => {\n  socket.on('error', err => {\n    console.log(err)\n  })\n})\n```",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-59466": {
-                "cve_id": "CVE-2025-59466",
-                "title": "We have identified a bug in Node.js error handling where \"Maximum ...",
-                "description": "We have identified a bug in Node.js error handling where \"Maximum call stack size exceeded\" errors become uncatchable when `async_hooks.createHook()` is enabled. Instead of reaching `process.on('uncaughtException')`, the process terminates, making the crash unrecoverable. Applications that rely on `AsyncLocalStorage` (v22, v20) or `async_hooks.createHook()` (v24, v22, v20) become vulnerable to denial-of-service crashes triggered by deep recursion under specific conditions.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
+                        "fixed": "0:12.22.9~dfsg-1ubuntu3"
                     }
                 ]
             },
@@ -2507,40 +2107,6 @@
                     {
                         "introduced": "0:12.22.9~dfsg-1ubuntu3",
                         "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2026-21636": {
-                "cve_id": "CVE-2026-21636",
-                "title": "A flaw in Node.js's permission model allows Unix Domain Socket (U ...",
-                "description": "A flaw in Node.js's permission model allows Unix Domain Socket (UDS) connections to bypass network restrictions when `--permission` is enabled. Even without `--allow-net`, attacker-controlled inputs (such as URLs or socketPath options) can connect to arbitrary local sockets via net, tls, or undici/fetch. This breaks the intended security boundary of the permission model and enables access to privileged local services, potentially leading to privilege escalation, data exposure, or local code execution.\n\n* The issue affects users of the Node.js permission model on version v25.\n\nIn the moment of this vulnerability, network permissions (`--allow-net`) are still in the experimental phase.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2026-21637": {
-                "cve_id": "CVE-2026-21637",
-                "title": "A flaw in Node.js TLS error handling allows remote attackers to c ...",
-                "description": "A flaw in Node.js TLS error handling allows remote attackers to crash or exhaust resources of a TLS server when `pskCallback` or `ALPNCallback` are in use. Synchronous exceptions thrown during these callbacks bypass standard TLS error handling paths (tlsClientError and error), causing either immediate process termination or silent file descriptor leaks that eventually lead to denial of service. Because these callbacks process attacker-controlled input during the TLS handshake, a remote client can repeatedly trigger the issue. This vulnerability affects TLS servers using PSK or ALPN callbacks across Node.js versions where these callbacks throw without being safely wrapped.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
                     }
                 ]
             },
@@ -2737,15 +2303,7 @@
                 "events": [
                     {
                         "introduced": "0:10.19.0~dfsg-3ubuntu1",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
+                        "fixed": "0:12.22.9~dfsg-1ubuntu3"
                     }
                 ]
             },
@@ -3391,71 +2949,6 @@
                     }
                 ]
             },
-            "CVE-2024-4603": {
-                "cve_id": "CVE-2024-4603",
-                "title": "Issue summary: Checking excessively long DSA keys or parameters m ...",
-                "description": "Issue summary: Checking excessively long DSA keys or parameters may be very\nslow.\n\nImpact summary: Applications that use the functions EVP_PKEY_param_check()\nor EVP_PKEY_public_check() to check a DSA public key or DSA parameters may\nexperience long delays. Where the key or parameters that are being checked\nhave been obtained from an untrusted source this may lead to a Denial of\nService.\n\nThe functions EVP_PKEY_param_check() or EVP_PKEY_public_check() perform\nvarious checks on DSA parameters. Some of those computations take a long time\nif the modulus (`p` parameter) is too large.\n\nTrying to use a very large modulus is slow and OpenSSL will not allow using\npublic keys with a modulus which is over 10,000 bits in length for signature\nverification. However the key and parameter check functions do not limit\nthe modulus size when performing the checks.\n\nAn application that calls EVP_PKEY_param_check() or EVP_PKEY_public_check()\nand supplies a key or parameters obtained from an untrusted source could be\nvulnerable to a Denial of Service attack.\n\nThese functions are not called by OpenSSL itself on untrusted DSA keys so\nonly applications that directly call these functions may be vulnerable.\n\nAlso vulnerable are the OpenSSL pkey and pkeyparam command line applications\nwhen using the `-check` option.\n\nThe OpenSSL SSL/TLS implementation is not affected by this issue.\n\nThe OpenSSL 3.0 and 3.1 FIPS providers are affected by this issue.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-4741": {
-                "cve_id": "CVE-2024-4741",
-                "title": "Issue summary: Calling the OpenSSL API function SSL_free_buffers  ...",
-                "description": "Issue summary: Calling the OpenSSL API function SSL_free_buffers may cause\nmemory to be accessed that was previously freed in some situations\n\nImpact summary: A use after free can have a range of potential consequences such\nas the corruption of valid data, crashes or execution of arbitrary code.\nHowever, only applications that directly call the SSL_free_buffers function are\naffected by this issue. Applications that do not call this function are not\nvulnerable. Our investigations indicate that this function is rarely used by\napplications.\n\nThe SSL_free_buffers function is used to free the internal OpenSSL buffer used\nwhen processing an incoming record from the network. The call is only expected\nto succeed if the buffer is not currently in use. However, two scenarios have\nbeen identified where the buffer is freed even when still in use.\n\nThe first scenario occurs where a record header has been received from the\nnetwork and processed by OpenSSL, but the full record body has not yet arrived.\nIn this case calling SSL_free_buffers will succeed even though a record has only\nbeen partially processed and the buffer is still in use.\n\nThe second scenario occurs where a full record containing application data has\nbeen received and processed by OpenSSL but the application has only read part of\nthis data. Again a call to SSL_free_buffers will succeed even though the buffer\nis still in use.\n\nWhile these scenarios could occur accidentally during normal operation a\nmalicious attacker could attempt to engineer a stituation where this occurs.\nWe are not aware of this issue being actively exploited.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-5535": {
-                "cve_id": "CVE-2024-5535",
-                "title": "Issue summary: Calling the OpenSSL API function SSL_select_next_p ...",
-                "description": "Issue summary: Calling the OpenSSL API function SSL_select_next_proto with an\nempty supported client protocols buffer may cause a crash or memory contents to\nbe sent to the peer.\n\nImpact summary: A buffer overread can have a range of potential consequences\nsuch as unexpected application beahviour or a crash. In particular this issue\ncould result in up to 255 bytes of arbitrary private data from memory being sent\nto the peer leading to a loss of confidentiality. However, only applications\nthat directly call the SSL_select_next_proto function with a 0 length list of\nsupported client protocols are affected by this issue. This would normally never\nbe a valid scenario and is typically not under attacker control but may occur by\naccident in the case of a configuration or programming error in the calling\napplication.\n\nThe OpenSSL API function SSL_select_next_proto is typically used by TLS\napplications that support ALPN (Application Layer Protocol Negotiation) or NPN\n(Next Protocol Negotiation). NPN is older, was never standardised and\nis deprecated in favour of ALPN. We believe that ALPN is significantly more\nwidely deployed than NPN. The SSL_select_next_proto function accepts a list of\nprotocols from the server and a list of protocols from the client and returns\nthe first protocol that appears in the server list that also appears in the\nclient list. In the case of no overlap between the two lists it returns the\nfirst item in the client list. In either case it will signal whether an overlap\nbetween the two lists was found. In the case where SSL_select_next_proto is\ncalled with a zero length client list it fails to notice this condition and\nreturns the memory immediately following the client list pointer (and reports\nthat there was no overlap in the lists).\n\nThis function is typically called from a server side application callback for\nALPN or a client side application callback for NPN. In the case of ALPN the list\nof protocols supplied by the client is guaranteed by libssl to never be zero in\nlength. The list of server protocols comes from the application and should never\nnormally be expected to be of zero length. In this case if the\nSSL_select_next_proto function has been called as expected (with the list\nsupplied by the client passed in the client/client_len parameters), then the\napplication will not be vulnerable to this issue. If the application has\naccidentally been configured with a zero length server list, and has\naccidentally passed that zero length server list in the client/client_len\nparameters, and has additionally failed to correctly handle a \"no overlap\"\nresponse (which would normally result in a handshake failure in ALPN) then it\nwill be vulnerable to this problem.\n\nIn the case of NPN, the protocol permits the client to opportunistically select\na protocol when there is no overlap. OpenSSL returns the first client protocol\nin the no overlap case in support of this. The list of client protocols comes\nfrom the application and should never normally be expected to be of zero length.\nHowever if the SSL_select_next_proto function is accidentally called with a\nclient_len of 0 then an invalid memory pointer will be returned instead. If the\napplication uses this output as the opportunistic protocol then the loss of\nconfidentiality will occur.\n\nThis issue has been assessed as Low severity because applications are most\nlikely to be vulnerable if they are using NPN instead of ALPN - but NPN is not\nwidely used. It also requires an application configuration or programming error.\nFinally, this issue would not typically be under attacker control making active\nexploitation unlikely.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.\n\nDue to the low severity of this issue we are not issuing new releases of\nOpenSSL at this time. The fix will be included in the next releases when they\nbecome available.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-6119": {
-                "cve_id": "CVE-2024-6119",
-                "title": "Issue summary: Applications performing certificate name checks (e ...",
-                "description": "Issue summary: Applications performing certificate name checks (e.g., TLS\nclients checking server certificates) may attempt to read an invalid memory\naddress resulting in abnormal termination of the application process.\n\nImpact summary: Abnormal termination of an application can a cause a denial of\nservice.\n\nApplications performing certificate name checks (e.g., TLS clients checking\nserver certificates) may attempt to read an invalid memory address when\ncomparing the expected name with an `otherName` subject alternative name of an\nX.509 certificate. This may result in an exception that terminates the\napplication program.\n\nNote that basic certificate chain validation (signatures, dates, ...) is not\naffected, the denial of service can occur only when the application also\nspecifies an expected DNS name, Email address or IP address.\n\nTLS servers rarely solicit client certificates, and even when they do, they\ngenerally don't perform a name check against a reference identifier (expected\nidentity), but rather extract the presented identity after checking the\ncertificate chain.  So TLS servers are generally not affected and the severity\nof the issue is Moderate.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2024-9143": {
-                "cve_id": "CVE-2024-9143",
-                "title": "Issue summary: Use of the low-level GF(2^m) elliptic curve APIs w ...",
-                "description": "Issue summary: Use of the low-level GF(2^m) elliptic curve APIs with untrusted\nexplicit values for the field polynomial can lead to out-of-bounds memory reads\nor writes.\n\nImpact summary: Out of bound memory writes can lead to an application crash or\neven a possibility of a remote code execution, however, in all the protocols\ninvolving Elliptic Curve Cryptography that we're aware of, either only \"named\ncurves\" are supported, or, if explicit curve parameters are supported, they\nspecify an X9.62 encoding of binary (GF(2^m)) curves that can't represent\nproblematic input values. Thus the likelihood of existence of a vulnerable\napplication is low.\n\nIn particular, the X9.62 encoding is used for ECC keys in X.509 certificates,\nso problematic inputs cannot occur in the context of processing X.509\ncertificates.  Any problematic use-cases would have to be using an \"exotic\"\ncurve encoding.\n\nThe affected APIs include: EC_GROUP_new_curve_GF2m(), EC_GROUP_new_from_params(),\nand various supporting BN_GF2m_*() functions.\n\nApplications working with \"exotic\" explicit binary (GF(2^m)) curve parameters,\nthat make it possible to represent invalid field polynomials with a zero\nconstant term, via the above or similar APIs, may terminate abruptly as a\nresult of reading or writing outside of array bounds.  Remote code execution\ncannot easily be ruled out.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
             "CVE-2025-11187": {
                 "cve_id": "CVE-2025-11187",
                 "title": "Issue summary: PBMAC1 parameters in PKCS#12 files are missing val ...",
@@ -3564,117 +3057,7 @@
                 "events": [
                     {
                         "introduced": "0:10.19.0~dfsg-3ubuntu1",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-55130": {
-                "cve_id": "CVE-2025-55130",
-                "title": "A flaw in Node.js\u2019s Permissions model allows attackers to bypass  ...",
-                "description": "A flaw in Node.js\u2019s Permissions model allows attackers to bypass `--allow-fs-read` and `--allow-fs-write` restrictions using crafted relative symlink paths. By chaining directories and symlinks, a script granted access only to the current directory can escape the allowed path and read sensitive files. This breaks the expected isolation guarantees and enables arbitrary file read/write, leading to potential system compromise.\nThis vulnerability affects users of the permission model on Node.js v20,  v22,  v24, and v25.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-55131": {
-                "cve_id": "CVE-2025-55131",
-                "title": "A flaw in Node.js's buffer allocation logic can expose uninitiali ...",
-                "description": "A flaw in Node.js's buffer allocation logic can expose uninitialized memory when allocations are interrupted, when using the `vm` module with the timeout option. Under specific timing conditions, buffers allocated with `Buffer.alloc` and other `TypedArray` instances like `Uint8Array` may contain leftover data from previous operations, allowing in-process secrets like tokens or passwords to leak or causing data corruption. While exploitation typically requires precise timing or in-process code execution, it can become remotely exploitable when untrusted input influences workload and timeouts, leading to potential confidentiality and integrity impact.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-55132": {
-                "cve_id": "CVE-2025-55132",
-                "title": "A flaw in Node.js's permission model allows a file's access and m ...",
-                "description": "A flaw in Node.js's permission model allows a file's access and modification timestamps to be changed via `futimes()` even when the process has only read permissions. Unlike `utimes()`, `futimes()` does not apply the expected write-permission checks, which means file metadata can be modified in read-only directories. This behavior could be used to alter timestamps in ways that obscure activity, reducing the reliability of logs. This vulnerability affects users of the permission model on Node.js v20,  v22,  v24, and v25.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-59464": {
-                "cve_id": "CVE-2025-59464",
-                "title": "A memory leak in Node.js\u2019s OpenSSL integration occurs when conver ...",
-                "description": "A memory leak in Node.js\u2019s OpenSSL integration occurs when converting `X.509` certificate fields to UTF-8 without freeing the allocated buffer. When applications call `socket.getPeerCertificate(true)`, each certificate field leaks memory, allowing remote clients to trigger steady memory growth through repeated TLS connections. Over time this can lead to resource exhaustion and denial of service.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-59465": {
-                "cve_id": "CVE-2025-59465",
-                "title": "A malformed `HTTP/2 HEADERS` frame with oversized, invalid `HPACK ...",
-                "description": "A malformed `HTTP/2 HEADERS` frame with oversized, invalid `HPACK` data can cause Node.js to crash by triggering an unhandled `TLSSocket` error `ECONNRESET`. Instead of safely closing the connection, the process crashes, enabling a remote denial of service. This primarily affects applications that do not attach explicit error handlers to secure sockets, for example:\n```\nserver.on('secureConnection', socket => {\n  socket.on('error', err => {\n    console.log(err)\n  })\n})\n```",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2025-59466": {
-                "cve_id": "CVE-2025-59466",
-                "title": "We have identified a bug in Node.js error handling where \"Maximum ...",
-                "description": "We have identified a bug in Node.js error handling where \"Maximum call stack size exceeded\" errors become uncatchable when `async_hooks.createHook()` is enabled. Instead of reaching `process.on('uncaughtException')`, the process terminates, making the crash unrecoverable. Applications that rely on `AsyncLocalStorage` (v22, v20) or `async_hooks.createHook()` (v24, v22, v20) become vulnerable to denial-of-service crashes triggered by deep recursion under specific conditions.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
+                        "fixed": "0:12.22.9~dfsg-1ubuntu3"
                     }
                 ]
             },
@@ -3792,40 +3175,6 @@
                     {
                         "introduced": "0:12.22.9~dfsg-1ubuntu3",
                         "fixed": "0:18.19.1+dfsg-6ubuntu5"
-                    }
-                ]
-            },
-            "CVE-2026-21636": {
-                "cve_id": "CVE-2026-21636",
-                "title": "A flaw in Node.js's permission model allows Unix Domain Socket (U ...",
-                "description": "A flaw in Node.js's permission model allows Unix Domain Socket (UDS) connections to bypass network restrictions when `--permission` is enabled. Even without `--allow-net`, attacker-controlled inputs (such as URLs or socketPath options) can connect to arbitrary local sockets via net, tls, or undici/fetch. This breaks the intended security boundary of the permission model and enables access to privileged local services, potentially leading to privilege escalation, data exposure, or local code execution.\n\n* The issue affects users of the Node.js permission model on version v25.\n\nIn the moment of this vulnerability, network permissions (`--allow-net`) are still in the experimental phase.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    }
-                ]
-            },
-            "CVE-2026-21637": {
-                "cve_id": "CVE-2026-21637",
-                "title": "A flaw in Node.js TLS error handling allows remote attackers to c ...",
-                "description": "A flaw in Node.js TLS error handling allows remote attackers to crash or exhaust resources of a TLS server when `pskCallback` or `ALPNCallback` are in use. Synchronous exceptions thrown during these callbacks bypass standard TLS error handling paths (tlsClientError and error), causing either immediate process termination or silent file descriptor leaks that eventually lead to denial of service. Because these callbacks process attacker-controlled input during the TLS handshake, a remote client can repeatedly trigger the issue. This vulnerability affects TLS servers using PSK or ALPN callbacks across Node.js versions where these callbacks throw without being safely wrapped.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:12.22.9~dfsg-1ubuntu3",
-                        "fixed": "0:20.19.5-1nodesource1"
-                    },
-                    {
-                        "introduced": "0:18.19.1+dfsg-6ubuntu5",
-                        "fixed": "0:20.19.5-1nodesource1"
                     }
                 ]
             },
