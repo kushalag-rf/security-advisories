@@ -33395,7 +33395,7 @@
                     },
                     {
                         "introduced": "6.11.4-301.fc41",
-                        "fixed": "6.12.15-200.fc41",
+                        "fixed": "6.12.14-200.fc41",
                         "identifier": "fc41"
                     },
                     {
@@ -157803,7 +157803,7 @@
                 "cve_id": "CVE-2026-23101",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nleds: led-class: Only Add LED to leds_list when it is fully ready\n\nBefore this change the LED was added to leds_list before led_init_core()\ngets called adding it the list before led_classdev.set_brightness_work gets\ninitialized.\n\nThis leaves a window where led_trigger_register() of a LED's default\ntrigger will call led_trigger_set() which calls led_set_brightness()\nwhich in turn will end up queueing the *uninitialized*\nled_classdev.set_brightness_work.\n\nThis race gets hit by the lenovo-thinkpad-t14s EC driver which registers\n2 LEDs with a default trigger provided by snd_ctl_led.ko in quick\nsuccession. The first led_classdev_register() causes an async modprobe of\nsnd_ctl_led to run and that async modprobe manages to exactly hit\nthe window where the second LED is on the leds_list without led_init_core()\nbeing called for it, resulting in:\n\n ------------[ cut here ]------------\n WARNING: CPU: 11 PID: 5608 at kernel/workqueue.c:4234 __flush_work+0x344/0x390\n Hardware name: LENOVO 21N2S01F0B/21N2S01F0B, BIOS N42ET93W (2.23 ) 09/01/2025\n ...\n Call trace:\n  __flush_work+0x344/0x390 (P)\n  flush_work+0x2c/0x50\n  led_trigger_set+0x1c8/0x340\n  led_trigger_register+0x17c/0x1c0\n  led_trigger_register_simple+0x84/0xe8\n  snd_ctl_led_init+0x40/0xf88 [snd_ctl_led]\n  do_one_initcall+0x5c/0x318\n  do_init_module+0x9c/0x2b8\n  load_module+0x7e0/0x998\n\nClose the race window by moving the adding of the LED to leds_list to\nafter the led_init_core() call.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -157920,7 +157920,7 @@
                 "cve_id": "CVE-2026-23102",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\narm64/fpsimd: signal: Fix restoration of SVE context\n\nWhen SME is supported, Restoring SVE signal context can go wrong in a\nfew ways, including placing the task into an invalid state where the\nkernel may read from out-of-bounds memory (and may potentially take a\nfatal fault) and/or may kill the task with a SIGKILL.\n\n(1) Restoring a context with SVE_SIG_FLAG_SM set can place the task into\n    an invalid state where SVCR.SM is set (and sve_state is non-NULL)\n    but TIF_SME is clear, consequently resuting in out-of-bounds memory\n    reads and/or killing the task with SIGKILL.\n\n    This can only occur in unusual (but legitimate) cases where the SVE\n    signal context has either been modified by userspace or was saved in\n    the context of another task (e.g. as with CRIU), as otherwise the\n    presence of an SVE signal context with SVE_SIG_FLAG_SM implies that\n    TIF_SME is already set.\n\n    While in this state, task_fpsimd_load() will NOT configure SMCR_ELx\n    (leaving some arbitrary value configured in hardware) before\n    restoring SVCR and attempting to restore the streaming mode SVE\n    registers from memory via sve_load_state(). As the value of\n    SMCR_ELx.LEN may be larger than the task's streaming SVE vector\n    length, this may read memory outside of the task's allocated\n    sve_state, reading unrelated data and/or triggering a fault.\n\n    While this can result in secrets being loaded into streaming SVE\n    registers, these values are never exposed. As TIF_SME is clear,\n    fpsimd_bind_task_to_cpu() will configure CPACR_ELx.SMEN to trap EL0\n    accesses to streaming mode SVE registers, so these cannot be\n    accessed directly at EL0. As fpsimd_save_user_state() verifies the\n    live vector length before saving (S)SVE state to memory, no secret\n    values can be saved back to memory (and hence cannot be observed via\n    ptrace, signals, etc).\n\n    When the live vector length doesn't match the expected vector length\n    for the task, fpsimd_save_user_state() will send a fatal SIGKILL\n    signal to the task. Hence the task may be killed after executing\n    userspace for some period of time.\n\n(2) Restoring a context with SVE_SIG_FLAG_SM clear does not clear the\n    task's SVCR.SM. If SVCR.SM was set prior to restoring the context,\n    then the task will be left in streaming mode unexpectedly, and some\n    register state will be combined inconsistently, though the task will\n    be left in legitimate state from the kernel's PoV.\n\n    This can only occur in unusual (but legitimate) cases where ptrace\n    has been used to set SVCR.SM after entry to the sigreturn syscall,\n    as syscall entry clears SVCR.SM.\n\n    In these cases, the the provided SVE register data will be loaded\n    into the task's sve_state using the non-streaming SVE vector length\n    and the FPSIMD registers will be merged into this using the\n    streaming SVE vector length.\n\nFix (1) by setting TIF_SME when setting SVCR.SM. This also requires\nensuring that the task's sme_state has been allocated, but as this could\ncontain live ZA state, it should not be zeroed. Fix (2) by clearing\nSVCR.SM when restoring a SVE signal context with SVE_SIG_FLAG_SM clear.\n\nFor consistency, I've pulled the manipulation of SVCR, TIF_SVE, TIF_SME,\nand fp_type earlier, immediately after the allocation of\nsve_state/sme_state, before the restore of the actual register state.\nThis makes it easier to ensure that these are always modified\nconsistently, even if a fault is taken while reading the register data\nfrom the signal context. I do not expect any software to depend on the\nexact state restored when a fault is taken while reading the context.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -158739,7 +158739,7 @@
                 "cve_id": "CVE-2026-23112",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnvmet-tcp: add bounds checks in nvmet_tcp_build_pdu_iovec\n\nnvmet_tcp_build_pdu_iovec() could walk past cmd->req.sg when a PDU\nlength or offset exceeds sg_cnt and then use bogus sg->length/offset\nvalues, leading to _copy_to_iter() GPF/KASAN. Guard sg_idx, remaining\nentries, and sg->length/offset before building the bvec.",
-                "severity": "MEDIUM",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -162848,7 +162848,7 @@
                 "cve_id": "CVE-2026-23187",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npmdomain: imx8m-blk-ctrl: fix out-of-range access of bc->domains\n\nFix out-of-range access of bc->domains in imx8m_blk_ctrl_remove().",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -163199,7 +163199,7 @@
                 "cve_id": "CVE-2026-23193",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: target: iscsi: Fix use-after-free in iscsit_dec_session_usage_count()\n\nIn iscsit_dec_session_usage_count(), the function calls complete() while\nholding the sess->session_usage_lock. Similar to the connection usage count\nlogic, the waiter signaled by complete() (e.g., in the session release\npath) may wake up and free the iscsit_session structure immediately.\n\nThis creates a race condition where the current thread may attempt to\nexecute spin_unlock_bh() on a session structure that has already been\ndeallocated, resulting in a KASAN slab-use-after-free.\n\nTo resolve this, release the session_usage_lock before calling complete()\nto ensure all dereferences of the sess pointer are finished before the\nwaiter is allowed to proceed with deallocation.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -163667,7 +163667,7 @@
                 "cve_id": "CVE-2026-23204",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: cls_u32: use skb_header_pointer_careful()\n\nskb_header_pointer() does not fully validate negative @offset values.\n\nUse skb_header_pointer_careful() instead.\n\nGangMin Kim provided a report and a repro fooling u32_classify():\n\nBUG: KASAN: slab-out-of-bounds in u32_classify+0x1180/0x11b0\nnet/sched/cls_u32.c:221",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -174174,7 +174174,7 @@
                     },
                     {
                         "introduced": "6.11.4-301.fc41",
-                        "fixed": "6.12.15-200.fc41",
+                        "fixed": "6.12.14-200.fc41",
                         "identifier": "fc41"
                     },
                     {
@@ -294519,7 +294519,7 @@
                 "cve_id": "CVE-2026-23101",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nleds: led-class: Only Add LED to leds_list when it is fully ready\n\nBefore this change the LED was added to leds_list before led_init_core()\ngets called adding it the list before led_classdev.set_brightness_work gets\ninitialized.\n\nThis leaves a window where led_trigger_register() of a LED's default\ntrigger will call led_trigger_set() which calls led_set_brightness()\nwhich in turn will end up queueing the *uninitialized*\nled_classdev.set_brightness_work.\n\nThis race gets hit by the lenovo-thinkpad-t14s EC driver which registers\n2 LEDs with a default trigger provided by snd_ctl_led.ko in quick\nsuccession. The first led_classdev_register() causes an async modprobe of\nsnd_ctl_led to run and that async modprobe manages to exactly hit\nthe window where the second LED is on the leds_list without led_init_core()\nbeing called for it, resulting in:\n\n ------------[ cut here ]------------\n WARNING: CPU: 11 PID: 5608 at kernel/workqueue.c:4234 __flush_work+0x344/0x390\n Hardware name: LENOVO 21N2S01F0B/21N2S01F0B, BIOS N42ET93W (2.23 ) 09/01/2025\n ...\n Call trace:\n  __flush_work+0x344/0x390 (P)\n  flush_work+0x2c/0x50\n  led_trigger_set+0x1c8/0x340\n  led_trigger_register+0x17c/0x1c0\n  led_trigger_register_simple+0x84/0xe8\n  snd_ctl_led_init+0x40/0xf88 [snd_ctl_led]\n  do_one_initcall+0x5c/0x318\n  do_init_module+0x9c/0x2b8\n  load_module+0x7e0/0x998\n\nClose the race window by moving the adding of the LED to leds_list to\nafter the led_init_core() call.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -294636,7 +294636,7 @@
                 "cve_id": "CVE-2026-23102",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\narm64/fpsimd: signal: Fix restoration of SVE context\n\nWhen SME is supported, Restoring SVE signal context can go wrong in a\nfew ways, including placing the task into an invalid state where the\nkernel may read from out-of-bounds memory (and may potentially take a\nfatal fault) and/or may kill the task with a SIGKILL.\n\n(1) Restoring a context with SVE_SIG_FLAG_SM set can place the task into\n    an invalid state where SVCR.SM is set (and sve_state is non-NULL)\n    but TIF_SME is clear, consequently resuting in out-of-bounds memory\n    reads and/or killing the task with SIGKILL.\n\n    This can only occur in unusual (but legitimate) cases where the SVE\n    signal context has either been modified by userspace or was saved in\n    the context of another task (e.g. as with CRIU), as otherwise the\n    presence of an SVE signal context with SVE_SIG_FLAG_SM implies that\n    TIF_SME is already set.\n\n    While in this state, task_fpsimd_load() will NOT configure SMCR_ELx\n    (leaving some arbitrary value configured in hardware) before\n    restoring SVCR and attempting to restore the streaming mode SVE\n    registers from memory via sve_load_state(). As the value of\n    SMCR_ELx.LEN may be larger than the task's streaming SVE vector\n    length, this may read memory outside of the task's allocated\n    sve_state, reading unrelated data and/or triggering a fault.\n\n    While this can result in secrets being loaded into streaming SVE\n    registers, these values are never exposed. As TIF_SME is clear,\n    fpsimd_bind_task_to_cpu() will configure CPACR_ELx.SMEN to trap EL0\n    accesses to streaming mode SVE registers, so these cannot be\n    accessed directly at EL0. As fpsimd_save_user_state() verifies the\n    live vector length before saving (S)SVE state to memory, no secret\n    values can be saved back to memory (and hence cannot be observed via\n    ptrace, signals, etc).\n\n    When the live vector length doesn't match the expected vector length\n    for the task, fpsimd_save_user_state() will send a fatal SIGKILL\n    signal to the task. Hence the task may be killed after executing\n    userspace for some period of time.\n\n(2) Restoring a context with SVE_SIG_FLAG_SM clear does not clear the\n    task's SVCR.SM. If SVCR.SM was set prior to restoring the context,\n    then the task will be left in streaming mode unexpectedly, and some\n    register state will be combined inconsistently, though the task will\n    be left in legitimate state from the kernel's PoV.\n\n    This can only occur in unusual (but legitimate) cases where ptrace\n    has been used to set SVCR.SM after entry to the sigreturn syscall,\n    as syscall entry clears SVCR.SM.\n\n    In these cases, the the provided SVE register data will be loaded\n    into the task's sve_state using the non-streaming SVE vector length\n    and the FPSIMD registers will be merged into this using the\n    streaming SVE vector length.\n\nFix (1) by setting TIF_SME when setting SVCR.SM. This also requires\nensuring that the task's sme_state has been allocated, but as this could\ncontain live ZA state, it should not be zeroed. Fix (2) by clearing\nSVCR.SM when restoring a SVE signal context with SVE_SIG_FLAG_SM clear.\n\nFor consistency, I've pulled the manipulation of SVCR, TIF_SVE, TIF_SME,\nand fp_type earlier, immediately after the allocation of\nsve_state/sme_state, before the restore of the actual register state.\nThis makes it easier to ensure that these are always modified\nconsistently, even if a fault is taken while reading the register data\nfrom the signal context. I do not expect any software to depend on the\nexact state restored when a fault is taken while reading the context.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -295455,7 +295455,7 @@
                 "cve_id": "CVE-2026-23112",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnvmet-tcp: add bounds checks in nvmet_tcp_build_pdu_iovec\n\nnvmet_tcp_build_pdu_iovec() could walk past cmd->req.sg when a PDU\nlength or offset exceeds sg_cnt and then use bogus sg->length/offset\nvalues, leading to _copy_to_iter() GPF/KASAN. Guard sg_idx, remaining\nentries, and sg->length/offset before building the bvec.",
-                "severity": "MEDIUM",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -299550,7 +299550,7 @@
                 "cve_id": "CVE-2026-23187",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npmdomain: imx8m-blk-ctrl: fix out-of-range access of bc->domains\n\nFix out-of-range access of bc->domains in imx8m_blk_ctrl_remove().",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -299901,7 +299901,7 @@
                 "cve_id": "CVE-2026-23193",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: target: iscsi: Fix use-after-free in iscsit_dec_session_usage_count()\n\nIn iscsit_dec_session_usage_count(), the function calls complete() while\nholding the sess->session_usage_lock. Similar to the connection usage count\nlogic, the waiter signaled by complete() (e.g., in the session release\npath) may wake up and free the iscsit_session structure immediately.\n\nThis creates a race condition where the current thread may attempt to\nexecute spin_unlock_bh() on a session structure that has already been\ndeallocated, resulting in a KASAN slab-use-after-free.\n\nTo resolve this, release the session_usage_lock before calling complete()\nto ensure all dereferences of the sess pointer are finished before the\nwaiter is allowed to proceed with deallocation.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -300369,7 +300369,7 @@
                 "cve_id": "CVE-2026-23204",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: cls_u32: use skb_header_pointer_careful()\n\nskb_header_pointer() does not fully validate negative @offset values.\n\nUse skb_header_pointer_careful() instead.\n\nGangMin Kim provided a report and a repro fooling u32_classify():\n\nBUG: KASAN: slab-out-of-bounds in u32_classify+0x1180/0x11b0\nnet/sched/cls_u32.c:221",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
