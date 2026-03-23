@@ -9267,19 +9267,6 @@
                     }
                 ]
             },
-            "CVE-2022-50705": {
-                "cve_id": "CVE-2022-50705",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nio_uring/rw: defer fsnotify calls to task context\n\nWe can't call these off the kiocb completion as that might be off\nsoft/hard irq context. Defer the calls to when we process the\ntask_work for this request. That avoids valid complaints like:\n\nstack backtrace:\nCPU: 1 PID: 0 Comm: swapper/1 Not tainted 6.0.0-rc6-syzkaller-00321-g105a36f3694e #0\nHardware name: Google Google Compute Engine/Google Compute Engine, BIOS Google 08/26/2022\nCall Trace:\n <IRQ>\n __dump_stack lib/dump_stack.c:88 [inline]\n dump_stack_lvl+0xcd/0x134 lib/dump_stack.c:106\n print_usage_bug kernel/locking/lockdep.c:3961 [inline]\n valid_state kernel/locking/lockdep.c:3973 [inline]\n mark_lock_irq kernel/locking/lockdep.c:4176 [inline]\n mark_lock.part.0.cold+0x18/0xd8 kernel/locking/lockdep.c:4632\n mark_lock kernel/locking/lockdep.c:4596 [inline]\n mark_usage kernel/locking/lockdep.c:4527 [inline]\n __lock_acquire+0x11d9/0x56d0 kernel/locking/lockdep.c:5007\n lock_acquire kernel/locking/lockdep.c:5666 [inline]\n lock_acquire+0x1ab/0x570 kernel/locking/lockdep.c:5631\n __fs_reclaim_acquire mm/page_alloc.c:4674 [inline]\n fs_reclaim_acquire+0x115/0x160 mm/page_alloc.c:4688\n might_alloc include/linux/sched/mm.h:271 [inline]\n slab_pre_alloc_hook mm/slab.h:700 [inline]\n slab_alloc mm/slab.c:3278 [inline]\n __kmem_cache_alloc_lru mm/slab.c:3471 [inline]\n kmem_cache_alloc+0x39/0x520 mm/slab.c:3491\n fanotify_alloc_fid_event fs/notify/fanotify/fanotify.c:580 [inline]\n fanotify_alloc_event fs/notify/fanotify/fanotify.c:813 [inline]\n fanotify_handle_event+0x1130/0x3f40 fs/notify/fanotify/fanotify.c:948\n send_to_group fs/notify/fsnotify.c:360 [inline]\n fsnotify+0xafb/0x1680 fs/notify/fsnotify.c:570\n __fsnotify_parent+0x62f/0xa60 fs/notify/fsnotify.c:230\n fsnotify_parent include/linux/fsnotify.h:77 [inline]\n fsnotify_file include/linux/fsnotify.h:99 [inline]\n fsnotify_access include/linux/fsnotify.h:309 [inline]\n __io_complete_rw_common+0x485/0x720 io_uring/rw.c:195\n io_complete_rw+0x1a/0x1f0 io_uring/rw.c:228\n iomap_dio_complete_work fs/iomap/direct-io.c:144 [inline]\n iomap_dio_bio_end_io+0x438/0x5e0 fs/iomap/direct-io.c:178\n bio_endio+0x5f9/0x780 block/bio.c:1564\n req_bio_endio block/blk-mq.c:695 [inline]\n blk_update_request+0x3fc/0x1300 block/blk-mq.c:825\n scsi_end_request+0x7a/0x9a0 drivers/scsi/scsi_lib.c:541\n scsi_io_completion+0x173/0x1f70 drivers/scsi/scsi_lib.c:971\n scsi_complete+0x122/0x3b0 drivers/scsi/scsi_lib.c:1438\n blk_complete_reqs+0xad/0xe0 block/blk-mq.c:1022\n __do_softirq+0x1d3/0x9c6 kernel/softirq.c:571\n invoke_softirq kernel/softirq.c:445 [inline]\n __irq_exit_rcu+0x123/0x180 kernel/softirq.c:650\n irq_exit_rcu+0x5/0x20 kernel/softirq.c:662\n common_interrupt+0xa9/0xc0 arch/x86/kernel/irq.c:240",
-                "severity": "LOW",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
             "CVE-2022-50706": {
                 "cve_id": "CVE-2022-50706",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -14243,19 +14230,6 @@
                     }
                 ]
             },
-            "CVE-2023-54019": {
-                "cve_id": "CVE-2023-54019",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsched/psi: use kernfs polling functions for PSI trigger polling\n\nDestroying psi trigger in cgroup_file_release causes UAF issues when\na cgroup is removed from under a polling process. This is happening\nbecause cgroup removal causes a call to cgroup_file_release while the\nactual file is still alive. Destroying the trigger at this point would\nalso destroy its waitqueue head and if there is still a polling process\non that file accessing the waitqueue, it will step on the freed pointer:\n\ndo_select\n  vfs_poll\n                           do_rmdir\n                             cgroup_rmdir\n                               kernfs_drain_open_files\n                                 cgroup_file_release\n                                   cgroup_pressure_release\n                                     psi_trigger_destroy\n                                       wake_up_pollfree(&t->event_wait)\n// vfs_poll is unblocked\n                                       synchronize_rcu\n                                       kfree(t)\n  poll_freewait -> UAF access to the trigger's waitqueue head\n\nPatch [1] fixed this issue for epoll() case using wake_up_pollfree(),\nhowever the same issue exists for synchronous poll() case.\nThe root cause of this issue is that the lifecycles of the psi trigger's\nwaitqueue and of the file associated with the trigger are different. Fix\nthis by using kernfs_generic_poll function when polling on cgroup-specific\npsi triggers. It internally uses kernfs_open_node->poll waitqueue head\nwith its lifecycle tied to the file's lifecycle. This also renders the\nfix in [1] obsolete, so revert it.\n\n[1] commit c2dbe32d5db5 (\"sched/psi: Fix use-after-free in ep_remove_wait_queue()\")",
-                "severity": "LOW",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
             "CVE-2023-54021": {
                 "cve_id": "CVE-2023-54021",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -14286,19 +14260,6 @@
                 "cve_id": "CVE-2023-54030",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nio_uring/net: don't overflow multishot recv\n\nDon't allow overflowing multishot recv CQEs, it might get out of\nhand, hurt performance, and in the worst case scenario OOM the task.",
-                "severity": "LOW",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
-            "CVE-2023-54031": {
-                "cve_id": "CVE-2023-54031",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvdpa: Add queue index attr to vdpa_nl_policy for nlattr length check\n\nThe vdpa_nl_policy structure is used to validate the nlattr when parsing\nthe incoming nlmsg. It will ensure the attribute being described produces\na valid nlattr pointer in info->attrs before entering into each handler\nin vdpa_nl_ops.\n\nThat is to say, the missing part in vdpa_nl_policy may lead to illegal\nnlattr after parsing, which could lead to OOB read just like CVE-2023-3773.\n\nThis patch adds the missing nla_policy for vdpa queue index attr to avoid\nsuch bugs.",
                 "severity": "LOW",
                 "status": "open",
                 "events": [
@@ -14412,36 +14373,10 @@
                     }
                 ]
             },
-            "CVE-2023-54057": {
-                "cve_id": "CVE-2023-54057",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niommu/amd: Add a length limitation for the ivrs_acpihid command-line parameter\n\nThe 'acpiid' buffer in the parse_ivrs_acpihid function may overflow,\nbecause the string specifier in the format string sscanf()\nhas no width limitation.\n\nFound by InfoTeCS on behalf of Linux Verification Center\n(linuxtesting.org) with SVACE.",
-                "severity": "LOW",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
             "CVE-2023-54058": {
                 "cve_id": "CVE-2023-54058",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfirmware: arm_ffa: Check if ffa_driver remove is present before executing\n\nCurrently ffa_drv->remove() is called unconditionally from\nffa_device_remove(). Since the driver registration doesn't check for it\nand allows it to be registered without .remove callback, we need to check\nfor the presence of it before executing it from ffa_device_remove() to\nabove a NULL pointer dereference like the one below:\n\n  | Unable to handle kernel NULL pointer dereference at virtual address 0000000000000000\n  | Mem abort info:\n  |   ESR = 0x0000000086000004\n  |   EC = 0x21: IABT (current EL), IL = 32 bits\n  |   SET = 0, FnV = 0\n  |   EA = 0, S1PTW = 0\n  |   FSC = 0x04: level 0 translation fault\n  | user pgtable: 4k pages, 48-bit VAs, pgdp=0000000881cc8000\n  | [0000000000000000] pgd=0000000000000000, p4d=0000000000000000\n  | Internal error: Oops: 0000000086000004 [#1] PREEMPT SMP\n  | CPU: 3 PID: 130 Comm: rmmod Not tainted 6.3.0-rc7 #6\n  | Hardware name: FVP Base RevC (DT)\n  | pstate: 63402809 (nZCv daif +PAN -UAO +TCO +DIT -SSBS BTYPE=-c)\n  | pc : 0x0\n  | lr : ffa_device_remove+0x20/0x2c\n  | Call trace:\n  |  0x0\n  |  device_release_driver_internal+0x16c/0x260\n  |  driver_detach+0x90/0xd0\n  |  bus_remove_driver+0xdc/0x11c\n  |  driver_unregister+0x30/0x54\n  |  ffa_driver_unregister+0x14/0x20\n  |  cleanup_module+0x18/0xeec\n  |  __arm64_sys_delete_module+0x234/0x378\n  |  invoke_syscall+0x40/0x108\n  |  el0_svc_common+0xb4/0xf0\n  |  do_el0_svc+0x30/0xa4\n  |  el0_svc+0x2c/0x7c\n  |  el0t_64_sync_handler+0x84/0xf0\n  |  el0t_64_sync+0x190/0x194",
-                "severity": "LOW",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
-            "CVE-2023-54062": {
-                "cve_id": "CVE-2023-54062",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\next4: fix invalid free tracking in ext4_xattr_move_to_block()\n\nIn ext4_xattr_move_to_block(), the value of the extended attribute\nwhich we need to move to an external block may be allocated by\nkvmalloc() if the value is stored in an external inode.  So at the end\nof the function the code tried to check if this was the case by\ntesting entry->e_value_inum.\n\nHowever, at this point, the pointer to the xattr entry is no longer\nvalid, because it was removed from the original location where it had\nbeen stored.  So we could end up calling kvfree() on a pointer which\nwas not allocated by kvmalloc(); or we could also potentially leak\nmemory by not freeing the buffer when it should be freed.  Fix this by\nstoring whether it should be freed in a separate variable.",
                 "severity": "LOW",
                 "status": "open",
                 "events": [
