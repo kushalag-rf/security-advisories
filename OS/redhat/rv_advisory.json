@@ -65289,7 +65289,7 @@
                 "cve_id": "CVE-2026-43287",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm: Account property blob allocations to memcg\n\nDRM_IOCTL_MODE_CREATEPROPBLOB allows userspace to allocate arbitrary-sized\nproperty blobs backed by kernel memory.\n\nCurrently, the blob data allocation is not accounted to the allocating\nprocess's memory cgroup, allowing unprivileged users to trigger unbounded\nkernel memory consumption and potentially cause system-wide OOM.\n\nMark the property blob data allocation with GFP_KERNEL_ACCOUNT so that the memory\nis properly charged to the caller's memcg. This ensures existing cgroup\nmemory limits apply and prevents uncontrolled kernel memory growth without\nintroducing additional policy or per-file limits.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65331,7 +65331,7 @@
                 "cve_id": "CVE-2026-43289",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nkexec: derive purgatory entry from symbol\n\nkexec_load_purgatory() derives image->start by locating e_entry inside an\nSHF_EXECINSTR section.  If the purgatory object contains multiple\nexecutable sections with overlapping sh_addr, the entrypoint check can\nmatch more than once and trigger a WARN.\n\nDerive the entry section from the purgatory_start symbol when present and\ncompute image->start from its final placement.  Keep the existing e_entry\nfallback for purgatories that do not expose the symbol.\n\nWARNING: kernel/kexec_file.c:1009 at kexec_load_purgatory+0x395/0x3c0, CPU#10: kexec/1784\nCall Trace:\n <TASK>\n bzImage64_load+0x133/0xa00\n __do_sys_kexec_file_load+0x2b3/0x5c0\n do_syscall_64+0x81/0x610\n entry_SYSCALL_64_after_hwframe+0x76/0x7e\n\n[me@linux.beauty: move helper to avoid forward declaration, per Baoquan]",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65436,7 +65436,7 @@
                 "cve_id": "CVE-2026-43309",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmd raid: fix hang when stopping arrays with metadata through dm-raid\n\nWhen using device-mapper's dm-raid target, stopping a RAID array can cause\nthe system to hang under specific conditions.\n\nThis occurs when:\n\n- A dm-raid managed device tree is suspended from top to bottom\n   (the top-level RAID device is suspended first, followed by its\n    underlying metadata and data devices)\n\n- The top-level RAID device is then removed\n\nRemoving the top-level device triggers a hang in the following sequence:\nthe dm-raid destructor calls md_stop(), which tries to flush the\nwrite-intent bitmap by writing to the metadata sub-devices. However, these\ndevices are already suspended, making them unable to complete the write-intent\noperations and causing an indefinite block.\n\nFix:\n\n- Prevent bitmap flushing when md_stop() is called from dm-raid\ndestructor context\n  and avoid a quiescing/unquescing cycle which could also cause I/O\n\n- Still allow write-intent bitmap flushing when called from dm-raid\nsuspend context\n\nThis ensures that RAID array teardown can complete successfully even when the\nunderlying devices are in a suspended state.\n\nThis second patch uses md_is_rdwr() to distinguish between suspend and\ndestructor paths as elaborated on above.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65457,7 +65457,7 @@
                 "cve_id": "CVE-2026-43311",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsoc/tegra: pmc: Fix unsafe generic_handle_irq() call\n\nCurrently, when resuming from system suspend on Tegra platforms,\nthe following warning is observed:\n\nWARNING: CPU: 0 PID: 14459 at kernel/irq/irqdesc.c:666\nCall trace:\n handle_irq_desc+0x20/0x58 (P)\n tegra186_pmc_wake_syscore_resume+0xe4/0x15c\n syscore_resume+0x3c/0xb8\n suspend_devices_and_enter+0x510/0x540\n pm_suspend+0x16c/0x1d8\n\nThe warning occurs because generic_handle_irq() is being called from\na non-interrupt context which is considered as unsafe.\n\nFix this warning by deferring generic_handle_irq() call to an IRQ work\nwhich gets executed in hard IRQ context where generic_handle_irq()\ncan be called safely.\n\nWhen PREEMPT_RT kernels are used, regular IRQ work (initialized with\ninit_irq_work) is deferred to run in per-CPU kthreads in preemptible\ncontext rather than hard IRQ context. Hence, use the IRQ_WORK_INIT_HARD\nvariant so that with PREEMPT_RT kernels, the IRQ work is processed in\nhardirq context instead of being deferred to a thread which is required\nfor calling generic_handle_irq().\n\nOn non-PREEMPT_RT kernels, both init_irq_work() and IRQ_WORK_INIT_HARD()\nexecute in IRQ context, so this change has no functional impact for\nstandard kernel configurations.\n\n[treding@nvidia.com: miscellaneous cleanups]",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65478,7 +65478,7 @@
                 "cve_id": "CVE-2026-43313",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nACPI: processor: Fix NULL-pointer dereference in acpi_processor_errata_piix4()\n\nIn acpi_processor_errata_piix4(), the pointer dev is first assigned an IDE\ndevice and then reassigned an ISA device:\n\n  dev = pci_get_subsys(..., PCI_DEVICE_ID_INTEL_82371AB, ...);\n  dev = pci_get_subsys(..., PCI_DEVICE_ID_INTEL_82371AB_0, ...);\n\nIf the first lookup succeeds but the second fails, dev becomes NULL. This\nleads to a potential null-pointer dereference when dev_dbg() is called:\n\n  if (errata.piix4.bmisx)\n    dev_dbg(&dev->dev, ...);\n\nTo prevent this, use two temporary pointers and retrieve each device\nindependently, avoiding overwriting dev with a possible NULL value.\n\n[ rjw: Subject adjustment, added an empty code line ]",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65499,7 +65499,7 @@
                 "cve_id": "CVE-2026-43314",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndm: remove fake timeout to avoid leak request\n\nSince commit 15f73f5b3e59 (\"blk-mq: move failure injection out of\nblk_mq_complete_request\"), drivers are responsible for calling\nblk_should_fake_timeout() at appropriate code paths and opportunities.\n\nHowever, the dm driver does not implement its own timeout handler and\nrelies on the timeout handling of its slave devices.\n\nIf an io-timeout-fail error is injected to a dm device, the request\nwill be leaked and never completed, causing tasks to hang indefinitely.\n\nReproduce:\n1. prepare dm which has iscsi slave device\n2. inject io-timeout-fail to dm\n   echo 1 >/sys/class/block/dm-0/io-timeout-fail\n   echo 100 >/sys/kernel/debug/fail_io_timeout/probability\n   echo 10 >/sys/kernel/debug/fail_io_timeout/times\n3. read/write dm\n4. iscsiadm -m node -u\n\nResult: hang task like below\n[  862.243768] INFO: task kworker/u514:2:151 blocked for more than 122 seconds.\n[  862.244133]       Tainted: G            E       6.19.0-rc1+ #51\n[  862.244337] \"echo 0 > /proc/sys/kernel/hung_task_timeout_secs\" disables this message.\n[  862.244718] task:kworker/u514:2  state:D stack:0     pid:151   tgid:151   ppid:2      task_flags:0x4288060 flags:0x00080000\n[  862.245024] Workqueue: iscsi_ctrl_3:1 __iscsi_unbind_session [scsi_transport_iscsi]\n[  862.245264] Call Trace:\n[  862.245587]  <TASK>\n[  862.245814]  __schedule+0x810/0x15c0\n[  862.246557]  schedule+0x69/0x180\n[  862.246760]  blk_mq_freeze_queue_wait+0xde/0x120\n[  862.247688]  elevator_change+0x16d/0x460\n[  862.247893]  elevator_set_none+0x87/0xf0\n[  862.248798]  blk_unregister_queue+0x12e/0x2a0\n[  862.248995]  __del_gendisk+0x231/0x7e0\n[  862.250143]  del_gendisk+0x12f/0x1d0\n[  862.250339]  sd_remove+0x85/0x130 [sd_mod]\n[  862.250650]  device_release_driver_internal+0x36d/0x530\n[  862.250849]  bus_remove_device+0x1dd/0x3f0\n[  862.251042]  device_del+0x38a/0x930\n[  862.252095]  __scsi_remove_device+0x293/0x360\n[  862.252291]  scsi_remove_target+0x486/0x760\n[  862.252654]  __iscsi_unbind_session+0x18a/0x3e0 [scsi_transport_iscsi]\n[  862.252886]  process_one_work+0x633/0xe50\n[  862.253101]  worker_thread+0x6df/0xf10\n[  862.253647]  kthread+0x36d/0x720\n[  862.254533]  ret_from_fork+0x2a6/0x470\n[  862.255852]  ret_from_fork_asm+0x1a/0x30\n[  862.256037]  </TASK>\n\nRemove the blk_should_fake_timeout() check from dm, as dm has no\nnative timeout handling and should not attempt to fake timeouts.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65541,6 +65541,174 @@
                 "cve_id": "CVE-2026-43321",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: Properly mark live registers for indirect jumps\n\nFor a `gotox rX` instruction the rX register should be marked as used\nin the compute_insn_live_regs() function. Fix this.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43323": {
+                "cve_id": "CVE-2026-43323",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsched/fair: Fix zero_vruntime tracking fix\n\nJohn reported that stress-ng-yield could make his machine unhappy and\nmanaged to bisect it to commit b3d99f43c72b (\"sched/fair: Fix\nzero_vruntime tracking\").\n\nThe combination of yield and that commit was specific enough to\nhypothesize the following scenario:\n\nSuppose we have 2 runnable tasks, both doing yield. Then one will be\neligible and one will not be, because the average position must be in\nbetween these two entities.\n\nTherefore, the runnable task will be eligible, and be promoted a full\nslice (all the tasks do is yield after all). This causes it to jump over\nthe other task and now the other task is eligible and current is no\nlonger. So we schedule.\n\nSince we are runnable, there is no {de,en}queue. All we have is the\n__{en,de}queue_entity() from {put_prev,set_next}_task(). But per the\nfingered commit, those two no longer move zero_vruntime.\n\nAll that moves zero_vruntime are tick and full {de,en}queue.\n\nThis means, that if the two tasks playing leapfrog can reach the\ncritical speed to reach the overflow point inside one tick's worth of\ntime, we're up a creek.\n\nAdditionally, when multiple cgroups are involved, there is no guarantee\nthe tick will in fact hit every cgroup in a timely manner. Statistically\nspeaking it will, but that same statistics does not rule out the\npossibility of one cgroup not getting a tick for a significant amount of\ntime -- however unlikely.\n\nTherefore, just like with the yield() case, force an update at the end\nof every slice. This ensures the update is never more than a single\nslice behind and the whole thing is within 2 lag bounds as per the\ncomment on entity_key().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43325": {
+                "cve_id": "CVE-2026-43325",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: iwlwifi: mvm: don't send a 6E related command when not supported\n\nMCC_ALLOWED_AP_TYPE_CMD is related to 6E support. Do not send it if the\ndevice doesn't support 6E.\nApparently, the firmware is mistakenly advertising support for this\ncommand even on AX201 which does not support 6E and then the firmware\ncrashes.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43328": {
+                "cve_id": "CVE-2026-43328",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncpufreq: governor: fix double free in cpufreq_dbs_governor_init() error path\n\nWhen kobject_init_and_add() fails, cpufreq_dbs_governor_init() calls\nkobject_put(&dbs_data->attr_set.kobj).\n\nThe kobject release callback cpufreq_dbs_data_release() calls\ngov->exit(dbs_data) and kfree(dbs_data), but the current error path\nthen calls gov->exit(dbs_data) and kfree(dbs_data) again, causing a\ndouble free.\n\nKeep the direct kfree(dbs_data) for the gov->init() failure path, but\nafter kobject_init_and_add() has been called, let kobject_put() handle\nthe cleanup through cpufreq_dbs_data_release().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43329": {
+                "cve_id": "CVE-2026-43329",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: flowtable: strictly check for maximum number of actions\n\nThe maximum number of flowtable hardware offload actions in IPv6 is:\n\n* ethernet mangling (4 payload actions, 2 for each ethernet address)\n* SNAT (4 payload actions)\n* DNAT (4 payload actions)\n* Double VLAN (4 vlan actions, 2 for popping vlan, and 2 for pushing)\n  for QinQ.\n* Redirect (1 action)\n\nWhich makes 17, while the maximum is 16. But act_ct supports for tunnels\nactions too. Note that payload action operates at 32-bit word level, so\nmangling an IPv6 address takes 4 payload actions.\n\nUpdate flow_action_entry_next() calls to check for the maximum number of\nsupported actions.\n\nWhile at it, rise the maximum number of actions per flow from 16 to 24\nso this works fine with IPv6 setups.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43332": {
+                "cve_id": "CVE-2026-43332",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nthermal: core: Fix thermal zone device registration error path\n\nIf thermal_zone_device_register_with_trips() fails after registering\na thermal zone device, it needs to wait for the tz->removal completion\nlike thermal_zone_device_unregister(), in case user space has managed\nto take a reference to the thermal zone device's kobject, in which case\nthermal_release() may not be called by the error path itself and tz may\nbe freed prematurely.\n\nAdd the missing wait_for_completion() call to the thermal zone device\nregistration error path.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43333": {
+                "cve_id": "CVE-2026-43333",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: reject direct access to nullable PTR_TO_BUF pointers\n\ncheck_mem_access() matches PTR_TO_BUF via base_type() which strips\nPTR_MAYBE_NULL, allowing direct dereference without a null check.\n\nMap iterator ctx->key and ctx->value are PTR_TO_BUF | PTR_MAYBE_NULL.\nOn stop callbacks these are NULL, causing a kernel NULL dereference.\n\nAdd a type_may_be_null() guard to the PTR_TO_BUF branch, matching the\nexisting PTR_TO_BTF_ID pattern.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43334": {
+                "cve_id": "CVE-2026-43334",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: SMP: force responder MITM requirements before building the pairing response\n\nsmp_cmd_pairing_req() currently builds the pairing response from the\ninitiator auth_req before enforcing the local BT_SECURITY_HIGH\nrequirement. If the initiator omits SMP_AUTH_MITM, the response can\nalso omit it even though the local side still requires MITM.\n\ntk_request() then sees an auth value without SMP_AUTH_MITM and may\nselect JUST_CFM, making method selection inconsistent with the pairing\npolicy the responder already enforces.\n\nWhen the local side requires HIGH security, first verify that MITM can\nbe achieved from the IO capabilities and then force SMP_AUTH_MITM in the\nresponse in both rsp.auth_req and auth. This keeps the responder auth bits\nand later method selection aligned.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43339": {
+                "cve_id": "CVE-2026-43339",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: prevent possible UaF in addrconf_permanent_addr()\n\nThe mentioned helper try to warn the user about an exceptional\ncondition, but the message is delivered too late, accessing the ipv6\nafter its possible deletion.\n\nReorder the statement to avoid the possible UaF; while at it, place the\nwarning outside the idev->lock as it needs no protection.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -66778,8 +66946,8 @@
             },
             "CVE-2026-46300": {
                 "cve_id": "CVE-2026-46300",
-                "title": "kernel: \"Fragnesia\" is a variant of Dirty Frag vulnerability in the ESP/XFRM leading to Local Privilege Escalation (LPE) vulnerability in the Linux kernel",
-                "description": "A flaw was found in the Linux kernel's XFRM ESP-in-TCP subsystem. This vulnerability, known as Fragnesia, allows a local attacker to achieve arbitrary byte writes into the kernel page cache of read-only files.",
+                "title": "Amazon Linux 2 2017.12 - ALAS2-2026-3307: important priority package update for kernel",
+                "description": "In the Linux kernel, the following vulnerability has been resolved: net: skbuff: propagate shared-frag marker through pskb_copy()",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -66800,6 +66968,34 @@
                     {
                         "introduced": "0",
                         "fixed": "7.0.6-200.fc44",
+                        "identifier": "fc44"
+                    }
+                ]
+            },
+            "CVE-2026-46333": {
+                "cve_id": "CVE-2026-46333",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nptrace: slightly saner 'get_dumpable()' logic\n\nThe 'dumpability' of a task is fundamentally about the memory image of\nthe task - the concept comes from whether it can core dump or not - and\nmakes no sense when you don't have an associated mm.\n\nAnd almost all users do in fact use it only for the case where the task\nhas a mm pointer.\n\nBut we have one odd special case: ptrace_may_access() uses 'dumpable' to\ncheck various other things entirely independently of the MM (typically\nexplicitly using flags like PTRACE_MODE_READ_FSCREDS).  Including for\nthreads that no longer have a VM (and maybe never did, like most kernel\nthreads).\n\nIt's not what this flag was designed for, but it is what it is.\n\nThe ptrace code does check that the uid/gid matches, so you do have to\nbe uid-0 to see kernel thread details, but this means that the\ntraditional \"drop capabilities\" model doesn't make any difference for\nthis all.\n\nMake it all make a *bit* more sense by saying that if you don't have a\nMM pointer, we'll use a cached \"last dumpability\" flag if the thread\never had a MM (it will be zero for kernel threads since it is never\nset), and require a proper CAP_SYS_PTRACE capability to override.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.19.14-104.fc42",
+                        "identifier": "fc42"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "7.0.8-100.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "7.0.8-200.fc44",
                         "identifier": "fc44"
                     }
                 ]
@@ -102061,7 +102257,7 @@
                 "cve_id": "CVE-2026-43287",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm: Account property blob allocations to memcg\n\nDRM_IOCTL_MODE_CREATEPROPBLOB allows userspace to allocate arbitrary-sized\nproperty blobs backed by kernel memory.\n\nCurrently, the blob data allocation is not accounted to the allocating\nprocess's memory cgroup, allowing unprivileged users to trigger unbounded\nkernel memory consumption and potentially cause system-wide OOM.\n\nMark the property blob data allocation with GFP_KERNEL_ACCOUNT so that the memory\nis properly charged to the caller's memcg. This ensures existing cgroup\nmemory limits apply and prevents uncontrolled kernel memory growth without\nintroducing additional policy or per-file limits.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -102103,7 +102299,7 @@
                 "cve_id": "CVE-2026-43289",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nkexec: derive purgatory entry from symbol\n\nkexec_load_purgatory() derives image->start by locating e_entry inside an\nSHF_EXECINSTR section.  If the purgatory object contains multiple\nexecutable sections with overlapping sh_addr, the entrypoint check can\nmatch more than once and trigger a WARN.\n\nDerive the entry section from the purgatory_start symbol when present and\ncompute image->start from its final placement.  Keep the existing e_entry\nfallback for purgatories that do not expose the symbol.\n\nWARNING: kernel/kexec_file.c:1009 at kexec_load_purgatory+0x395/0x3c0, CPU#10: kexec/1784\nCall Trace:\n <TASK>\n bzImage64_load+0x133/0xa00\n __do_sys_kexec_file_load+0x2b3/0x5c0\n do_syscall_64+0x81/0x610\n entry_SYSCALL_64_after_hwframe+0x76/0x7e\n\n[me@linux.beauty: move helper to avoid forward declaration, per Baoquan]",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -102208,7 +102404,7 @@
                 "cve_id": "CVE-2026-43309",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmd raid: fix hang when stopping arrays with metadata through dm-raid\n\nWhen using device-mapper's dm-raid target, stopping a RAID array can cause\nthe system to hang under specific conditions.\n\nThis occurs when:\n\n- A dm-raid managed device tree is suspended from top to bottom\n   (the top-level RAID device is suspended first, followed by its\n    underlying metadata and data devices)\n\n- The top-level RAID device is then removed\n\nRemoving the top-level device triggers a hang in the following sequence:\nthe dm-raid destructor calls md_stop(), which tries to flush the\nwrite-intent bitmap by writing to the metadata sub-devices. However, these\ndevices are already suspended, making them unable to complete the write-intent\noperations and causing an indefinite block.\n\nFix:\n\n- Prevent bitmap flushing when md_stop() is called from dm-raid\ndestructor context\n  and avoid a quiescing/unquescing cycle which could also cause I/O\n\n- Still allow write-intent bitmap flushing when called from dm-raid\nsuspend context\n\nThis ensures that RAID array teardown can complete successfully even when the\nunderlying devices are in a suspended state.\n\nThis second patch uses md_is_rdwr() to distinguish between suspend and\ndestructor paths as elaborated on above.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -102229,7 +102425,7 @@
                 "cve_id": "CVE-2026-43311",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsoc/tegra: pmc: Fix unsafe generic_handle_irq() call\n\nCurrently, when resuming from system suspend on Tegra platforms,\nthe following warning is observed:\n\nWARNING: CPU: 0 PID: 14459 at kernel/irq/irqdesc.c:666\nCall trace:\n handle_irq_desc+0x20/0x58 (P)\n tegra186_pmc_wake_syscore_resume+0xe4/0x15c\n syscore_resume+0x3c/0xb8\n suspend_devices_and_enter+0x510/0x540\n pm_suspend+0x16c/0x1d8\n\nThe warning occurs because generic_handle_irq() is being called from\na non-interrupt context which is considered as unsafe.\n\nFix this warning by deferring generic_handle_irq() call to an IRQ work\nwhich gets executed in hard IRQ context where generic_handle_irq()\ncan be called safely.\n\nWhen PREEMPT_RT kernels are used, regular IRQ work (initialized with\ninit_irq_work) is deferred to run in per-CPU kthreads in preemptible\ncontext rather than hard IRQ context. Hence, use the IRQ_WORK_INIT_HARD\nvariant so that with PREEMPT_RT kernels, the IRQ work is processed in\nhardirq context instead of being deferred to a thread which is required\nfor calling generic_handle_irq().\n\nOn non-PREEMPT_RT kernels, both init_irq_work() and IRQ_WORK_INIT_HARD()\nexecute in IRQ context, so this change has no functional impact for\nstandard kernel configurations.\n\n[treding@nvidia.com: miscellaneous cleanups]",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -102250,7 +102446,7 @@
                 "cve_id": "CVE-2026-43313",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nACPI: processor: Fix NULL-pointer dereference in acpi_processor_errata_piix4()\n\nIn acpi_processor_errata_piix4(), the pointer dev is first assigned an IDE\ndevice and then reassigned an ISA device:\n\n  dev = pci_get_subsys(..., PCI_DEVICE_ID_INTEL_82371AB, ...);\n  dev = pci_get_subsys(..., PCI_DEVICE_ID_INTEL_82371AB_0, ...);\n\nIf the first lookup succeeds but the second fails, dev becomes NULL. This\nleads to a potential null-pointer dereference when dev_dbg() is called:\n\n  if (errata.piix4.bmisx)\n    dev_dbg(&dev->dev, ...);\n\nTo prevent this, use two temporary pointers and retrieve each device\nindependently, avoiding overwriting dev with a possible NULL value.\n\n[ rjw: Subject adjustment, added an empty code line ]",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -102271,7 +102467,7 @@
                 "cve_id": "CVE-2026-43314",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndm: remove fake timeout to avoid leak request\n\nSince commit 15f73f5b3e59 (\"blk-mq: move failure injection out of\nblk_mq_complete_request\"), drivers are responsible for calling\nblk_should_fake_timeout() at appropriate code paths and opportunities.\n\nHowever, the dm driver does not implement its own timeout handler and\nrelies on the timeout handling of its slave devices.\n\nIf an io-timeout-fail error is injected to a dm device, the request\nwill be leaked and never completed, causing tasks to hang indefinitely.\n\nReproduce:\n1. prepare dm which has iscsi slave device\n2. inject io-timeout-fail to dm\n   echo 1 >/sys/class/block/dm-0/io-timeout-fail\n   echo 100 >/sys/kernel/debug/fail_io_timeout/probability\n   echo 10 >/sys/kernel/debug/fail_io_timeout/times\n3. read/write dm\n4. iscsiadm -m node -u\n\nResult: hang task like below\n[  862.243768] INFO: task kworker/u514:2:151 blocked for more than 122 seconds.\n[  862.244133]       Tainted: G            E       6.19.0-rc1+ #51\n[  862.244337] \"echo 0 > /proc/sys/kernel/hung_task_timeout_secs\" disables this message.\n[  862.244718] task:kworker/u514:2  state:D stack:0     pid:151   tgid:151   ppid:2      task_flags:0x4288060 flags:0x00080000\n[  862.245024] Workqueue: iscsi_ctrl_3:1 __iscsi_unbind_session [scsi_transport_iscsi]\n[  862.245264] Call Trace:\n[  862.245587]  <TASK>\n[  862.245814]  __schedule+0x810/0x15c0\n[  862.246557]  schedule+0x69/0x180\n[  862.246760]  blk_mq_freeze_queue_wait+0xde/0x120\n[  862.247688]  elevator_change+0x16d/0x460\n[  862.247893]  elevator_set_none+0x87/0xf0\n[  862.248798]  blk_unregister_queue+0x12e/0x2a0\n[  862.248995]  __del_gendisk+0x231/0x7e0\n[  862.250143]  del_gendisk+0x12f/0x1d0\n[  862.250339]  sd_remove+0x85/0x130 [sd_mod]\n[  862.250650]  device_release_driver_internal+0x36d/0x530\n[  862.250849]  bus_remove_device+0x1dd/0x3f0\n[  862.251042]  device_del+0x38a/0x930\n[  862.252095]  __scsi_remove_device+0x293/0x360\n[  862.252291]  scsi_remove_target+0x486/0x760\n[  862.252654]  __iscsi_unbind_session+0x18a/0x3e0 [scsi_transport_iscsi]\n[  862.252886]  process_one_work+0x633/0xe50\n[  862.253101]  worker_thread+0x6df/0xf10\n[  862.253647]  kthread+0x36d/0x720\n[  862.254533]  ret_from_fork+0x2a6/0x470\n[  862.255852]  ret_from_fork_asm+0x1a/0x30\n[  862.256037]  </TASK>\n\nRemove the blk_should_fake_timeout() check from dm, as dm has no\nnative timeout handling and should not attempt to fake timeouts.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -102313,6 +102509,174 @@
                 "cve_id": "CVE-2026-43321",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: Properly mark live registers for indirect jumps\n\nFor a `gotox rX` instruction the rX register should be marked as used\nin the compute_insn_live_regs() function. Fix this.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43323": {
+                "cve_id": "CVE-2026-43323",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsched/fair: Fix zero_vruntime tracking fix\n\nJohn reported that stress-ng-yield could make his machine unhappy and\nmanaged to bisect it to commit b3d99f43c72b (\"sched/fair: Fix\nzero_vruntime tracking\").\n\nThe combination of yield and that commit was specific enough to\nhypothesize the following scenario:\n\nSuppose we have 2 runnable tasks, both doing yield. Then one will be\neligible and one will not be, because the average position must be in\nbetween these two entities.\n\nTherefore, the runnable task will be eligible, and be promoted a full\nslice (all the tasks do is yield after all). This causes it to jump over\nthe other task and now the other task is eligible and current is no\nlonger. So we schedule.\n\nSince we are runnable, there is no {de,en}queue. All we have is the\n__{en,de}queue_entity() from {put_prev,set_next}_task(). But per the\nfingered commit, those two no longer move zero_vruntime.\n\nAll that moves zero_vruntime are tick and full {de,en}queue.\n\nThis means, that if the two tasks playing leapfrog can reach the\ncritical speed to reach the overflow point inside one tick's worth of\ntime, we're up a creek.\n\nAdditionally, when multiple cgroups are involved, there is no guarantee\nthe tick will in fact hit every cgroup in a timely manner. Statistically\nspeaking it will, but that same statistics does not rule out the\npossibility of one cgroup not getting a tick for a significant amount of\ntime -- however unlikely.\n\nTherefore, just like with the yield() case, force an update at the end\nof every slice. This ensures the update is never more than a single\nslice behind and the whole thing is within 2 lag bounds as per the\ncomment on entity_key().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43325": {
+                "cve_id": "CVE-2026-43325",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: iwlwifi: mvm: don't send a 6E related command when not supported\n\nMCC_ALLOWED_AP_TYPE_CMD is related to 6E support. Do not send it if the\ndevice doesn't support 6E.\nApparently, the firmware is mistakenly advertising support for this\ncommand even on AX201 which does not support 6E and then the firmware\ncrashes.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43328": {
+                "cve_id": "CVE-2026-43328",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncpufreq: governor: fix double free in cpufreq_dbs_governor_init() error path\n\nWhen kobject_init_and_add() fails, cpufreq_dbs_governor_init() calls\nkobject_put(&dbs_data->attr_set.kobj).\n\nThe kobject release callback cpufreq_dbs_data_release() calls\ngov->exit(dbs_data) and kfree(dbs_data), but the current error path\nthen calls gov->exit(dbs_data) and kfree(dbs_data) again, causing a\ndouble free.\n\nKeep the direct kfree(dbs_data) for the gov->init() failure path, but\nafter kobject_init_and_add() has been called, let kobject_put() handle\nthe cleanup through cpufreq_dbs_data_release().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43329": {
+                "cve_id": "CVE-2026-43329",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: flowtable: strictly check for maximum number of actions\n\nThe maximum number of flowtable hardware offload actions in IPv6 is:\n\n* ethernet mangling (4 payload actions, 2 for each ethernet address)\n* SNAT (4 payload actions)\n* DNAT (4 payload actions)\n* Double VLAN (4 vlan actions, 2 for popping vlan, and 2 for pushing)\n  for QinQ.\n* Redirect (1 action)\n\nWhich makes 17, while the maximum is 16. But act_ct supports for tunnels\nactions too. Note that payload action operates at 32-bit word level, so\nmangling an IPv6 address takes 4 payload actions.\n\nUpdate flow_action_entry_next() calls to check for the maximum number of\nsupported actions.\n\nWhile at it, rise the maximum number of actions per flow from 16 to 24\nso this works fine with IPv6 setups.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43332": {
+                "cve_id": "CVE-2026-43332",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nthermal: core: Fix thermal zone device registration error path\n\nIf thermal_zone_device_register_with_trips() fails after registering\na thermal zone device, it needs to wait for the tz->removal completion\nlike thermal_zone_device_unregister(), in case user space has managed\nto take a reference to the thermal zone device's kobject, in which case\nthermal_release() may not be called by the error path itself and tz may\nbe freed prematurely.\n\nAdd the missing wait_for_completion() call to the thermal zone device\nregistration error path.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43333": {
+                "cve_id": "CVE-2026-43333",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: reject direct access to nullable PTR_TO_BUF pointers\n\ncheck_mem_access() matches PTR_TO_BUF via base_type() which strips\nPTR_MAYBE_NULL, allowing direct dereference without a null check.\n\nMap iterator ctx->key and ctx->value are PTR_TO_BUF | PTR_MAYBE_NULL.\nOn stop callbacks these are NULL, causing a kernel NULL dereference.\n\nAdd a type_may_be_null() guard to the PTR_TO_BUF branch, matching the\nexisting PTR_TO_BTF_ID pattern.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43334": {
+                "cve_id": "CVE-2026-43334",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: SMP: force responder MITM requirements before building the pairing response\n\nsmp_cmd_pairing_req() currently builds the pairing response from the\ninitiator auth_req before enforcing the local BT_SECURITY_HIGH\nrequirement. If the initiator omits SMP_AUTH_MITM, the response can\nalso omit it even though the local side still requires MITM.\n\ntk_request() then sees an auth value without SMP_AUTH_MITM and may\nselect JUST_CFM, making method selection inconsistent with the pairing\npolicy the responder already enforces.\n\nWhen the local side requires HIGH security, first verify that MITM can\nbe achieved from the IO capabilities and then force SMP_AUTH_MITM in the\nresponse in both rsp.auth_req and auth. This keeps the responder auth bits\nand later method selection aligned.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-43339": {
+                "cve_id": "CVE-2026-43339",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: prevent possible UaF in addrconf_permanent_addr()\n\nThe mentioned helper try to warn the user about an exceptional\ncondition, but the message is delivered too late, accessing the ipv6\nafter its possible deletion.\n\nReorder the statement to avoid the possible UaF; while at it, place the\nwarning outside the idev->lock as it needs no protection.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -103550,8 +103914,8 @@
             },
             "CVE-2026-46300": {
                 "cve_id": "CVE-2026-46300",
-                "title": "kernel: \"Fragnesia\" is a variant of Dirty Frag vulnerability in the ESP/XFRM leading to Local Privilege Escalation (LPE) vulnerability in the Linux kernel",
-                "description": "A flaw was found in the Linux kernel's XFRM ESP-in-TCP subsystem. This vulnerability, known as Fragnesia, allows a local attacker to achieve arbitrary byte writes into the kernel page cache of read-only files.",
+                "title": "Amazon Linux 2 2017.12 - ALAS2-2026-3307: important priority package update for kernel",
+                "description": "In the Linux kernel, the following vulnerability has been resolved: net: skbuff: propagate shared-frag marker through pskb_copy()",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -103572,6 +103936,34 @@
                     {
                         "introduced": "0",
                         "fixed": "7.0.6-200.fc44",
+                        "identifier": "fc44"
+                    }
+                ]
+            },
+            "CVE-2026-46333": {
+                "cve_id": "CVE-2026-46333",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nptrace: slightly saner 'get_dumpable()' logic\n\nThe 'dumpability' of a task is fundamentally about the memory image of\nthe task - the concept comes from whether it can core dump or not - and\nmakes no sense when you don't have an associated mm.\n\nAnd almost all users do in fact use it only for the case where the task\nhas a mm pointer.\n\nBut we have one odd special case: ptrace_may_access() uses 'dumpable' to\ncheck various other things entirely independently of the MM (typically\nexplicitly using flags like PTRACE_MODE_READ_FSCREDS).  Including for\nthreads that no longer have a VM (and maybe never did, like most kernel\nthreads).\n\nIt's not what this flag was designed for, but it is what it is.\n\nThe ptrace code does check that the uid/gid matches, so you do have to\nbe uid-0 to see kernel thread details, but this means that the\ntraditional \"drop capabilities\" model doesn't make any difference for\nthis all.\n\nMake it all make a *bit* more sense by saying that if you don't have a\nMM pointer, we'll use a cached \"last dumpability\" flag if the thread\never had a MM (it will be zero for kernel threads since it is never\nset), and require a proper CAP_SYS_PTRACE capability to override.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.19.14-104.fc42",
+                        "identifier": "fc42"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "7.0.8-100.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "7.0.8-200.fc44",
                         "identifier": "fc44"
                     }
                 ]
