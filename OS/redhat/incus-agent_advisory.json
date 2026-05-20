@@ -1,397 +1,7 @@
 {
     "package_name": "incus-agent",
     "advisory": {
-        "5": {
-            "CVE-2024-45337": {
-                "cve_id": "CVE-2024-45337",
-                "title": "Applications and libraries which misuse connection.serverAuthenti ...",
-                "description": "Applications and libraries which misuse connection.serverAuthenticate (via callback field ServerConfig.PublicKeyCallback) may be susceptible to an authorization bypass. The documentation for ServerConfig.PublicKeyCallback says that \"A call to this function does not guarantee that the key offered is in fact used to authenticate.\" Specifically, the SSH protocol allows clients to inquire about whether a public key is acceptable before proving control of the corresponding private key. PublicKeyCallback may be called with multiple keys, and the order in which the keys were provided cannot be used to infer which key the client successfully authenticated with, if any. Some applications, which store the key(s) passed to PublicKeyCallback (or derived information) and make security relevant determinations based on it once the connection is established, may make incorrect assumptions. For example, an attacker may send public keys A and B, and then authenticate with A. PublicKeyCallback would be called only twice, first with A and then with B. A vulnerable application may then make authorization decisions based on key B for which the attacker does not actually control the private key. Since this API is widely misused, as a partial mitigation golang.org/x/cry...@v0.31.0 enforces the property that, when successfully authenticating via public key, the last key passed to ServerConfig.PublicKeyCallback will be the key used to authenticate the connection. PublicKeyCallback will now be called multiple times with the same key, if necessary. Note that the client may still not control the last key passed to PublicKeyCallback if the connection is then authenticated with a different method, such as PasswordCallback, KeyboardInteractiveCallback, or NoClientAuth. Users should be using the Extensions field of the Permissions return value from the various authentication callbacks to record data associated with the authentication attempt instead of referencing external state. Once the connection is established the state corresponding to the successful authentication attempt can be retrieved via the ServerConn.Permissions field. Note that some third-party libraries misuse the Permissions type by sharing it across authentication attempts; users of third-party libraries should refer to the relevant projects for guidance.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.8-1.fc41",
-                        "identifier": "fc41"
-                    }
-                ]
-            },
-            "CVE-2025-22869": {
-                "cve_id": "CVE-2025-22869",
-                "title": "SSH servers which implement file transfer protocols are vulnerabl ...",
-                "description": "SSH servers which implement file transfer protocols are vulnerable to a denial of service attack from clients which complete the key exchange slowly, or not at all, causing pending content to be read into memory, but never transmitted.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-22870": {
-                "cve_id": "CVE-2025-22870",
-                "title": "Matching of hosts against proxy patterns can improperly treat an  ...",
-                "description": "Matching of hosts against proxy patterns can improperly treat an IPv6 zone ID as a hostname component. For example, when the NO_PROXY environment variable is set to \"*.example.com\", a request to \"[::1%25.example.com]:80` will incorrectly match and not be proxied.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-27144": {
-                "cve_id": "CVE-2025-27144",
-                "title": "Go JOSE provides an implementation of the Javascript Object Signi ...",
-                "description": "Go JOSE provides an implementation of the Javascript Object Signing and Encryption set of standards in Go, including support for JSON Web Encryption (JWE), JSON Web Signature (JWS), and JSON Web Token (JWT) standards. In versions on the 4.x branch prior to version 4.0.5, when parsing compact JWS or JWE input, Go JOSE could use excessive memory. The code used strings.Split(token, \".\") to split JWT tokens, which is vulnerable to excessive memory consumption when processing maliciously crafted tokens with a large number of `.` characters.  An attacker could exploit this by sending numerous malformed tokens, leading to memory exhaustion and a Denial of Service. Version 4.0.5 fixes this issue. As a workaround, applications could pre-validate that payloads passed to Go JOSE do not contain an excessive number of `.` characters.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-30204": {
-                "cve_id": "CVE-2025-30204",
-                "title": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in ...",
-                "description": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in version 3.2.0 and prior to versions 5.2.2 and 4.5.2, the function parse.ParseUnverified splits (via a call to strings.Split) its argument (which is untrusted data) on periods. As a result, in the face of a malicious request whose Authorization header consists of Bearer  followed by many period characters, a call to that function incurs allocations to the tune of O(n) bytes (where n stands for the length of the function's argument), with a constant factor of about 16. This issue is fixed in 5.2.2 and 4.5.2.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-52889": {
-                "cve_id": "CVE-2025-52889",
-                "title": "Incus is a system container and virtual machine manager. When usi ...",
-                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus version 6.12 and 6.13 generates nftables rules for local services (DHCP, DNS...) that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to DHCP pool exhaustion and opens the door for other attacks. A patch is available at commit 2516fb19ad8428454cb4edfe70c0a5f0dc1da214.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.15-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.15-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-52890": {
-                "cve_id": "CVE-2025-52890",
-                "title": "Incus is a system container and virtual machine manager. When usi ...",
-                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus versions 6.12 and 6.13generates nftables rules that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to ARP spoofing on the bridge and to fully spoof another VM/container on the same bridge. Commit 254dfd2483ab8de39b47c2258b7f1cf0759231c8 contains a patch for the issue.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.15-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.15-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            }
-        },
-        "10": {
-            "CVE-2024-45337": {
-                "cve_id": "CVE-2024-45337",
-                "title": "Applications and libraries which misuse connection.serverAuthenti ...",
-                "description": "Applications and libraries which misuse connection.serverAuthenticate (via callback field ServerConfig.PublicKeyCallback) may be susceptible to an authorization bypass. The documentation for ServerConfig.PublicKeyCallback says that \"A call to this function does not guarantee that the key offered is in fact used to authenticate.\" Specifically, the SSH protocol allows clients to inquire about whether a public key is acceptable before proving control of the corresponding private key. PublicKeyCallback may be called with multiple keys, and the order in which the keys were provided cannot be used to infer which key the client successfully authenticated with, if any. Some applications, which store the key(s) passed to PublicKeyCallback (or derived information) and make security relevant determinations based on it once the connection is established, may make incorrect assumptions. For example, an attacker may send public keys A and B, and then authenticate with A. PublicKeyCallback would be called only twice, first with A and then with B. A vulnerable application may then make authorization decisions based on key B for which the attacker does not actually control the private key. Since this API is widely misused, as a partial mitigation golang.org/x/cry...@v0.31.0 enforces the property that, when successfully authenticating via public key, the last key passed to ServerConfig.PublicKeyCallback will be the key used to authenticate the connection. PublicKeyCallback will now be called multiple times with the same key, if necessary. Note that the client may still not control the last key passed to PublicKeyCallback if the connection is then authenticated with a different method, such as PasswordCallback, KeyboardInteractiveCallback, or NoClientAuth. Users should be using the Extensions field of the Permissions return value from the various authentication callbacks to record data associated with the authentication attempt instead of referencing external state. Once the connection is established the state corresponding to the successful authentication attempt can be retrieved via the ServerConn.Permissions field. Note that some third-party libraries misuse the Permissions type by sharing it across authentication attempts; users of third-party libraries should refer to the relevant projects for guidance.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.8-1.fc41",
-                        "identifier": "fc41"
-                    }
-                ]
-            },
-            "CVE-2025-22869": {
-                "cve_id": "CVE-2025-22869",
-                "title": "SSH servers which implement file transfer protocols are vulnerabl ...",
-                "description": "SSH servers which implement file transfer protocols are vulnerable to a denial of service attack from clients which complete the key exchange slowly, or not at all, causing pending content to be read into memory, but never transmitted.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-22870": {
-                "cve_id": "CVE-2025-22870",
-                "title": "Matching of hosts against proxy patterns can improperly treat an  ...",
-                "description": "Matching of hosts against proxy patterns can improperly treat an IPv6 zone ID as a hostname component. For example, when the NO_PROXY environment variable is set to \"*.example.com\", a request to \"[::1%25.example.com]:80` will incorrectly match and not be proxied.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-27144": {
-                "cve_id": "CVE-2025-27144",
-                "title": "Go JOSE provides an implementation of the Javascript Object Signi ...",
-                "description": "Go JOSE provides an implementation of the Javascript Object Signing and Encryption set of standards in Go, including support for JSON Web Encryption (JWE), JSON Web Signature (JWS), and JSON Web Token (JWT) standards. In versions on the 4.x branch prior to version 4.0.5, when parsing compact JWS or JWE input, Go JOSE could use excessive memory. The code used strings.Split(token, \".\") to split JWT tokens, which is vulnerable to excessive memory consumption when processing maliciously crafted tokens with a large number of `.` characters.  An attacker could exploit this by sending numerous malformed tokens, leading to memory exhaustion and a Denial of Service. Version 4.0.5 fixes this issue. As a workaround, applications could pre-validate that payloads passed to Go JOSE do not contain an excessive number of `.` characters.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-30204": {
-                "cve_id": "CVE-2025-30204",
-                "title": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in ...",
-                "description": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in version 3.2.0 and prior to versions 5.2.2 and 4.5.2, the function parse.ParseUnverified splits (via a call to strings.Split) its argument (which is untrusted data) on periods. As a result, in the face of a malicious request whose Authorization header consists of Bearer  followed by many period characters, a call to that function incurs allocations to the tune of O(n) bytes (where n stands for the length of the function's argument), with a constant factor of about 16. This issue is fixed in 5.2.2 and 4.5.2.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-52889": {
-                "cve_id": "CVE-2025-52889",
-                "title": "Incus is a system container and virtual machine manager. When usi ...",
-                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus version 6.12 and 6.13 generates nftables rules for local services (DHCP, DNS...) that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to DHCP pool exhaustion and opens the door for other attacks. A patch is available at commit 2516fb19ad8428454cb4edfe70c0a5f0dc1da214.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.15-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.15-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-52890": {
-                "cve_id": "CVE-2025-52890",
-                "title": "Incus is a system container and virtual machine manager. When usi ...",
-                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus versions 6.12 and 6.13generates nftables rules that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to ARP spoofing on the bridge and to fully spoof another VM/container on the same bridge. Commit 254dfd2483ab8de39b47c2258b7f1cf0759231c8 contains a patch for the issue.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.15-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.15-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            }
-        },
         "7": {
-            "CVE-2024-45337": {
-                "cve_id": "CVE-2024-45337",
-                "title": "Applications and libraries which misuse connection.serverAuthenti ...",
-                "description": "Applications and libraries which misuse connection.serverAuthenticate (via callback field ServerConfig.PublicKeyCallback) may be susceptible to an authorization bypass. The documentation for ServerConfig.PublicKeyCallback says that \"A call to this function does not guarantee that the key offered is in fact used to authenticate.\" Specifically, the SSH protocol allows clients to inquire about whether a public key is acceptable before proving control of the corresponding private key. PublicKeyCallback may be called with multiple keys, and the order in which the keys were provided cannot be used to infer which key the client successfully authenticated with, if any. Some applications, which store the key(s) passed to PublicKeyCallback (or derived information) and make security relevant determinations based on it once the connection is established, may make incorrect assumptions. For example, an attacker may send public keys A and B, and then authenticate with A. PublicKeyCallback would be called only twice, first with A and then with B. A vulnerable application may then make authorization decisions based on key B for which the attacker does not actually control the private key. Since this API is widely misused, as a partial mitigation golang.org/x/cry...@v0.31.0 enforces the property that, when successfully authenticating via public key, the last key passed to ServerConfig.PublicKeyCallback will be the key used to authenticate the connection. PublicKeyCallback will now be called multiple times with the same key, if necessary. Note that the client may still not control the last key passed to PublicKeyCallback if the connection is then authenticated with a different method, such as PasswordCallback, KeyboardInteractiveCallback, or NoClientAuth. Users should be using the Extensions field of the Permissions return value from the various authentication callbacks to record data associated with the authentication attempt instead of referencing external state. Once the connection is established the state corresponding to the successful authentication attempt can be retrieved via the ServerConn.Permissions field. Note that some third-party libraries misuse the Permissions type by sharing it across authentication attempts; users of third-party libraries should refer to the relevant projects for guidance.",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.8-1.fc41",
-                        "identifier": "fc41"
-                    }
-                ]
-            },
-            "CVE-2025-22869": {
-                "cve_id": "CVE-2025-22869",
-                "title": "SSH servers which implement file transfer protocols are vulnerabl ...",
-                "description": "SSH servers which implement file transfer protocols are vulnerable to a denial of service attack from clients which complete the key exchange slowly, or not at all, causing pending content to be read into memory, but never transmitted.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-22870": {
-                "cve_id": "CVE-2025-22870",
-                "title": "Matching of hosts against proxy patterns can improperly treat an  ...",
-                "description": "Matching of hosts against proxy patterns can improperly treat an IPv6 zone ID as a hostname component. For example, when the NO_PROXY environment variable is set to \"*.example.com\", a request to \"[::1%25.example.com]:80` will incorrectly match and not be proxied.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-27144": {
-                "cve_id": "CVE-2025-27144",
-                "title": "Go JOSE provides an implementation of the Javascript Object Signi ...",
-                "description": "Go JOSE provides an implementation of the Javascript Object Signing and Encryption set of standards in Go, including support for JSON Web Encryption (JWE), JSON Web Signature (JWS), and JSON Web Token (JWT) standards. In versions on the 4.x branch prior to version 4.0.5, when parsing compact JWS or JWE input, Go JOSE could use excessive memory. The code used strings.Split(token, \".\") to split JWT tokens, which is vulnerable to excessive memory consumption when processing maliciously crafted tokens with a large number of `.` characters.  An attacker could exploit this by sending numerous malformed tokens, leading to memory exhaustion and a Denial of Service. Version 4.0.5 fixes this issue. As a workaround, applications could pre-validate that payloads passed to Go JOSE do not contain an excessive number of `.` characters.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-30204": {
-                "cve_id": "CVE-2025-30204",
-                "title": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in ...",
-                "description": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in version 3.2.0 and prior to versions 5.2.2 and 4.5.2, the function parse.ParseUnverified splits (via a call to strings.Split) its argument (which is untrusted data) on periods. As a result, in the face of a malicious request whose Authorization header consists of Bearer  followed by many period characters, a call to that function incurs allocations to the tune of O(n) bytes (where n stands for the length of the function's argument), with a constant factor of about 16. This issue is fixed in 5.2.2 and 4.5.2.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.12-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.12-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-52889": {
-                "cve_id": "CVE-2025-52889",
-                "title": "Incus is a system container and virtual machine manager. When usi ...",
-                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus version 6.12 and 6.13 generates nftables rules for local services (DHCP, DNS...) that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to DHCP pool exhaustion and opens the door for other attacks. A patch is available at commit 2516fb19ad8428454cb4edfe70c0a5f0dc1da214.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.15-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.15-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            },
-            "CVE-2025-52890": {
-                "cve_id": "CVE-2025-52890",
-                "title": "Incus is a system container and virtual machine manager. When usi ...",
-                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus versions 6.12 and 6.13generates nftables rules that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to ARP spoofing on the bridge and to fully spoof another VM/container on the same bridge. Commit 254dfd2483ab8de39b47c2258b7f1cf0759231c8 contains a patch for the issue.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.2-3.fc41",
-                        "fixed": "6.15-1.fc41",
-                        "identifier": "fc41"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "6.15-1.fc42",
-                        "identifier": "fc42"
-                    }
-                ]
-            }
-        },
-        "9": {
             "CVE-2024-45337": {
                 "cve_id": "CVE-2024-45337",
                 "title": "Applications and libraries which misuse connection.serverAuthenti ...",
@@ -652,6 +262,396 @@
             }
         },
         "8": {
+            "CVE-2024-45337": {
+                "cve_id": "CVE-2024-45337",
+                "title": "Applications and libraries which misuse connection.serverAuthenti ...",
+                "description": "Applications and libraries which misuse connection.serverAuthenticate (via callback field ServerConfig.PublicKeyCallback) may be susceptible to an authorization bypass. The documentation for ServerConfig.PublicKeyCallback says that \"A call to this function does not guarantee that the key offered is in fact used to authenticate.\" Specifically, the SSH protocol allows clients to inquire about whether a public key is acceptable before proving control of the corresponding private key. PublicKeyCallback may be called with multiple keys, and the order in which the keys were provided cannot be used to infer which key the client successfully authenticated with, if any. Some applications, which store the key(s) passed to PublicKeyCallback (or derived information) and make security relevant determinations based on it once the connection is established, may make incorrect assumptions. For example, an attacker may send public keys A and B, and then authenticate with A. PublicKeyCallback would be called only twice, first with A and then with B. A vulnerable application may then make authorization decisions based on key B for which the attacker does not actually control the private key. Since this API is widely misused, as a partial mitigation golang.org/x/cry...@v0.31.0 enforces the property that, when successfully authenticating via public key, the last key passed to ServerConfig.PublicKeyCallback will be the key used to authenticate the connection. PublicKeyCallback will now be called multiple times with the same key, if necessary. Note that the client may still not control the last key passed to PublicKeyCallback if the connection is then authenticated with a different method, such as PasswordCallback, KeyboardInteractiveCallback, or NoClientAuth. Users should be using the Extensions field of the Permissions return value from the various authentication callbacks to record data associated with the authentication attempt instead of referencing external state. Once the connection is established the state corresponding to the successful authentication attempt can be retrieved via the ServerConn.Permissions field. Note that some third-party libraries misuse the Permissions type by sharing it across authentication attempts; users of third-party libraries should refer to the relevant projects for guidance.",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.8-1.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2025-22869": {
+                "cve_id": "CVE-2025-22869",
+                "title": "SSH servers which implement file transfer protocols are vulnerabl ...",
+                "description": "SSH servers which implement file transfer protocols are vulnerable to a denial of service attack from clients which complete the key exchange slowly, or not at all, causing pending content to be read into memory, but never transmitted.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-22870": {
+                "cve_id": "CVE-2025-22870",
+                "title": "Matching of hosts against proxy patterns can improperly treat an  ...",
+                "description": "Matching of hosts against proxy patterns can improperly treat an IPv6 zone ID as a hostname component. For example, when the NO_PROXY environment variable is set to \"*.example.com\", a request to \"[::1%25.example.com]:80` will incorrectly match and not be proxied.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-27144": {
+                "cve_id": "CVE-2025-27144",
+                "title": "Go JOSE provides an implementation of the Javascript Object Signi ...",
+                "description": "Go JOSE provides an implementation of the Javascript Object Signing and Encryption set of standards in Go, including support for JSON Web Encryption (JWE), JSON Web Signature (JWS), and JSON Web Token (JWT) standards. In versions on the 4.x branch prior to version 4.0.5, when parsing compact JWS or JWE input, Go JOSE could use excessive memory. The code used strings.Split(token, \".\") to split JWT tokens, which is vulnerable to excessive memory consumption when processing maliciously crafted tokens with a large number of `.` characters.  An attacker could exploit this by sending numerous malformed tokens, leading to memory exhaustion and a Denial of Service. Version 4.0.5 fixes this issue. As a workaround, applications could pre-validate that payloads passed to Go JOSE do not contain an excessive number of `.` characters.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-30204": {
+                "cve_id": "CVE-2025-30204",
+                "title": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in ...",
+                "description": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in version 3.2.0 and prior to versions 5.2.2 and 4.5.2, the function parse.ParseUnverified splits (via a call to strings.Split) its argument (which is untrusted data) on periods. As a result, in the face of a malicious request whose Authorization header consists of Bearer  followed by many period characters, a call to that function incurs allocations to the tune of O(n) bytes (where n stands for the length of the function's argument), with a constant factor of about 16. This issue is fixed in 5.2.2 and 4.5.2.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-52889": {
+                "cve_id": "CVE-2025-52889",
+                "title": "Incus is a system container and virtual machine manager. When usi ...",
+                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus version 6.12 and 6.13 generates nftables rules for local services (DHCP, DNS...) that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to DHCP pool exhaustion and opens the door for other attacks. A patch is available at commit 2516fb19ad8428454cb4edfe70c0a5f0dc1da214.",
+                "severity": "LOW",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.15-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.15-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-52890": {
+                "cve_id": "CVE-2025-52890",
+                "title": "Incus is a system container and virtual machine manager. When usi ...",
+                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus versions 6.12 and 6.13generates nftables rules that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to ARP spoofing on the bridge and to fully spoof another VM/container on the same bridge. Commit 254dfd2483ab8de39b47c2258b7f1cf0759231c8 contains a patch for the issue.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.15-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.15-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            }
+        },
+        "10": {
+            "CVE-2024-45337": {
+                "cve_id": "CVE-2024-45337",
+                "title": "Applications and libraries which misuse connection.serverAuthenti ...",
+                "description": "Applications and libraries which misuse connection.serverAuthenticate (via callback field ServerConfig.PublicKeyCallback) may be susceptible to an authorization bypass. The documentation for ServerConfig.PublicKeyCallback says that \"A call to this function does not guarantee that the key offered is in fact used to authenticate.\" Specifically, the SSH protocol allows clients to inquire about whether a public key is acceptable before proving control of the corresponding private key. PublicKeyCallback may be called with multiple keys, and the order in which the keys were provided cannot be used to infer which key the client successfully authenticated with, if any. Some applications, which store the key(s) passed to PublicKeyCallback (or derived information) and make security relevant determinations based on it once the connection is established, may make incorrect assumptions. For example, an attacker may send public keys A and B, and then authenticate with A. PublicKeyCallback would be called only twice, first with A and then with B. A vulnerable application may then make authorization decisions based on key B for which the attacker does not actually control the private key. Since this API is widely misused, as a partial mitigation golang.org/x/cry...@v0.31.0 enforces the property that, when successfully authenticating via public key, the last key passed to ServerConfig.PublicKeyCallback will be the key used to authenticate the connection. PublicKeyCallback will now be called multiple times with the same key, if necessary. Note that the client may still not control the last key passed to PublicKeyCallback if the connection is then authenticated with a different method, such as PasswordCallback, KeyboardInteractiveCallback, or NoClientAuth. Users should be using the Extensions field of the Permissions return value from the various authentication callbacks to record data associated with the authentication attempt instead of referencing external state. Once the connection is established the state corresponding to the successful authentication attempt can be retrieved via the ServerConn.Permissions field. Note that some third-party libraries misuse the Permissions type by sharing it across authentication attempts; users of third-party libraries should refer to the relevant projects for guidance.",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.8-1.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2025-22869": {
+                "cve_id": "CVE-2025-22869",
+                "title": "SSH servers which implement file transfer protocols are vulnerabl ...",
+                "description": "SSH servers which implement file transfer protocols are vulnerable to a denial of service attack from clients which complete the key exchange slowly, or not at all, causing pending content to be read into memory, but never transmitted.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-22870": {
+                "cve_id": "CVE-2025-22870",
+                "title": "Matching of hosts against proxy patterns can improperly treat an  ...",
+                "description": "Matching of hosts against proxy patterns can improperly treat an IPv6 zone ID as a hostname component. For example, when the NO_PROXY environment variable is set to \"*.example.com\", a request to \"[::1%25.example.com]:80` will incorrectly match and not be proxied.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-27144": {
+                "cve_id": "CVE-2025-27144",
+                "title": "Go JOSE provides an implementation of the Javascript Object Signi ...",
+                "description": "Go JOSE provides an implementation of the Javascript Object Signing and Encryption set of standards in Go, including support for JSON Web Encryption (JWE), JSON Web Signature (JWS), and JSON Web Token (JWT) standards. In versions on the 4.x branch prior to version 4.0.5, when parsing compact JWS or JWE input, Go JOSE could use excessive memory. The code used strings.Split(token, \".\") to split JWT tokens, which is vulnerable to excessive memory consumption when processing maliciously crafted tokens with a large number of `.` characters.  An attacker could exploit this by sending numerous malformed tokens, leading to memory exhaustion and a Denial of Service. Version 4.0.5 fixes this issue. As a workaround, applications could pre-validate that payloads passed to Go JOSE do not contain an excessive number of `.` characters.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-30204": {
+                "cve_id": "CVE-2025-30204",
+                "title": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in ...",
+                "description": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in version 3.2.0 and prior to versions 5.2.2 and 4.5.2, the function parse.ParseUnverified splits (via a call to strings.Split) its argument (which is untrusted data) on periods. As a result, in the face of a malicious request whose Authorization header consists of Bearer  followed by many period characters, a call to that function incurs allocations to the tune of O(n) bytes (where n stands for the length of the function's argument), with a constant factor of about 16. This issue is fixed in 5.2.2 and 4.5.2.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-52889": {
+                "cve_id": "CVE-2025-52889",
+                "title": "Incus is a system container and virtual machine manager. When usi ...",
+                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus version 6.12 and 6.13 generates nftables rules for local services (DHCP, DNS...) that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to DHCP pool exhaustion and opens the door for other attacks. A patch is available at commit 2516fb19ad8428454cb4edfe70c0a5f0dc1da214.",
+                "severity": "LOW",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.15-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.15-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-52890": {
+                "cve_id": "CVE-2025-52890",
+                "title": "Incus is a system container and virtual machine manager. When usi ...",
+                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus versions 6.12 and 6.13generates nftables rules that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to ARP spoofing on the bridge and to fully spoof another VM/container on the same bridge. Commit 254dfd2483ab8de39b47c2258b7f1cf0759231c8 contains a patch for the issue.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.15-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.15-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            }
+        },
+        "9": {
+            "CVE-2024-45337": {
+                "cve_id": "CVE-2024-45337",
+                "title": "Applications and libraries which misuse connection.serverAuthenti ...",
+                "description": "Applications and libraries which misuse connection.serverAuthenticate (via callback field ServerConfig.PublicKeyCallback) may be susceptible to an authorization bypass. The documentation for ServerConfig.PublicKeyCallback says that \"A call to this function does not guarantee that the key offered is in fact used to authenticate.\" Specifically, the SSH protocol allows clients to inquire about whether a public key is acceptable before proving control of the corresponding private key. PublicKeyCallback may be called with multiple keys, and the order in which the keys were provided cannot be used to infer which key the client successfully authenticated with, if any. Some applications, which store the key(s) passed to PublicKeyCallback (or derived information) and make security relevant determinations based on it once the connection is established, may make incorrect assumptions. For example, an attacker may send public keys A and B, and then authenticate with A. PublicKeyCallback would be called only twice, first with A and then with B. A vulnerable application may then make authorization decisions based on key B for which the attacker does not actually control the private key. Since this API is widely misused, as a partial mitigation golang.org/x/cry...@v0.31.0 enforces the property that, when successfully authenticating via public key, the last key passed to ServerConfig.PublicKeyCallback will be the key used to authenticate the connection. PublicKeyCallback will now be called multiple times with the same key, if necessary. Note that the client may still not control the last key passed to PublicKeyCallback if the connection is then authenticated with a different method, such as PasswordCallback, KeyboardInteractiveCallback, or NoClientAuth. Users should be using the Extensions field of the Permissions return value from the various authentication callbacks to record data associated with the authentication attempt instead of referencing external state. Once the connection is established the state corresponding to the successful authentication attempt can be retrieved via the ServerConn.Permissions field. Note that some third-party libraries misuse the Permissions type by sharing it across authentication attempts; users of third-party libraries should refer to the relevant projects for guidance.",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.8-1.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2025-22869": {
+                "cve_id": "CVE-2025-22869",
+                "title": "SSH servers which implement file transfer protocols are vulnerabl ...",
+                "description": "SSH servers which implement file transfer protocols are vulnerable to a denial of service attack from clients which complete the key exchange slowly, or not at all, causing pending content to be read into memory, but never transmitted.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-22870": {
+                "cve_id": "CVE-2025-22870",
+                "title": "Matching of hosts against proxy patterns can improperly treat an  ...",
+                "description": "Matching of hosts against proxy patterns can improperly treat an IPv6 zone ID as a hostname component. For example, when the NO_PROXY environment variable is set to \"*.example.com\", a request to \"[::1%25.example.com]:80` will incorrectly match and not be proxied.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-27144": {
+                "cve_id": "CVE-2025-27144",
+                "title": "Go JOSE provides an implementation of the Javascript Object Signi ...",
+                "description": "Go JOSE provides an implementation of the Javascript Object Signing and Encryption set of standards in Go, including support for JSON Web Encryption (JWE), JSON Web Signature (JWS), and JSON Web Token (JWT) standards. In versions on the 4.x branch prior to version 4.0.5, when parsing compact JWS or JWE input, Go JOSE could use excessive memory. The code used strings.Split(token, \".\") to split JWT tokens, which is vulnerable to excessive memory consumption when processing maliciously crafted tokens with a large number of `.` characters.  An attacker could exploit this by sending numerous malformed tokens, leading to memory exhaustion and a Denial of Service. Version 4.0.5 fixes this issue. As a workaround, applications could pre-validate that payloads passed to Go JOSE do not contain an excessive number of `.` characters.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-30204": {
+                "cve_id": "CVE-2025-30204",
+                "title": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in ...",
+                "description": "golang-jwt is a Go implementation of JSON Web Tokens. Starting in version 3.2.0 and prior to versions 5.2.2 and 4.5.2, the function parse.ParseUnverified splits (via a call to strings.Split) its argument (which is untrusted data) on periods. As a result, in the face of a malicious request whose Authorization header consists of Bearer  followed by many period characters, a call to that function incurs allocations to the tune of O(n) bytes (where n stands for the length of the function's argument), with a constant factor of about 16. This issue is fixed in 5.2.2 and 4.5.2.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.12-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.12-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-52889": {
+                "cve_id": "CVE-2025-52889",
+                "title": "Incus is a system container and virtual machine manager. When usi ...",
+                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus version 6.12 and 6.13 generates nftables rules for local services (DHCP, DNS...) that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to DHCP pool exhaustion and opens the door for other attacks. A patch is available at commit 2516fb19ad8428454cb4edfe70c0a5f0dc1da214.",
+                "severity": "LOW",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.15-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.15-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            },
+            "CVE-2025-52890": {
+                "cve_id": "CVE-2025-52890",
+                "title": "Incus is a system container and virtual machine manager. When usi ...",
+                "description": "Incus is a system container and virtual machine manager. When using an ACL on a device connected to a bridge, Incus versions 6.12 and 6.13generates nftables rules that partially bypass security options `security.mac_filtering`, `security.ipv4_filtering` and `security.ipv6_filtering`. This can lead to ARP spoofing on the bridge and to fully spoof another VM/container on the same bridge. Commit 254dfd2483ab8de39b47c2258b7f1cf0759231c8 contains a patch for the issue.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "6.2-3.fc41",
+                        "fixed": "6.15-1.fc41",
+                        "identifier": "fc41"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "6.15-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            }
+        },
+        "5": {
             "CVE-2024-45337": {
                 "cve_id": "CVE-2024-45337",
                 "title": "Applications and libraries which misuse connection.serverAuthenti ...",
