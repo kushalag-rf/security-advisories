@@ -21154,7 +21154,7 @@
                 "cve_id": "CVE-2026-23312",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: usb: kaweth: validate USB endpoints\n\nThe kaweth driver should validate that the device it is probing has the\nproper number and types of USB endpoints it is expecting before it binds\nto it.  If a malicious device were to not have the same urbs the driver\nwill crash later on when it blindly accesses these endpoints.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -21167,7 +21167,7 @@
                 "cve_id": "CVE-2026-23313",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ni40e: Fix preempt count leak in napi poll tracepoint\n\nUsing get_cpu() in the tracepoint assignment causes an obvious preempt\ncount leak because nothing invokes put_cpu() to undo it:\n\n  softirq: huh, entered softirq 3 NET_RX with preempt_count 00000100, exited with 00000101?\n\nThis clearly has seen a lot of testing in the last 3+ years...\n\nUse smp_processor_id() instead.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -21596,7 +21596,7 @@
                 "cve_id": "CVE-2026-23454",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mana: fix use-after-free in mana_hwc_destroy_channel() by reordering teardown\n\nA potential race condition exists in mana_hwc_destroy_channel() where\nhwc->caller_ctx is freed before the HWC's Completion Queue (CQ) and\nEvent Queue (EQ) are destroyed. This allows an in-flight CQ interrupt\nhandler to dereference freed memory, leading to a use-after-free or\nNULL pointer dereference in mana_hwc_handle_resp().\n\nmana_smc_teardown_hwc() signals the hardware to stop but does not\nsynchronize against IRQ handlers already executing on other CPUs. The\nIRQ synchronization only happens in mana_hwc_destroy_cq() via\nmana_gd_destroy_eq() -> mana_gd_deregister_irq(). Since this runs\nafter kfree(hwc->caller_ctx), a concurrent mana_hwc_rx_event_handler()\ncan dereference freed caller_ctx (and rxq->msg_buf) in\nmana_hwc_handle_resp().\n\nFix this by reordering teardown to reverse-of-creation order: destroy\nthe TX/RX work queues and CQ/EQ before freeing hwc->caller_ctx. This\nensures all in-flight interrupt handlers complete before the memory they\naccess is freed.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -22286,6 +22286,19 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nspi: use generic driver_override infrastructure\n\nWhen a driver is probed through __driver_attach(), the bus' match()\ncallback is called without the device lock held, thus accessing the\ndriver_override field without a lock, which can cause a UAF.\n\nFix this by using the driver-core driver_override infrastructure taking\ncare of proper locking internally.\n\nNote that calling match() from __driver_attach() without the device lock\nheld is intentional. [1]\n\nAlso note that we do not enable the driver_override feature of struct\nbus_type, as SPI - in contrast to most other buses - passes \"\" to\nsysfs_emit() when the driver_override pointer is NULL. Thus, printing\n\"\\n\" instead of \"(null)\\n\".",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
+            "CVE-2026-31488": {
+                "cve_id": "CVE-2026-31488",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Do not skip unrelated mode changes in DSC validation\n\nStarting with commit 17ce8a6907f7 (\"drm/amd/display: Add dsc pre-validation in\natomic check\"), amdgpu resets the CRTC state mode_changed flag to false when\nrecomputing the DSC configuration results in no timing change for a particular\nstream.\n\nHowever, this is incorrect in scenarios where a change in MST/DSC configuration\nhappens in the same KMS commit as another (unrelated) mode change. For example,\nthe integrated panel of a laptop may be configured differently (e.g., HDR\nenabled/disabled) depending on whether external screens are attached. In this\ncase, plugging in external DP-MST screens may result in the mode_changed flag\nbeing dropped incorrectly for the integrated panel if its DSC configuration\ndid not change during precomputation in pre_validate_dsc().\n\nAt this point, however, dm_update_crtc_state() has already created new streams\nfor CRTCs with DSC-independent mode changes. In turn,\namdgpu_dm_commit_streams() will never release the old stream, resulting in a\nmemory leak. amdgpu_dm_atomic_commit_tail() will never acquire a reference to\nthe new stream either, which manifests as a use-after-free when the stream gets\ndisabled later on:\n\nBUG: KASAN: use-after-free in dc_stream_release+0x25/0x90 [amdgpu]\nWrite of size 4 at addr ffff88813d836524 by task kworker/9:9/29977\n\nWorkqueue: events drm_mode_rmfb_work_fn\nCall Trace:\n <TASK>\n dump_stack_lvl+0x6e/0xa0\n print_address_description.constprop.0+0x88/0x320\n ? dc_stream_release+0x25/0x90 [amdgpu]\n print_report+0xfc/0x1ff\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? __virt_addr_valid+0x225/0x4e0\n ? dc_stream_release+0x25/0x90 [amdgpu]\n kasan_report+0xe1/0x180\n ? dc_stream_release+0x25/0x90 [amdgpu]\n kasan_check_range+0x125/0x200\n dc_stream_release+0x25/0x90 [amdgpu]\n dc_state_destruct+0x14d/0x5c0 [amdgpu]\n dc_state_release.part.0+0x4e/0x130 [amdgpu]\n dm_atomic_destroy_state+0x3f/0x70 [amdgpu]\n drm_atomic_state_default_clear+0x8ee/0xf30\n ? drm_mode_object_put.part.0+0xb1/0x130\n __drm_atomic_state_free+0x15c/0x2d0\n atomic_remove_fb+0x67e/0x980\n\nSince there is no reliable way of figuring out whether a CRTC has unrelated\nmode changes pending at the time of DSC validation, remember the value of the\nmode_changed flag from before the point where a CRTC was marked as potentially\naffected by a change in DSC configuration. Reset the mode_changed flag to this\nearlier value instead in pre_validate_dsc().\n\n(cherry picked from commit cc7c7121ae082b7b82891baa7280f1ff2608f22b)",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -25874,6 +25887,19 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: sch_red: Replace direct dequeue call with peek and qdisc_dequeue_peeked\n\nWhen red qdisc has children (eg qfq qdisc) whose peek() callback is\nqdisc_peek_dequeued(), we could get a kernel panic. When the parent of such\nqdiscs (eg illustrated in patch #3 as tbf) wants to retrieve an skb from\nits child (red in this case), it will do the following:\n 1a. do a peek() - and when sensing there's an skb the child can offer, then\n     - the child in this case(red) calls its child's (qfq) peek.\n        qfq does the right thing and will return the gso_skb queue packet.\n        Note: if there wasnt a gso_skb entry then qfq will store it there.\n 1b. invoke a dequeue() on the child (red). And herein lies the problem.\n     - red will call the child's dequeue() which will essentially just\n       try to grab something of qfq's queue.\n\n[   78.667668][  T363] KASAN: null-ptr-deref in range [0x0000000000000048-0x000000000000004f]\n[   78.667927][  T363] CPU: 1 UID: 0 PID: 363 Comm: ping Not tainted 7.1.0-rc1-00033-g46f74a3f7d57-dirty #790 PREEMPT(full)\n[   78.668263][  T363] Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011\n[   78.668486][  T363] RIP: 0010:qfq_dequeue+0x446/0xc90 [sch_qfq]\n[   78.668718][  T363] Code: 54 c0 e8 dd 90 00 f1 48 c7 c7 e0 03 54 c0 48 89 de e8 ce 90 00 f1 48 8d 7b 48 b8 ff ff 37 00 48 89 fa 48 c1 e0 2a 48 c1 ea 03 <80> 3c 02 00 74 05 e8 ef a1 e1 f1 48 8b 7b 48 48 8d 54 24 58 48 8d\n[   78.669312][  T363] RSP: 0018:ffff88810de573e0 EFLAGS: 00010216\n[   78.669533][  T363] RAX: dffffc0000000000 RBX: 0000000000000000 RCX: 0000000000000000\n[   78.669790][  T363] RDX: 0000000000000009 RSI: 0000000000000004 RDI: 0000000000000048\n[   78.670044][  T363] RBP: ffff888110dc4000 R08: ffffffffb1b0885a R09: fffffbfff6ba9078\n[   78.670297][  T363] R10: 0000000000000003 R11: ffff888110e31c80 R12: 0000001880000000\n[   78.670560][  T363] R13: ffff888110dc4150 R14: ffff888110dc42b8 R15: 0000000000000200\n[   78.670814][  T363] FS:  00007f66a8f09c40(0000) GS:ffff888163428000(0000) knlGS:0000000000000000\n[   78.671110][  T363] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[   78.671324][  T363] CR2: 000055db4c6a30a8 CR3: 000000010da67000 CR4: 0000000000750ef0\n[   78.671585][  T363] PKRU: 55555554\n[   78.671713][  T363] Call Trace:\n[   78.671843][  T363]  <TASK>\n[   78.671936][  T363]  ? __pfx_qfq_dequeue+0x10/0x10 [sch_qfq]\n[   78.672148][  T363]  ? __pfx__printk+0x10/0x10\n[   78.672322][  T363]  ? srso_alias_return_thunk+0x5/0xfbef5\n[   78.672496][  T363]  ? lockdep_hardirqs_on_prepare+0xa8/0x1a0\n[   78.672706][  T363]  ? srso_alias_return_thunk+0x5/0xfbef5\n[   78.672875][  T363]  ? trace_hardirqs_on+0x19/0x1a0\n[   78.673047][  T363]  red_dequeue+0x65/0x270 [sch_red]\n[   78.673217][  T363]  ? srso_alias_return_thunk+0x5/0xfbef5\n[   78.673385][  T363]  tbf_dequeue.cold+0xb0/0x70c [sch_tbf]\n[   78.673566][  T363]  __qdisc_run+0x169/0x1900\n\nThe right thing to do in #1b is to grab the skb off gso_skb queue.\nThis patchset fixes that issue by changing #1b to use qdisc_dequeue_peeked()\nmethod instead.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
+            "CVE-2026-43503": {
+                "cve_id": "CVE-2026-43503",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: skbuff: propagate shared-frag marker through frag-transfer helpers\n\nTwo frag-transfer helpers (__pskb_copy_fclone() and skb_shift()) fail\nto propagate the SKBFL_SHARED_FRAG bit in skb_shinfo()->flags when\nmoving frags from source to destination.  __pskb_copy_fclone() defers\nthe rest of the shinfo metadata to skb_copy_header() after copying\nfrag descriptors, but that helper only carries over gso_{size,segs,\ntype} and never touches skb_shinfo()->flags; skb_shift() moves frag\ndescriptors directly and leaves flags untouched.  As a result, the\ndestination skb keeps a reference to the same externally-owned or\npage-cache-backed pages while reporting skb_has_shared_frag() as\nfalse.\n\nThe mismatch is harmful in any in-place writer that uses\nskb_has_shared_frag() to decide whether shared pages must be detoured\nthrough skb_cow_data().  ESP input is one such writer (esp4.c,\nesp6.c), and a single nft 'dup to <local>' rule -- or any other\nnf_dup_ipv4() / xt_TEE caller -- is enough to land a pskb_copy()'d\nskb in esp_input() with the marker stripped, letting an unprivileged\nuser write into the page cache of a root-owned read-only file via\nauthencesn-ESN stray writes.\n\nSet SKBFL_SHARED_FRAG on the destination whenever frag descriptors\nwere actually moved from the source.  skb_copy() and skb_copy_expand()\nshare skb_copy_header() too but linearize all paged data into freshly\nallocated head storage and emerge with nr_frags == 0, so\nskb_has_shared_frag() returns false on its own; they need no change.\n\nThe same omission exists in skb_gro_receive() and skb_gro_receive_list().\nThe former moves the incoming skb's frag descriptors into the\naccumulator's last sub-skb via two paths (a direct frag-move loop and\nthe head_frag + memcpy path); the latter chains the incoming skb whole\nonto p's frag_list.  Downstream skb_segment() reads only\nskb_shinfo(p)->flags, and skb_segment_list() reuses each sub-skb's\nshinfo as the nskb -- both p and lp must carry the marker.\n\nThe same omission also exists in tcp_clone_payload(), which builds an\nMTU probe skb by moving frag descriptors from skbs on sk_write_queue\ninto a freshly allocated nskb.  The helper falls into the same family\nand warrants the same fix for consistency; no TCP TX-side in-place\nwriter is currently known to reach a user page through this gap, but\na future consumer depending on the marker would regress silently.\n\nThe same omission exists in skb_segment(): the per-iteration flag\nmerge takes only head_skb's flag, and the inner switch that rebinds\nfrag_skb to list_skb on head_skb-frags exhaustion does not fold the\nnew frag_skb's flag into nskb.  Fold frag_skb's flag at both sites\nso segments drawing frags from frag_list members carry the marker.",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -58884,19 +58910,6 @@
                     }
                 ]
             },
-            "CVE-2025-71238": {
-                "cve_id": "CVE-2025-71238",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: qla2xxx: Fix bsg_done() causing double free\n\nKernel panic observed on system,\n\n[5353358.825191] BUG: unable to handle page fault for address: ff5f5e897b024000\n[5353358.825194] #PF: supervisor write access in kernel mode\n[5353358.825195] #PF: error_code(0x0002) - not-present page\n[5353358.825196] PGD 100006067 P4D 0\n[5353358.825198] Oops: 0002 [#1] PREEMPT SMP NOPTI\n[5353358.825200] CPU: 5 PID: 2132085 Comm: qlafwupdate.sub Kdump: loaded Tainted: G        W    L    -------  ---  5.14.0-503.34.1.el9_5.x86_64 #1\n[5353358.825203] Hardware name: HPE ProLiant DL360 Gen11/ProLiant DL360 Gen11, BIOS 2.44 01/17/2025\n[5353358.825204] RIP: 0010:memcpy_erms+0x6/0x10\n[5353358.825211] RSP: 0018:ff591da8f4f6b710 EFLAGS: 00010246\n[5353358.825212] RAX: ff5f5e897b024000 RBX: 0000000000007090 RCX: 0000000000001000\n[5353358.825213] RDX: 0000000000001000 RSI: ff591da8f4fed090 RDI: ff5f5e897b024000\n[5353358.825214] RBP: 0000000000010000 R08: ff5f5e897b024000 R09: 0000000000000000\n[5353358.825215] R10: ff46cf8c40517000 R11: 0000000000000001 R12: 0000000000008090\n[5353358.825216] R13: ff591da8f4f6b720 R14: 0000000000001000 R15: 0000000000000000\n[5353358.825218] FS:  00007f1e88d47740(0000) GS:ff46cf935f940000(0000) knlGS:0000000000000000\n[5353358.825219] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[5353358.825220] CR2: ff5f5e897b024000 CR3: 0000000231532004 CR4: 0000000000771ef0\n[5353358.825221] PKRU: 55555554\n[5353358.825222] Call Trace:\n[5353358.825223]  <TASK>\n[5353358.825224]  ? show_trace_log_lvl+0x1c4/0x2df\n[5353358.825229]  ? show_trace_log_lvl+0x1c4/0x2df\n[5353358.825232]  ? sg_copy_buffer+0xc8/0x110\n[5353358.825236]  ? __die_body.cold+0x8/0xd\n[5353358.825238]  ? page_fault_oops+0x134/0x170\n[5353358.825242]  ? kernelmode_fixup_or_oops+0x84/0x110\n[5353358.825244]  ? exc_page_fault+0xa8/0x150\n[5353358.825247]  ? asm_exc_page_fault+0x22/0x30\n[5353358.825252]  ? memcpy_erms+0x6/0x10\n[5353358.825253]  sg_copy_buffer+0xc8/0x110\n[5353358.825259]  qla2x00_process_vendor_specific+0x652/0x1320 [qla2xxx]\n[5353358.825317]  qla24xx_bsg_request+0x1b2/0x2d0 [qla2xxx]\n\nMost routines in qla_bsg.c call bsg_done() only for success cases.\nHowever a few invoke it for failure case as well leading to a double\nfree. Validate before calling bsg_done().",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
             "CVE-2025-71273": {
                 "cve_id": "CVE-2025-71273",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -60799,7 +60812,7 @@
                 "cve_id": "CVE-2026-23312",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: usb: kaweth: validate USB endpoints\n\nThe kaweth driver should validate that the device it is probing has the\nproper number and types of USB endpoints it is expecting before it binds\nto it.  If a malicious device were to not have the same urbs the driver\nwill crash later on when it blindly accesses these endpoints.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -60812,7 +60825,7 @@
                 "cve_id": "CVE-2026-23313",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ni40e: Fix preempt count leak in napi poll tracepoint\n\nUsing get_cpu() in the tracepoint assignment causes an obvious preempt\ncount leak because nothing invokes put_cpu() to undo it:\n\n  softirq: huh, entered softirq 3 NET_RX with preempt_count 00000100, exited with 00000101?\n\nThis clearly has seen a lot of testing in the last 3+ years...\n\nUse smp_processor_id() instead.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -61657,7 +61670,7 @@
                 "cve_id": "CVE-2026-23454",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mana: fix use-after-free in mana_hwc_destroy_channel() by reordering teardown\n\nA potential race condition exists in mana_hwc_destroy_channel() where\nhwc->caller_ctx is freed before the HWC's Completion Queue (CQ) and\nEvent Queue (EQ) are destroyed. This allows an in-flight CQ interrupt\nhandler to dereference freed memory, leading to a use-after-free or\nNULL pointer dereference in mana_hwc_handle_resp().\n\nmana_smc_teardown_hwc() signals the hardware to stop but does not\nsynchronize against IRQ handlers already executing on other CPUs. The\nIRQ synchronization only happens in mana_hwc_destroy_cq() via\nmana_gd_destroy_eq() -> mana_gd_deregister_irq(). Since this runs\nafter kfree(hwc->caller_ctx), a concurrent mana_hwc_rx_event_handler()\ncan dereference freed caller_ctx (and rxq->msg_buf) in\nmana_hwc_handle_resp().\n\nFix this by reordering teardown to reverse-of-creation order: destroy\nthe TX/RX work queues and CQ/EQ before freeing hwc->caller_ctx. This\nensures all in-flight interrupt handlers complete before the memory they\naccess is freed.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -61839,7 +61852,7 @@
                 "cve_id": "CVE-2026-31390",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe: Fix memory leak in xe_vm_madvise_ioctl\n\nWhen check_bo_args_are_sane() validation fails, jump to the new\nfree_vmas cleanup label to properly free the allocated resources.\nThis ensures proper cleanup in this error path.\n\n(cherry picked from commit 29bd06faf727a4b76663e4be0f7d770e2d2a7965)",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -62581,6 +62594,19 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nspi: use generic driver_override infrastructure\n\nWhen a driver is probed through __driver_attach(), the bus' match()\ncallback is called without the device lock held, thus accessing the\ndriver_override field without a lock, which can cause a UAF.\n\nFix this by using the driver-core driver_override infrastructure taking\ncare of proper locking internally.\n\nNote that calling match() from __driver_attach() without the device lock\nheld is intentional. [1]\n\nAlso note that we do not enable the driver_override feature of struct\nbus_type, as SPI - in contrast to most other buses - passes \"\" to\nsysfs_emit() when the driver_override pointer is NULL. Thus, printing\n\"\\n\" instead of \"(null)\\n\".",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-31488": {
+                "cve_id": "CVE-2026-31488",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Do not skip unrelated mode changes in DSC validation\n\nStarting with commit 17ce8a6907f7 (\"drm/amd/display: Add dsc pre-validation in\natomic check\"), amdgpu resets the CRTC state mode_changed flag to false when\nrecomputing the DSC configuration results in no timing change for a particular\nstream.\n\nHowever, this is incorrect in scenarios where a change in MST/DSC configuration\nhappens in the same KMS commit as another (unrelated) mode change. For example,\nthe integrated panel of a laptop may be configured differently (e.g., HDR\nenabled/disabled) depending on whether external screens are attached. In this\ncase, plugging in external DP-MST screens may result in the mode_changed flag\nbeing dropped incorrectly for the integrated panel if its DSC configuration\ndid not change during precomputation in pre_validate_dsc().\n\nAt this point, however, dm_update_crtc_state() has already created new streams\nfor CRTCs with DSC-independent mode changes. In turn,\namdgpu_dm_commit_streams() will never release the old stream, resulting in a\nmemory leak. amdgpu_dm_atomic_commit_tail() will never acquire a reference to\nthe new stream either, which manifests as a use-after-free when the stream gets\ndisabled later on:\n\nBUG: KASAN: use-after-free in dc_stream_release+0x25/0x90 [amdgpu]\nWrite of size 4 at addr ffff88813d836524 by task kworker/9:9/29977\n\nWorkqueue: events drm_mode_rmfb_work_fn\nCall Trace:\n <TASK>\n dump_stack_lvl+0x6e/0xa0\n print_address_description.constprop.0+0x88/0x320\n ? dc_stream_release+0x25/0x90 [amdgpu]\n print_report+0xfc/0x1ff\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? __virt_addr_valid+0x225/0x4e0\n ? dc_stream_release+0x25/0x90 [amdgpu]\n kasan_report+0xe1/0x180\n ? dc_stream_release+0x25/0x90 [amdgpu]\n kasan_check_range+0x125/0x200\n dc_stream_release+0x25/0x90 [amdgpu]\n dc_state_destruct+0x14d/0x5c0 [amdgpu]\n dc_state_release.part.0+0x4e/0x130 [amdgpu]\n dm_atomic_destroy_state+0x3f/0x70 [amdgpu]\n drm_atomic_state_default_clear+0x8ee/0xf30\n ? drm_mode_object_put.part.0+0xb1/0x130\n __drm_atomic_state_free+0x15c/0x2d0\n atomic_remove_fb+0x67e/0x980\n\nSince there is no reliable way of figuring out whether a CRTC has unrelated\nmode changes pending at the time of DSC validation, remember the value of the\nmode_changed flag from before the point where a CRTC was marked as potentially\naffected by a change in DSC configuration. Reset the mode_changed flag to this\nearlier value instead in pre_validate_dsc().\n\n(cherry picked from commit cc7c7121ae082b7b82891baa7280f1ff2608f22b)",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -67390,6 +67416,19 @@
                 "cve_id": "CVE-2026-43501",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: rpl: reserve mac_len headroom when recompressed SRH grows\n\nipv6_rpl_srh_rcv() decompresses an RFC 6554 Source Routing Header, swaps\nthe next segment into ipv6_hdr->daddr, recompresses, then pulls the old\nheader and pushes the new one plus the IPv6 header back.  The\nrecompressed header can be larger than the received one when the swap\nreduces the common-prefix length the segments share with daddr (CmprI=0,\nCmprE>0, seg[0][0] != daddr[0] gives the maximum +8 bytes).\n\npskb_expand_head() was gated on segments_left == 0, so on earlier\nsegments the push consumed unchecked headroom.  Once skb_push() leaves\nfewer than skb->mac_len bytes in front of data,\nskb_mac_header_rebuild()'s call to:\n\n\tskb_set_mac_header(skb, -skb->mac_len);\n\nwill store (data - head) - mac_len into the u16 mac_header field, which\nwraps to ~65530, and the following memmove() writes mac_len bytes ~64KiB\npast skb->head.\n\nA single AF_INET6/SOCK_RAW/IPV6_HDRINCL packet over lo with a two\nsegment type-3 SRH (CmprI=0, CmprE=15) reaches headroom 8 after one\npass; KASAN reports a 14-byte OOB write in ipv6_rthdr_rcv.\n\nFix this by expanding the head whenever the remaining room is less than\nthe push size plus mac_len, and request that much extra so the rebuilt\nMAC header fits afterwards.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-43503": {
+                "cve_id": "CVE-2026-43503",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: skbuff: propagate shared-frag marker through frag-transfer helpers\n\nTwo frag-transfer helpers (__pskb_copy_fclone() and skb_shift()) fail\nto propagate the SKBFL_SHARED_FRAG bit in skb_shinfo()->flags when\nmoving frags from source to destination.  __pskb_copy_fclone() defers\nthe rest of the shinfo metadata to skb_copy_header() after copying\nfrag descriptors, but that helper only carries over gso_{size,segs,\ntype} and never touches skb_shinfo()->flags; skb_shift() moves frag\ndescriptors directly and leaves flags untouched.  As a result, the\ndestination skb keeps a reference to the same externally-owned or\npage-cache-backed pages while reporting skb_has_shared_frag() as\nfalse.\n\nThe mismatch is harmful in any in-place writer that uses\nskb_has_shared_frag() to decide whether shared pages must be detoured\nthrough skb_cow_data().  ESP input is one such writer (esp4.c,\nesp6.c), and a single nft 'dup to <local>' rule -- or any other\nnf_dup_ipv4() / xt_TEE caller -- is enough to land a pskb_copy()'d\nskb in esp_input() with the marker stripped, letting an unprivileged\nuser write into the page cache of a root-owned read-only file via\nauthencesn-ESN stray writes.\n\nSet SKBFL_SHARED_FRAG on the destination whenever frag descriptors\nwere actually moved from the source.  skb_copy() and skb_copy_expand()\nshare skb_copy_header() too but linearize all paged data into freshly\nallocated head storage and emerge with nr_frags == 0, so\nskb_has_shared_frag() returns false on its own; they need no change.\n\nThe same omission exists in skb_gro_receive() and skb_gro_receive_list().\nThe former moves the incoming skb's frag descriptors into the\naccumulator's last sub-skb via two paths (a direct frag-move loop and\nthe head_frag + memcpy path); the latter chains the incoming skb whole\nonto p's frag_list.  Downstream skb_segment() reads only\nskb_shinfo(p)->flags, and skb_segment_list() reuses each sub-skb's\nshinfo as the nskb -- both p and lp must carry the marker.\n\nThe same omission also exists in tcp_clone_payload(), which builds an\nMTU probe skb by moving frag descriptors from skbs on sk_write_queue\ninto a freshly allocated nskb.  The helper falls into the same family\nand warrants the same fix for consistency; no TCP TX-side in-place\nwriter is currently known to reach a user page through this gap, but\na future consumer depending on the marker would regress silently.\n\nThe same omission exists in skb_segment(): the per-iteration flag\nmerge takes only head_skb's flag, and the inner switch that rebinds\nfrag_skb to list_skb on head_skb-frags exhaustion does not fold the\nnew frag_skb's flag into nskb.  Fold frag_skb's flag at both sites\nso segments drawing frags from frag_list members carry the marker.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -84718,7 +84757,7 @@
                 "cve_id": "CVE-2026-23312",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: usb: kaweth: validate USB endpoints\n\nThe kaweth driver should validate that the device it is probing has the\nproper number and types of USB endpoints it is expecting before it binds\nto it.  If a malicious device were to not have the same urbs the driver\nwill crash later on when it blindly accesses these endpoints.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
