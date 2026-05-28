@@ -3374,7 +3374,7 @@
                 ]
             }
         },
-        "8": {
+        "10": {
             "CVE-2024-12797": {
                 "cve_id": "CVE-2024-12797",
                 "title": "Issue summary: Clients using RFC7250 Raw Public Keys (RPKs) to au ...",
@@ -3401,7 +3401,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el8"
+                        "identifier": "el10"
                     },
                     {
                         "introduced": "1:3.2.2-9.fc41",
@@ -3459,12 +3459,8 @@
                 "title": "Issue summary: Some non-default TLS server configurations can cau ...",
                 "description": "Issue summary: Some non-default TLS server configurations can cause unbounded\nmemory growth when processing TLSv1.3 sessions\n\nImpact summary: An attacker may exploit certain server configurations to trigger\nunbounded memory growth that would lead to a Denial of Service\n\nThis problem can occur in TLSv1.3 if the non-default SSL_OP_NO_TICKET option is\nbeing used (but not if early_data support is also configured and the default\nanti-replay protection is in use). In this case, under certain conditions, the\nsession cache can get into an incorrect state and it will fail to flush properly\nas it fills. The session cache will continue to grow in an unbounded manner. A\nmalicious client could deliberately create the scenario for this failure to\nforce a Denial of Service. It may also happen by accident in normal operation.\n\nThis issue only affects TLS servers supporting TLSv1.3. It does not affect TLS\nclients.\n\nThe FIPS modules in 3.2, 3.1 and 3.0 are not affected by this issue. OpenSSL\n1.0.2 is also not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "1.1.1a-1.0.riscv64.fc30",
@@ -3512,8 +3508,12 @@
                 "title": "Issue summary: Checking excessively long DSA keys or parameters m ...",
                 "description": "Issue summary: Checking excessively long DSA keys or parameters may be very\nslow.\n\nImpact summary: Applications that use the functions EVP_PKEY_param_check()\nor EVP_PKEY_public_check() to check a DSA public key or DSA parameters may\nexperience long delays. Where the key or parameters that are being checked\nhave been obtained from an untrusted source this may lead to a Denial of\nService.\n\nThe functions EVP_PKEY_param_check() or EVP_PKEY_public_check() perform\nvarious checks on DSA parameters. Some of those computations take a long time\nif the modulus (`p` parameter) is too large.\n\nTrying to use a very large modulus is slow and OpenSSL will not allow using\npublic keys with a modulus which is over 10,000 bits in length for signature\nverification. However the key and parameter check functions do not limit\nthe modulus size when performing the checks.\n\nAn application that calls EVP_PKEY_param_check() or EVP_PKEY_public_check()\nand supplies a key or parameters obtained from an untrusted source could be\nvulnerable to a Denial of Service attack.\n\nThese functions are not called by OpenSSL itself on untrusted DSA keys so\nonly applications that directly call these functions may be vulnerable.\n\nAlso vulnerable are the OpenSSL pkey and pkeyparam command line applications\nwhen using the `-check` option.\n\nThe OpenSSL SSL/TLS implementation is not affected by this issue.\n\nThe OpenSSL 3.0 and 3.1 FIPS providers are affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "3.2.2-8.fc42",
@@ -3526,12 +3526,8 @@
                 "title": "Issue summary: Calling the OpenSSL API function SSL_free_buffers  ...",
                 "description": "Issue summary: Calling the OpenSSL API function SSL_free_buffers may cause\nmemory to be accessed that was previously freed in some situations\n\nImpact summary: A use after free can have a range of potential consequences such\nas the corruption of valid data, crashes or execution of arbitrary code.\nHowever, only applications that directly call the SSL_free_buffers function are\naffected by this issue. Applications that do not call this function are not\nvulnerable. Our investigations indicate that this function is rarely used by\napplications.\n\nThe SSL_free_buffers function is used to free the internal OpenSSL buffer used\nwhen processing an incoming record from the network. The call is only expected\nto succeed if the buffer is not currently in use. However, two scenarios have\nbeen identified where the buffer is freed even when still in use.\n\nThe first scenario occurs where a record header has been received from the\nnetwork and processed by OpenSSL, but the full record body has not yet arrived.\nIn this case calling SSL_free_buffers will succeed even though a record has only\nbeen partially processed and the buffer is still in use.\n\nThe second scenario occurs where a full record containing application data has\nbeen received and processed by OpenSSL but the application has only read part of\nthis data. Again a call to SSL_free_buffers will succeed even though the buffer\nis still in use.\n\nWhile these scenarios could occur accidentally during normal operation a\nmalicious attacker could attempt to engineer a stituation where this occurs.\nWe are not aware of this issue being actively exploited.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "1.1.1a-1.0.riscv64.fc30",
@@ -3576,6 +3572,10 @@
                 "severity": "CRITICAL",
                 "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
                     {
                         "introduced": "1:3.2.2-9.fc41",
                         "identifier": "fc41"
@@ -3741,12 +3741,8 @@
                 "title": "Issue summary: If an application using the SSL_CIPHER_find() func ...",
                 "description": "Issue summary: If an application using the SSL_CIPHER_find() function in\na QUIC protocol client or server receives an unknown cipher suite from\nthe peer, a NULL dereference occurs.\n\nImpact summary: A NULL pointer dereference leads to abnormal termination of\nthe running process causing Denial of Service.\n\nSome applications call SSL_CIPHER_find() from the client_hello_cb callback\non the cipher ID received from the peer. If this is done with an SSL object\nimplementing the QUIC protocol, NULL pointer dereference will happen if\nthe examined cipher ID is unknown or unsupported.\n\nAs it is not very common to call this function in applications using the QUIC \nprotocol and the worst outcome is Denial of Service, the issue was assessed\nas Low severity.\n\nThe vulnerable code was introduced in the 3.2 version with the addition\nof the QUIC protocol support.\n\nThe FIPS modules in 3.6, 3.5, 3.4 and 3.3 are not affected by this issue,\nas the QUIC implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4 and 3.3 are vulnerable to this issue.\n\nOpenSSL 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "3.5.5-2.fc45",
@@ -3759,12 +3755,8 @@
                 "title": "Issue summary: The 'openssl dgst' command-line tool silently trun ...",
                 "description": "Issue summary: The 'openssl dgst' command-line tool silently truncates input\ndata to 16MB when using one-shot signing algorithms and reports success instead\nof an error.\n\nImpact summary: A user signing or verifying files larger than 16MB with\none-shot algorithms (such as Ed25519, Ed448, or ML-DSA) may believe the entire\nfile is authenticated while trailing data beyond 16MB remains unauthenticated.\n\nWhen the 'openssl dgst' command is used with algorithms that only support\none-shot signing (Ed25519, Ed448, ML-DSA-44, ML-DSA-65, ML-DSA-87), the input\nis buffered with a 16MB limit. If the input exceeds this limit, the tool\nsilently truncates to the first 16MB and continues without signaling an error,\ncontrary to what the documentation states. This creates an integrity gap where\ntrailing bytes can be modified without detection if both signing and\nverification are performed using the same affected codepath.\n\nThe issue affects only the command-line tool behavior. Verifiers that process\nthe full message using library APIs will reject the signature, so the risk\nprimarily affects workflows that both sign and verify with the affected\n'openssl dgst' command. Streaming digest algorithms for 'openssl dgst' and\nlibrary users are unaffected.\n\nThe FIPS modules in 3.5 and 3.6 are not affected by this issue, as the\ncommand-line tools are outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.5 and 3.6 are vulnerable to this issue.\n\nOpenSSL 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "3.5.5-2.fc45",
@@ -3791,12 +3783,8 @@
                 "title": "Issue summary: Writing large, newline-free data into a BIO chain  ...",
                 "description": "Issue summary: Writing large, newline-free data into a BIO chain using the\nline-buffering filter where the next BIO performs short writes can trigger\na heap-based out-of-bounds write.\n\nImpact summary: This out-of-bounds write can cause memory corruption which\ntypically results in a crash, leading to Denial of Service for an application.\n\nThe line-buffering BIO filter (BIO_f_linebuffer) is not used by default in\nTLS/SSL data paths. In OpenSSL command-line applications, it is typically\nonly pushed onto stdout/stderr on VMS systems. Third-party applications that\nexplicitly use this filter with a BIO chain that can short-write and that\nwrite large, newline-free data influenced by an attacker would be affected.\nHowever, the circumstances where this could happen are unlikely to be under\nattacker control, and BIO_f_linebuffer is unlikely to be handling non-curated\ndata controlled by an attacker. For that reason the issue was assessed as\nLow severity.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the BIO implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "1.0.2d-2.fc23",
@@ -3854,12 +3842,8 @@
                 "title": "Issue summary: When using the low-level OCB API directly with AES ...",
                 "description": "Issue summary: When using the low-level OCB API directly with AES-NI or<br>other hardware-accelerated code paths, inputs whose length is not a multiple<br>of 16 bytes can leave the final partial block unencrypted and unauthenticated.<br><br>Impact summary: The trailing 1-15 bytes of a message may be exposed in<br>cleartext on encryption and are not covered by the authentication tag,<br>allowing an attacker to read or tamper with those bytes without detection.<br><br>The low-level OCB encrypt and decrypt routines in the hardware-accelerated<br>stream path process full 16-byte blocks but do not advance the input/output<br>pointers. The subsequent tail-handling code then operates on the original<br>base pointers, effectively reprocessing the beginning of the buffer while<br>leaving the actual trailing bytes unprocessed. The authentication checksum<br>also excludes the true tail bytes.<br><br>However, typical OpenSSL consumers using EVP are not affected because the<br>higher-level EVP and provider OCB implementations split inputs so that full<br>blocks and trailing partial blocks are processed in separate calls, avoiding<br>the problematic code path. Additionally, TLS does not use OCB ciphersuites.<br>The vulnerability only affects applications that call the low-level<br>CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions directly with<br>non-block-aligned lengths in a single call on hardware-accelerated builds.<br>For these reasons the issue was assessed as Low severity.<br><br>The FIPS modules in 3.6, 3.5, 3.4, 3.3, 3.2, 3.1 and 3.0 are not affected<br>by this issue, as OCB mode is not a FIPS-approved algorithm.<br><br>OpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.<br><br>OpenSSL 1.0.2 is not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "1.1.1a-1.0.riscv64.fc30",
@@ -3951,12 +3935,8 @@
                 "title": "Issue summary: A type confusion vulnerability exists in the TimeS ...",
                 "description": "Issue summary: A type confusion vulnerability exists in the TimeStamp Response\nverification code where an ASN1_TYPE union member is accessed without first\nvalidating the type, causing an invalid or NULL pointer dereference when\nprocessing a malformed TimeStamp Response file.\n\nImpact summary: An application calling TS_RESP_verify_response() with a\nmalformed TimeStamp Response can be caused to dereference an invalid or\nNULL pointer when reading, resulting in a Denial of Service.\n\nThe functions ossl_ess_get_signing_cert() and ossl_ess_get_signing_cert_v2()\naccess the signing cert attribute value without validating its type.\nWhen the type is not V_ASN1_SEQUENCE, this results in accessing invalid memory\nthrough the ASN1_TYPE union, causing a crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nTimeStamp Response to an application that verifies timestamp responses. The\nTimeStamp protocol (RFC 3161) is not widely used and the impact of the\nexploit is just a Denial of Service. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the TimeStamp Response implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "1.1.1a-1.0.riscv64.fc30",
@@ -3999,12 +3979,8 @@
                 "title": "Issue summary: Processing a malformed PKCS#12 file can trigger a  ...",
                 "description": "Issue summary: Processing a malformed PKCS#12 file can trigger a NULL pointer\ndereference in the PKCS12_item_decrypt_d2i_ex() function.\n\nImpact summary: A NULL pointer dereference can trigger a crash which leads to\nDenial of Service for an application processing PKCS#12 files.\n\nThe PKCS12_item_decrypt_d2i_ex() function does not check whether the oct\nparameter is NULL before dereferencing it. When called from\nPKCS12_unpack_p7encdata() with a malformed PKCS#12 file, this parameter can\nbe NULL, causing a crash. The vulnerability is limited to Denial of Service\nand cannot be escalated to achieve code execution or memory disclosure.\n\nExploiting this issue requires an attacker to provide a malformed PKCS#12 file\nto an application that processes it. For that reason the issue was assessed as\nLow severity according to our Security Policy.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "1.0.2d-2.fc23",
@@ -4129,8 +4105,12 @@
                 "title": "Issue summary: An application using the OpenSSL HTTP client API f ...",
                 "description": "Issue summary: An application using the OpenSSL HTTP client API functions may\ntrigger an out-of-bounds read if the 'no_proxy' environment variable is set and\nthe host portion of the authority component of the HTTP URL is an IPv6 address.\n\nImpact summary: An out-of-bounds read can trigger a crash which leads to\nDenial of Service for an application.\n\nThe OpenSSL HTTP client API functions can be used directly by applications\nbut they are also used by the OCSP client functions and CMP (Certificate\nManagement Protocol) client implementation in OpenSSL. However the URLs used\nby these implementations are unlikely to be controlled by an attacker.\n\nIn this vulnerable code the out of bounds read can only trigger a crash.\nFurthermore the vulnerability requires an attacker-controlled URL to be\npassed from an application to the OpenSSL function and the user has to have\na 'no_proxy' environment variable set. For the aforementioned reasons the\nissue was assessed as Low severity.\n\nThe vulnerable code was introduced in the following patch releases:\n3.0.16, 3.1.8, 3.2.4, 3.3.3, 3.4.0 and 3.5.0.\n\nThe FIPS modules in 3.5, 3.4, 3.3, 3.2, 3.1 and 3.0 are not affected by this\nissue, as the HTTP client implementation is outside the OpenSSL FIPS module\nboundary.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "3.5.5-2.fc45",
@@ -4143,12 +4123,8 @@
                 "title": "Issue summary: An invalid or NULL pointer dereference can happen  ...",
                 "description": "Issue summary: An invalid or NULL pointer dereference can happen in\nan application processing a malformed PKCS#12 file.\n\nImpact summary: An application processing a malformed PKCS#12 file can be\ncaused to dereference an invalid or NULL pointer on memory read, resulting\nin a Denial of Service.\n\nA type confusion vulnerability exists in PKCS#12 parsing code where\nan ASN1_TYPE union member is accessed without first validating the type,\ncausing an invalid pointer read.\n\nThe location is constrained to a 1-byte address space, meaning any\nattempted pointer manipulation can only target addresses between 0x00 and 0xFF.\nThis range corresponds to the zero page, which is unmapped on most modern\noperating systems and will reliably result in a crash, leading only to a\nDenial of Service. Exploiting this issue also requires a user or application\nto process a maliciously crafted PKCS#12 file. It is uncommon to accept\nuntrusted PKCS#12 files in applications as they are usually used to store\nprivate keys which are trusted by definition. For these reasons, the issue\nwas assessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "1.1.1a-1.0.riscv64.fc30",
@@ -4191,12 +4167,8 @@
                 "title": "Issue summary: A type confusion vulnerability exists in the signa ...",
                 "description": "Issue summary: A type confusion vulnerability exists in the signature\nverification of signed PKCS#7 data where an ASN1_TYPE union member is\naccessed without first validating the type, causing an invalid or NULL\npointer dereference when processing malformed PKCS#7 data.\n\nImpact summary: An application performing signature verification of PKCS#7\ndata or calling directly the PKCS7_digest_from_attributes() function can be\ncaused to dereference an invalid or NULL pointer when reading, resulting in\na Denial of Service.\n\nThe function PKCS7_digest_from_attributes() accesses the message digest attribute\nvalue without validating its type. When the type is not V_ASN1_OCTET_STRING,\nthis results in accessing invalid memory through the ASN1_TYPE union, causing\na crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nsigned PKCS#7 to an application that verifies it. The impact of the\nexploit is just a Denial of Service, the PKCS7 API is legacy and applications\nshould be using the CMS API instead. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#7 parsing implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "1.0.2d-2.fc23",
@@ -4249,6 +4221,19 @@
                     }
                 ]
             },
+            "CVE-2026-2673": {
+                "cve_id": "CVE-2026-2673",
+                "title": "Issue summary: An OpenSSL TLS 1.3 server may fail to negotiate th ...",
+                "description": "Issue summary: An OpenSSL TLS 1.3 server may fail to negotiate the expected\npreferred key exchange group when its key exchange group configuration includes\nthe default by using the 'DEFAULT' keyword.\n\nImpact summary: A less preferred key exchange may be used even when a more\npreferred group is supported by both client and server, if the group\nwas not included among the client's initial predicated keyshares.\nThis will sometimes be the case with the new hybrid post-quantum groups,\nif the client chooses to defer their use until specifically requested by\nthe server.\n\nIf an OpenSSL TLS 1.3 server's configuration uses the 'DEFAULT' keyword to\ninterpolate the built-in default group list into its own configuration, perhaps\nadding or removing specific elements, then an implementation defect causes the\n'DEFAULT' list to lose its 'tuple' structure, and all server-supported groups\nwere treated as a single sufficiently secure 'tuple', with the server not\nsending a Hello Retry Request (HRR) even when a group in a more preferred tuple\nwas mutually supported.\n\nAs a result, the client and server might fail to negotiate a mutually supported\npost-quantum key agreement group, such as 'X25519MLKEM768', if the client's\nconfiguration results in only 'classical' groups (such as 'X25519' being the\nonly ones in the client's initial keyshare prediction).\n\nOpenSSL 3.5 and later support a new syntax for selecting the most preferred TLS\n1.3 key agreement group on TLS servers.  The old syntax had a single 'flat'\nlist of groups, and treated all the supported groups as sufficiently secure.\nIf any of the keyshares predicted by the client were supported by the server\nthe most preferred among these was selected, even if other groups supported by\nthe client, but not included in the list of predicted keyshares would have been\nmore preferred, if included.\n\nThe new syntax partitions the groups into distinct 'tuples' of roughly\nequivalent security.  Within each tuple the most preferred group included among\nthe client's predicted keyshares is chosen, but if the client supports a group\nfrom a more preferred tuple, but did not predict any corresponding keyshares,\nthe server will ask the client to retry the ClientHello (by issuing a Hello\nRetry Request or HRR) with the most preferred mutually supported group.\n\nThe above works as expected when the server's configuration uses the built-in\ndefault group list, or explicitly defines its own list by directly defining the\nvarious desired groups and group 'tuples'.\n\nNo OpenSSL FIPS modules are affected by this issue, the code in question lies\noutside the FIPS boundary.\n\nOpenSSL 3.6 and 3.5 are vulnerable to this issue.\n\nOpenSSL 3.6 users should upgrade to OpenSSL 3.6.2 once it is released.\nOpenSSL 3.5 users should upgrade to OpenSSL 3.5.6 once it is released.\n\nOpenSSL 3.4, 3.3, 3.0, 1.0.2 and 1.1.1 are not affected by this issue.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    }
+                ]
+            },
             "CVE-2026-28387": {
                 "cve_id": "CVE-2026-28387",
                 "title": "Issue summary: An uncommon configuration of clients performing DA ...",
@@ -4258,7 +4243,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el8"
+                        "identifier": "el10"
                     },
                     {
                         "introduced": "0",
@@ -4301,7 +4286,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el8"
+                        "identifier": "el10"
                     },
                     {
                         "introduced": "0",
@@ -4359,7 +4344,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el8"
+                        "identifier": "el10"
                     },
                     {
                         "introduced": "0",
@@ -4417,7 +4402,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el8"
+                        "identifier": "el10"
                     },
                     {
                         "introduced": "0",
@@ -4475,7 +4460,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el8"
+                        "identifier": "el10"
                     }
                 ]
             },
@@ -5730,7 +5715,7 @@
                 ]
             }
         },
-        "10": {
+        "8": {
             "CVE-2024-12797": {
                 "cve_id": "CVE-2024-12797",
                 "title": "Issue summary: Clients using RFC7250 Raw Public Keys (RPKs) to au ...",
@@ -5757,7 +5742,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el10"
+                        "identifier": "el8"
                     },
                     {
                         "introduced": "1:3.2.2-9.fc41",
@@ -5815,8 +5800,12 @@
                 "title": "Issue summary: Some non-default TLS server configurations can cau ...",
                 "description": "Issue summary: Some non-default TLS server configurations can cause unbounded\nmemory growth when processing TLSv1.3 sessions\n\nImpact summary: An attacker may exploit certain server configurations to trigger\nunbounded memory growth that would lead to a Denial of Service\n\nThis problem can occur in TLSv1.3 if the non-default SSL_OP_NO_TICKET option is\nbeing used (but not if early_data support is also configured and the default\nanti-replay protection is in use). In this case, under certain conditions, the\nsession cache can get into an incorrect state and it will fail to flush properly\nas it fills. The session cache will continue to grow in an unbounded manner. A\nmalicious client could deliberately create the scenario for this failure to\nforce a Denial of Service. It may also happen by accident in normal operation.\n\nThis issue only affects TLS servers supporting TLSv1.3. It does not affect TLS\nclients.\n\nThe FIPS modules in 3.2, 3.1 and 3.0 are not affected by this issue. OpenSSL\n1.0.2 is also not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "1.1.1a-1.0.riscv64.fc30",
@@ -5864,12 +5853,8 @@
                 "title": "Issue summary: Checking excessively long DSA keys or parameters m ...",
                 "description": "Issue summary: Checking excessively long DSA keys or parameters may be very\nslow.\n\nImpact summary: Applications that use the functions EVP_PKEY_param_check()\nor EVP_PKEY_public_check() to check a DSA public key or DSA parameters may\nexperience long delays. Where the key or parameters that are being checked\nhave been obtained from an untrusted source this may lead to a Denial of\nService.\n\nThe functions EVP_PKEY_param_check() or EVP_PKEY_public_check() perform\nvarious checks on DSA parameters. Some of those computations take a long time\nif the modulus (`p` parameter) is too large.\n\nTrying to use a very large modulus is slow and OpenSSL will not allow using\npublic keys with a modulus which is over 10,000 bits in length for signature\nverification. However the key and parameter check functions do not limit\nthe modulus size when performing the checks.\n\nAn application that calls EVP_PKEY_param_check() or EVP_PKEY_public_check()\nand supplies a key or parameters obtained from an untrusted source could be\nvulnerable to a Denial of Service attack.\n\nThese functions are not called by OpenSSL itself on untrusted DSA keys so\nonly applications that directly call these functions may be vulnerable.\n\nAlso vulnerable are the OpenSSL pkey and pkeyparam command line applications\nwhen using the `-check` option.\n\nThe OpenSSL SSL/TLS implementation is not affected by this issue.\n\nThe OpenSSL 3.0 and 3.1 FIPS providers are affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "3.2.2-8.fc42",
@@ -5882,8 +5867,12 @@
                 "title": "Issue summary: Calling the OpenSSL API function SSL_free_buffers  ...",
                 "description": "Issue summary: Calling the OpenSSL API function SSL_free_buffers may cause\nmemory to be accessed that was previously freed in some situations\n\nImpact summary: A use after free can have a range of potential consequences such\nas the corruption of valid data, crashes or execution of arbitrary code.\nHowever, only applications that directly call the SSL_free_buffers function are\naffected by this issue. Applications that do not call this function are not\nvulnerable. Our investigations indicate that this function is rarely used by\napplications.\n\nThe SSL_free_buffers function is used to free the internal OpenSSL buffer used\nwhen processing an incoming record from the network. The call is only expected\nto succeed if the buffer is not currently in use. However, two scenarios have\nbeen identified where the buffer is freed even when still in use.\n\nThe first scenario occurs where a record header has been received from the\nnetwork and processed by OpenSSL, but the full record body has not yet arrived.\nIn this case calling SSL_free_buffers will succeed even though a record has only\nbeen partially processed and the buffer is still in use.\n\nThe second scenario occurs where a full record containing application data has\nbeen received and processed by OpenSSL but the application has only read part of\nthis data. Again a call to SSL_free_buffers will succeed even though the buffer\nis still in use.\n\nWhile these scenarios could occur accidentally during normal operation a\nmalicious attacker could attempt to engineer a stituation where this occurs.\nWe are not aware of this issue being actively exploited.\n\nThe FIPS modules in 3.3, 3.2, 3.1 and 3.0 are not affected by this issue.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "1.1.1a-1.0.riscv64.fc30",
@@ -5928,10 +5917,6 @@
                 "severity": "CRITICAL",
                 "status": "open",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
                     {
                         "introduced": "1:3.2.2-9.fc41",
                         "identifier": "fc41"
@@ -6097,8 +6082,12 @@
                 "title": "Issue summary: If an application using the SSL_CIPHER_find() func ...",
                 "description": "Issue summary: If an application using the SSL_CIPHER_find() function in\na QUIC protocol client or server receives an unknown cipher suite from\nthe peer, a NULL dereference occurs.\n\nImpact summary: A NULL pointer dereference leads to abnormal termination of\nthe running process causing Denial of Service.\n\nSome applications call SSL_CIPHER_find() from the client_hello_cb callback\non the cipher ID received from the peer. If this is done with an SSL object\nimplementing the QUIC protocol, NULL pointer dereference will happen if\nthe examined cipher ID is unknown or unsupported.\n\nAs it is not very common to call this function in applications using the QUIC \nprotocol and the worst outcome is Denial of Service, the issue was assessed\nas Low severity.\n\nThe vulnerable code was introduced in the 3.2 version with the addition\nof the QUIC protocol support.\n\nThe FIPS modules in 3.6, 3.5, 3.4 and 3.3 are not affected by this issue,\nas the QUIC implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4 and 3.3 are vulnerable to this issue.\n\nOpenSSL 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "3.5.5-2.fc45",
@@ -6111,8 +6100,12 @@
                 "title": "Issue summary: The 'openssl dgst' command-line tool silently trun ...",
                 "description": "Issue summary: The 'openssl dgst' command-line tool silently truncates input\ndata to 16MB when using one-shot signing algorithms and reports success instead\nof an error.\n\nImpact summary: A user signing or verifying files larger than 16MB with\none-shot algorithms (such as Ed25519, Ed448, or ML-DSA) may believe the entire\nfile is authenticated while trailing data beyond 16MB remains unauthenticated.\n\nWhen the 'openssl dgst' command is used with algorithms that only support\none-shot signing (Ed25519, Ed448, ML-DSA-44, ML-DSA-65, ML-DSA-87), the input\nis buffered with a 16MB limit. If the input exceeds this limit, the tool\nsilently truncates to the first 16MB and continues without signaling an error,\ncontrary to what the documentation states. This creates an integrity gap where\ntrailing bytes can be modified without detection if both signing and\nverification are performed using the same affected codepath.\n\nThe issue affects only the command-line tool behavior. Verifiers that process\nthe full message using library APIs will reject the signature, so the risk\nprimarily affects workflows that both sign and verify with the affected\n'openssl dgst' command. Streaming digest algorithms for 'openssl dgst' and\nlibrary users are unaffected.\n\nThe FIPS modules in 3.5 and 3.6 are not affected by this issue, as the\ncommand-line tools are outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.5 and 3.6 are vulnerable to this issue.\n\nOpenSSL 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "3.5.5-2.fc45",
@@ -6139,8 +6132,12 @@
                 "title": "Issue summary: Writing large, newline-free data into a BIO chain  ...",
                 "description": "Issue summary: Writing large, newline-free data into a BIO chain using the\nline-buffering filter where the next BIO performs short writes can trigger\na heap-based out-of-bounds write.\n\nImpact summary: This out-of-bounds write can cause memory corruption which\ntypically results in a crash, leading to Denial of Service for an application.\n\nThe line-buffering BIO filter (BIO_f_linebuffer) is not used by default in\nTLS/SSL data paths. In OpenSSL command-line applications, it is typically\nonly pushed onto stdout/stderr on VMS systems. Third-party applications that\nexplicitly use this filter with a BIO chain that can short-write and that\nwrite large, newline-free data influenced by an attacker would be affected.\nHowever, the circumstances where this could happen are unlikely to be under\nattacker control, and BIO_f_linebuffer is unlikely to be handling non-curated\ndata controlled by an attacker. For that reason the issue was assessed as\nLow severity.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the BIO implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "1.0.2d-2.fc23",
@@ -6198,8 +6195,12 @@
                 "title": "Issue summary: When using the low-level OCB API directly with AES ...",
                 "description": "Issue summary: When using the low-level OCB API directly with AES-NI or<br>other hardware-accelerated code paths, inputs whose length is not a multiple<br>of 16 bytes can leave the final partial block unencrypted and unauthenticated.<br><br>Impact summary: The trailing 1-15 bytes of a message may be exposed in<br>cleartext on encryption and are not covered by the authentication tag,<br>allowing an attacker to read or tamper with those bytes without detection.<br><br>The low-level OCB encrypt and decrypt routines in the hardware-accelerated<br>stream path process full 16-byte blocks but do not advance the input/output<br>pointers. The subsequent tail-handling code then operates on the original<br>base pointers, effectively reprocessing the beginning of the buffer while<br>leaving the actual trailing bytes unprocessed. The authentication checksum<br>also excludes the true tail bytes.<br><br>However, typical OpenSSL consumers using EVP are not affected because the<br>higher-level EVP and provider OCB implementations split inputs so that full<br>blocks and trailing partial blocks are processed in separate calls, avoiding<br>the problematic code path. Additionally, TLS does not use OCB ciphersuites.<br>The vulnerability only affects applications that call the low-level<br>CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions directly with<br>non-block-aligned lengths in a single call on hardware-accelerated builds.<br>For these reasons the issue was assessed as Low severity.<br><br>The FIPS modules in 3.6, 3.5, 3.4, 3.3, 3.2, 3.1 and 3.0 are not affected<br>by this issue, as OCB mode is not a FIPS-approved algorithm.<br><br>OpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.<br><br>OpenSSL 1.0.2 is not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "1.1.1a-1.0.riscv64.fc30",
@@ -6291,8 +6292,12 @@
                 "title": "Issue summary: A type confusion vulnerability exists in the TimeS ...",
                 "description": "Issue summary: A type confusion vulnerability exists in the TimeStamp Response\nverification code where an ASN1_TYPE union member is accessed without first\nvalidating the type, causing an invalid or NULL pointer dereference when\nprocessing a malformed TimeStamp Response file.\n\nImpact summary: An application calling TS_RESP_verify_response() with a\nmalformed TimeStamp Response can be caused to dereference an invalid or\nNULL pointer when reading, resulting in a Denial of Service.\n\nThe functions ossl_ess_get_signing_cert() and ossl_ess_get_signing_cert_v2()\naccess the signing cert attribute value without validating its type.\nWhen the type is not V_ASN1_SEQUENCE, this results in accessing invalid memory\nthrough the ASN1_TYPE union, causing a crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nTimeStamp Response to an application that verifies timestamp responses. The\nTimeStamp protocol (RFC 3161) is not widely used and the impact of the\nexploit is just a Denial of Service. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the TimeStamp Response implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "1.1.1a-1.0.riscv64.fc30",
@@ -6335,8 +6340,12 @@
                 "title": "Issue summary: Processing a malformed PKCS#12 file can trigger a  ...",
                 "description": "Issue summary: Processing a malformed PKCS#12 file can trigger a NULL pointer\ndereference in the PKCS12_item_decrypt_d2i_ex() function.\n\nImpact summary: A NULL pointer dereference can trigger a crash which leads to\nDenial of Service for an application processing PKCS#12 files.\n\nThe PKCS12_item_decrypt_d2i_ex() function does not check whether the oct\nparameter is NULL before dereferencing it. When called from\nPKCS12_unpack_p7encdata() with a malformed PKCS#12 file, this parameter can\nbe NULL, causing a crash. The vulnerability is limited to Denial of Service\nand cannot be escalated to achieve code execution or memory disclosure.\n\nExploiting this issue requires an attacker to provide a malformed PKCS#12 file\nto an application that processes it. For that reason the issue was assessed as\nLow severity according to our Security Policy.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "1.0.2d-2.fc23",
@@ -6461,12 +6470,8 @@
                 "title": "Issue summary: An application using the OpenSSL HTTP client API f ...",
                 "description": "Issue summary: An application using the OpenSSL HTTP client API functions may\ntrigger an out-of-bounds read if the 'no_proxy' environment variable is set and\nthe host portion of the authority component of the HTTP URL is an IPv6 address.\n\nImpact summary: An out-of-bounds read can trigger a crash which leads to\nDenial of Service for an application.\n\nThe OpenSSL HTTP client API functions can be used directly by applications\nbut they are also used by the OCSP client functions and CMP (Certificate\nManagement Protocol) client implementation in OpenSSL. However the URLs used\nby these implementations are unlikely to be controlled by an attacker.\n\nIn this vulnerable code the out of bounds read can only trigger a crash.\nFurthermore the vulnerability requires an attacker-controlled URL to be\npassed from an application to the OpenSSL function and the user has to have\na 'no_proxy' environment variable set. For the aforementioned reasons the\nissue was assessed as Low severity.\n\nThe vulnerable code was introduced in the following patch releases:\n3.0.16, 3.1.8, 3.2.4, 3.3.3, 3.4.0 and 3.5.0.\n\nThe FIPS modules in 3.5, 3.4, 3.3, 3.2, 3.1 and 3.0 are not affected by this\nissue, as the HTTP client implementation is outside the OpenSSL FIPS module\nboundary.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
                     {
                         "introduced": "0",
                         "fixed": "3.5.5-2.fc45",
@@ -6479,8 +6484,12 @@
                 "title": "Issue summary: An invalid or NULL pointer dereference can happen  ...",
                 "description": "Issue summary: An invalid or NULL pointer dereference can happen in\nan application processing a malformed PKCS#12 file.\n\nImpact summary: An application processing a malformed PKCS#12 file can be\ncaused to dereference an invalid or NULL pointer on memory read, resulting\nin a Denial of Service.\n\nA type confusion vulnerability exists in PKCS#12 parsing code where\nan ASN1_TYPE union member is accessed without first validating the type,\ncausing an invalid pointer read.\n\nThe location is constrained to a 1-byte address space, meaning any\nattempted pointer manipulation can only target addresses between 0x00 and 0xFF.\nThis range corresponds to the zero page, which is unmapped on most modern\noperating systems and will reliably result in a crash, leading only to a\nDenial of Service. Exploiting this issue also requires a user or application\nto process a maliciously crafted PKCS#12 file. It is uncommon to accept\nuntrusted PKCS#12 files in applications as they are usually used to store\nprivate keys which are trusted by definition. For these reasons, the issue\nwas assessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "1.1.1a-1.0.riscv64.fc30",
@@ -6523,8 +6532,12 @@
                 "title": "Issue summary: A type confusion vulnerability exists in the signa ...",
                 "description": "Issue summary: A type confusion vulnerability exists in the signature\nverification of signed PKCS#7 data where an ASN1_TYPE union member is\naccessed without first validating the type, causing an invalid or NULL\npointer dereference when processing malformed PKCS#7 data.\n\nImpact summary: An application performing signature verification of PKCS#7\ndata or calling directly the PKCS7_digest_from_attributes() function can be\ncaused to dereference an invalid or NULL pointer when reading, resulting in\na Denial of Service.\n\nThe function PKCS7_digest_from_attributes() accesses the message digest attribute\nvalue without validating its type. When the type is not V_ASN1_OCTET_STRING,\nthis results in accessing invalid memory through the ASN1_TYPE union, causing\na crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nsigned PKCS#7 to an application that verifies it. The impact of the\nexploit is just a Denial of Service, the PKCS7 API is legacy and applications\nshould be using the CMS API instead. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#7 parsing implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "0",
                         "fixed": "1.0.2d-2.fc23",
@@ -6577,19 +6590,6 @@
                     }
                 ]
             },
-            "CVE-2026-2673": {
-                "cve_id": "CVE-2026-2673",
-                "title": "Issue summary: An OpenSSL TLS 1.3 server may fail to negotiate th ...",
-                "description": "Issue summary: An OpenSSL TLS 1.3 server may fail to negotiate the expected\npreferred key exchange group when its key exchange group configuration includes\nthe default by using the 'DEFAULT' keyword.\n\nImpact summary: A less preferred key exchange may be used even when a more\npreferred group is supported by both client and server, if the group\nwas not included among the client's initial predicated keyshares.\nThis will sometimes be the case with the new hybrid post-quantum groups,\nif the client chooses to defer their use until specifically requested by\nthe server.\n\nIf an OpenSSL TLS 1.3 server's configuration uses the 'DEFAULT' keyword to\ninterpolate the built-in default group list into its own configuration, perhaps\nadding or removing specific elements, then an implementation defect causes the\n'DEFAULT' list to lose its 'tuple' structure, and all server-supported groups\nwere treated as a single sufficiently secure 'tuple', with the server not\nsending a Hello Retry Request (HRR) even when a group in a more preferred tuple\nwas mutually supported.\n\nAs a result, the client and server might fail to negotiate a mutually supported\npost-quantum key agreement group, such as 'X25519MLKEM768', if the client's\nconfiguration results in only 'classical' groups (such as 'X25519' being the\nonly ones in the client's initial keyshare prediction).\n\nOpenSSL 3.5 and later support a new syntax for selecting the most preferred TLS\n1.3 key agreement group on TLS servers.  The old syntax had a single 'flat'\nlist of groups, and treated all the supported groups as sufficiently secure.\nIf any of the keyshares predicted by the client were supported by the server\nthe most preferred among these was selected, even if other groups supported by\nthe client, but not included in the list of predicted keyshares would have been\nmore preferred, if included.\n\nThe new syntax partitions the groups into distinct 'tuples' of roughly\nequivalent security.  Within each tuple the most preferred group included among\nthe client's predicted keyshares is chosen, but if the client supports a group\nfrom a more preferred tuple, but did not predict any corresponding keyshares,\nthe server will ask the client to retry the ClientHello (by issuing a Hello\nRetry Request or HRR) with the most preferred mutually supported group.\n\nThe above works as expected when the server's configuration uses the built-in\ndefault group list, or explicitly defines its own list by directly defining the\nvarious desired groups and group 'tuples'.\n\nNo OpenSSL FIPS modules are affected by this issue, the code in question lies\noutside the FIPS boundary.\n\nOpenSSL 3.6 and 3.5 are vulnerable to this issue.\n\nOpenSSL 3.6 users should upgrade to OpenSSL 3.6.2 once it is released.\nOpenSSL 3.5 users should upgrade to OpenSSL 3.5.6 once it is released.\n\nOpenSSL 3.4, 3.3, 3.0, 1.0.2 and 1.1.1 are not affected by this issue.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    }
-                ]
-            },
             "CVE-2026-28387": {
                 "cve_id": "CVE-2026-28387",
                 "title": "Issue summary: An uncommon configuration of clients performing DA ...",
@@ -6599,7 +6599,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el10"
+                        "identifier": "el8"
                     },
                     {
                         "introduced": "0",
@@ -6642,7 +6642,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el10"
+                        "identifier": "el8"
                     },
                     {
                         "introduced": "0",
@@ -6700,7 +6700,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el10"
+                        "identifier": "el8"
                     },
                     {
                         "introduced": "0",
@@ -6758,7 +6758,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el10"
+                        "identifier": "el8"
                     },
                     {
                         "introduced": "0",
@@ -6816,7 +6816,7 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "identifier": "el10"
+                        "identifier": "el8"
                     }
                 ]
             },
