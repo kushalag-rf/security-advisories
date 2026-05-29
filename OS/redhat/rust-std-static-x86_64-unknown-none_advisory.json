@@ -1,0 +1,133 @@
+{
+    "package_name": "rust-std-static-x86_64-unknown-none",
+    "advisory": {
+        "7": {
+            "CVE-2024-24576": {
+                "cve_id": "CVE-2024-24576",
+                "title": "Rust is a programming language. The Rust Security Response WG was ...",
+                "description": "Rust is a programming language. The Rust Security Response WG was notified that the Rust standard library prior to version 1.77.2 did not properly escape arguments when invoking batch files (with the `bat` and `cmd` extensions) on Windows using the `Command`. An attacker able to control the arguments passed to the spawned process could execute arbitrary shell commands by bypassing the escaping. The severity of this vulnerability is critical for those who invoke batch files on Windows with untrusted arguments. No other platform or use is affected.\n\nThe `Command::arg` and `Command::args` APIs state in their documentation that the arguments will be passed to the spawned process as-is, regardless of the content of the arguments, and will not be evaluated by a shell. This means it should be safe to pass untrusted input as an argument.\n\nOn Windows, the implementation of this is more complex than other platforms, because the Windows API only provides a single string containing all the arguments to the spawned process, and it's up to the spawned process to split them. Most programs use the standard C run-time argv, which in practice results in a mostly consistent way arguments are splitted.\n\nOne exception though is `cmd.exe` (used among other things to execute batch files), which has its own argument splitting logic. That forces the standard library to implement custom escaping for arguments passed to batch files. Unfortunately it was reported that our escaping logic was not thorough enough, and it was possible to pass malicious arguments that would result in arbitrary shell execution.\n\nDue to the complexity of `cmd.exe`, we didn't identify a solution that would correctly escape arguments in all cases. To maintain our API guarantees, we improved the robustness of the escaping code, and changed the `Command` API to return an `InvalidInput` error when it cannot safely escape an argument. This error will be emitted when spawning the process.\n\nThe fix is included in Rust 1.77.2. Note that the new escaping logic for batch files errs on the conservative side, and could reject valid arguments. Those who implement the escaping themselves or only handle trusted inputs on Windows can also use the `CommandExt::raw_arg` method to bypass the standard library's escaping logic.",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "1.77.0-1.fc40",
+                        "fixed": "1.77.2-1.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "1.77.2-1.fc38",
+                        "identifier": "fc38"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "1.77.2-1.fc39",
+                        "identifier": "fc39"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "1.77.2-1.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2024-3566": {
+                "cve_id": "CVE-2024-3566",
+                "title": "A command inject vulnerability allows an attacker to perform comm ...",
+                "description": "A command inject vulnerability allows an attacker to perform command injection on Windows applications that indirectly depend on the CreateProcess function when the specific conditions are satisfied.",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "1.77.0-1.fc40",
+                        "fixed": "1.82.0-1.fc40",
+                        "identifier": "fc40"
+                    }
+                ]
+            },
+            "CVE-2024-43402": {
+                "cve_id": "CVE-2024-43402",
+                "title": "Rust is a programming language. The fix for CVE-2024-24576, where ...",
+                "description": "Rust is a programming language. The fix for CVE-2024-24576, where `std::process::Command` incorrectly escaped arguments when invoking batch files on Windows, was incomplete. Prior to Rust version 1.81.0, it was possible to bypass the fix when the batch file name had trailing whitespace or periods (which are ignored and stripped by Windows). To determine whether to apply the `cmd.exe` escaping rules, the original fix for the vulnerability checked whether the command name ended with `.bat` or `.cmd`. At the time that seemed enough, as we refuse to invoke batch scripts with no file extension. Windows removes trailing whitespace and periods when parsing file paths. For example, `.bat. .` is interpreted by Windows as `.bat`, but the original fix didn't check for that. Affected users who are using Rust 1.77.2 or greater can remove the trailing whitespace (ASCII 0x20) and trailing periods (ASCII 0x2E) from the batch file name to bypass the incomplete fix and enable the mitigations. Users are affected if their code or one of their dependencies invoke a batch script on Windows with trailing whitespace or trailing periods in the name, and pass untrusted arguments to it. Rust 1.81.0 will update the standard library to apply the CVE-2024-24576 mitigations to all batch files invocations, regardless of the trailing chars in the file name.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "1.77.0-1.fc40",
+                        "fixed": "1.82.0-1.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "1.81.0-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            }
+        },
+        "10": {
+            "CVE-2024-24576": {
+                "cve_id": "CVE-2024-24576",
+                "title": "Rust is a programming language. The Rust Security Response WG was ...",
+                "description": "Rust is a programming language. The Rust Security Response WG was notified that the Rust standard library prior to version 1.77.2 did not properly escape arguments when invoking batch files (with the `bat` and `cmd` extensions) on Windows using the `Command`. An attacker able to control the arguments passed to the spawned process could execute arbitrary shell commands by bypassing the escaping. The severity of this vulnerability is critical for those who invoke batch files on Windows with untrusted arguments. No other platform or use is affected.\n\nThe `Command::arg` and `Command::args` APIs state in their documentation that the arguments will be passed to the spawned process as-is, regardless of the content of the arguments, and will not be evaluated by a shell. This means it should be safe to pass untrusted input as an argument.\n\nOn Windows, the implementation of this is more complex than other platforms, because the Windows API only provides a single string containing all the arguments to the spawned process, and it's up to the spawned process to split them. Most programs use the standard C run-time argv, which in practice results in a mostly consistent way arguments are splitted.\n\nOne exception though is `cmd.exe` (used among other things to execute batch files), which has its own argument splitting logic. That forces the standard library to implement custom escaping for arguments passed to batch files. Unfortunately it was reported that our escaping logic was not thorough enough, and it was possible to pass malicious arguments that would result in arbitrary shell execution.\n\nDue to the complexity of `cmd.exe`, we didn't identify a solution that would correctly escape arguments in all cases. To maintain our API guarantees, we improved the robustness of the escaping code, and changed the `Command` API to return an `InvalidInput` error when it cannot safely escape an argument. This error will be emitted when spawning the process.\n\nThe fix is included in Rust 1.77.2. Note that the new escaping logic for batch files errs on the conservative side, and could reject valid arguments. Those who implement the escaping themselves or only handle trusted inputs on Windows can also use the `CommandExt::raw_arg` method to bypass the standard library's escaping logic.",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "1.77.0-1.fc40",
+                        "fixed": "1.77.2-1.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "1.77.2-1.fc38",
+                        "identifier": "fc38"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "1.77.2-1.fc39",
+                        "identifier": "fc39"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "1.77.2-1.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2024-3566": {
+                "cve_id": "CVE-2024-3566",
+                "title": "A command inject vulnerability allows an attacker to perform comm ...",
+                "description": "A command inject vulnerability allows an attacker to perform command injection on Windows applications that indirectly depend on the CreateProcess function when the specific conditions are satisfied.",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "1.77.0-1.fc40",
+                        "fixed": "1.82.0-1.fc40",
+                        "identifier": "fc40"
+                    }
+                ]
+            },
+            "CVE-2024-43402": {
+                "cve_id": "CVE-2024-43402",
+                "title": "Rust is a programming language. The fix for CVE-2024-24576, where ...",
+                "description": "Rust is a programming language. The fix for CVE-2024-24576, where `std::process::Command` incorrectly escaped arguments when invoking batch files on Windows, was incomplete. Prior to Rust version 1.81.0, it was possible to bypass the fix when the batch file name had trailing whitespace or periods (which are ignored and stripped by Windows). To determine whether to apply the `cmd.exe` escaping rules, the original fix for the vulnerability checked whether the command name ended with `.bat` or `.cmd`. At the time that seemed enough, as we refuse to invoke batch scripts with no file extension. Windows removes trailing whitespace and periods when parsing file paths. For example, `.bat. .` is interpreted by Windows as `.bat`, but the original fix didn't check for that. Affected users who are using Rust 1.77.2 or greater can remove the trailing whitespace (ASCII 0x20) and trailing periods (ASCII 0x2E) from the batch file name to bypass the incomplete fix and enable the mitigations. Users are affected if their code or one of their dependencies invoke a batch script on Windows with trailing whitespace or trailing periods in the name, and pass untrusted arguments to it. Rust 1.81.0 will update the standard library to apply the CVE-2024-24576 mitigations to all batch files invocations, regardless of the trailing chars in the file name.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "1.77.0-1.fc40",
+                        "fixed": "1.82.0-1.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "1.81.0-1.fc42",
+                        "identifier": "fc42"
+                    }
+                ]
+            }
+        }
+    }
+}
