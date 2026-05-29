@@ -28162,7 +28162,7 @@
                     },
                     {
                         "introduced": "6.8.5-301.fc40",
-                        "fixed": "6.12.14-100.fc40",
+                        "fixed": "6.12.15-100.fc40",
                         "identifier": "fc40"
                     },
                     {
@@ -56037,7 +56037,7 @@
                 "cve_id": "CVE-2026-23302",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: annotate data-races around sk->sk_{data_ready,write_space}\n\nskmsg (and probably other layers) are changing these pointers\nwhile other cpus might read them concurrently.\n\nAdd corresponding READ_ONCE()/WRITE_ONCE() annotations\nfor UDP, TCP and AF_UNIX.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -56058,7 +56058,7 @@
                 "cve_id": "CVE-2026-23303",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: Don't log plaintext credentials in cifs_set_cifscreds\n\nWhen debug logging is enabled, cifs_set_cifscreds() logs the key\npayload and exposes the plaintext username and password. Remove the\ndebug log to avoid exposing credentials.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -56121,7 +56121,7 @@
                 "cve_id": "CVE-2026-23310",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf/bonding: reject vlan+srcmac xmit_hash_policy change when XDP is loaded\n\nbond_option_mode_set() already rejects mode changes that would make a\nloaded XDP program incompatible via bond_xdp_check().  However,\nbond_option_xmit_hash_policy_set() has no such guard.\n\nFor 802.3ad and balance-xor modes, bond_xdp_check() returns false when\nxmit_hash_policy is vlan+srcmac, because the 802.1q payload is usually\nabsent due to hardware offload.  This means a user can:\n\n1. Attach a native XDP program to a bond in 802.3ad/balance-xor mode\n   with a compatible xmit_hash_policy (e.g. layer2+3).\n2. Change xmit_hash_policy to vlan+srcmac while XDP remains loaded.\n\nThis leaves bond->xdp_prog set but bond_xdp_check() now returning false\nfor the same device.  When the bond is later destroyed, dev_xdp_uninstall()\ncalls bond_xdp_set(dev, NULL, NULL) to remove the program, which hits\nthe bond_xdp_check() guard and returns -EOPNOTSUPP, triggering:\n\nWARN_ON(dev_xdp_install(dev, mode, bpf_op, NULL, 0, NULL))\n\nFix this by rejecting xmit_hash_policy changes to vlan+srcmac when an\nXDP program is loaded on a bond in 802.3ad or balance-xor mode.\n\ncommit 39a0876d595b (\"net, bonding: Disallow vlan+srcmac with XDP\")\nintroduced bond_xdp_check() which returns false for 802.3ad/balance-xor\nmodes when xmit_hash_policy is vlan+srcmac.  The check was wired into\nbond_xdp_set() to reject XDP attachment with an incompatible policy, but\nthe symmetric path -- preventing xmit_hash_policy from being changed to an\nincompatible value after XDP is already loaded -- was left unguarded in\nbond_option_xmit_hash_policy_set().\n\nNote:\ncommit 094ee6017ea0 (\"bonding: check xdp prog when set bond mode\")\nlater added a similar guard to bond_option_mode_set(), but\nbond_option_xmit_hash_policy_set() remained unprotected.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -68332,11 +68332,53 @@
                     }
                 ]
             },
+            "CVE-2026-46012": {
+                "cve_id": "CVE-2026-46012",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nrxrpc: Fix memory leaks in rxkad_verify_response()\n\nFix rxkad_verify_response() to free the ticket and the server key under all\ncircumstances by initialising the ticket pointer to NULL and then making\nall paths through the function after the first allocation has been done go\nthrough a single common epilogue that just releases everything - where all\nthe releases skip on a NULL pointer.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
             "CVE-2026-46014": {
                 "cve_id": "CVE-2026-46014",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: SVM: Add missing save/restore handling of LBR MSRs\n\nMSR_IA32_DEBUGCTLMSR and LBR MSRs are currently not enumerated by\nKVM_GET_MSR_INDEX_LIST, and LBR MSRs cannot be set with KVM_SET_MSRS. So\nsave/restore is completely broken.\n\nFix it by adding the MSRs to msrs_to_save_base, and allowing writes to\nLBR MSRs from userspace only (as they are read-only MSRs) if LBR\nvirtualization is enabled.  Additionally, to correctly restore L1's LBRs\nwhile L2 is running, make sure the LBRs are copied from the captured\nVMCB01 save area in svm_copy_vmrun_state().\n\nNote, for VMX, this also fixes a flaw where MSR_IA32_DEBUGCTLMSR isn't\nreported as an MSR to save/restore.\n\nNote #2, over-reporting MSR_IA32_LASTxxx on Intel is ok, as KVM already\nhandles unsupported reads and writes thanks to commit b5e2fec0ebc3 (\"KVM:\nIgnore DEBUGCTL MSRs with no effect\") (kvm_do_msr_access() will morph the\nunsupported userspace write into a nop).\n\n[sean: guard with lbrv checks, massage changelog]",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46015": {
+                "cve_id": "CVE-2026-46015",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntcp: call sk_data_ready() after listener migration\n\nWhen inet_csk_listen_stop() migrates an established child socket from\na closing listener to another socket in the same SO_REUSEPORT group,\nthe target listener gets a new accept-queue entry via\ninet_csk_reqsk_queue_add(), but that path never notifies the target\nlistener's waiters. A nonblocking accept() still works because it\nchecks the queue directly, but poll()/epoll_wait() waiters and\nblocking accept() callers can also remain asleep indefinitely.\n\nCall READ_ONCE(nsk->sk_data_ready)(nsk) after a successful migration\nin inet_csk_listen_stop().\n\nHowever, after inet_csk_reqsk_queue_add() succeeds, the ref acquired\nin reuseport_migrate_sock() is effectively transferred to\nnreq->rsk_listener. Another CPU can then dequeue nreq via accept()\nor listener shutdown, hit reqsk_put(), and drop that listener ref.\nSince listeners are SOCK_RCU_FREE, wrap the post-queue_add()\ndereferences of nsk in rcu_read_lock()/rcu_read_unlock(), which also\ncovers the existing sock_net(nsk) access in that path.\n\nThe reqsk_timer_handler() path does not need the same changes for two\nreasons: half-open requests become readable only after the final ACK,\nwhere tcp_child_process() already wakes the listener; and once nreq is\nvisible via inet_ehash_insert(), the success path no longer touches\nnsk directly.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -69240,6 +69282,27 @@
                     }
                 ]
             },
+            "CVE-2026-46094": {
+                "cve_id": "CVE-2026-46094",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\next4: fix bounds check in check_xattrs() to prevent out-of-bounds access\n\nThe bounds check for the next xattr entry in check_xattrs() uses\n(void *)next >= end, which allows next to point within sizeof(u32)\nbytes of end. On the next loop iteration, IS_LAST_ENTRY() reads 4\nbytes via *(__u32 *)(entry), which can overrun the valid xattr region.\n\nFor example, if next lands at end - 1, the check passes since\nnext < end, but IS_LAST_ENTRY() reads 4 bytes starting at end - 1,\naccessing 3 bytes beyond the valid region.\n\nFix this by changing the check to (void *)next + sizeof(u32) > end,\nensuring there is always enough space for the IS_LAST_ENTRY() read\non the subsequent iteration.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
             "CVE-2026-46095": {
                 "cve_id": "CVE-2026-46095",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -69313,6 +69376,137 @@
                     {
                         "introduced": "6.11.4-301.fc41",
                         "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46107": {
+                "cve_id": "CVE-2026-46107",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndm-thin: fix metadata refcount underflow\n\nThere's a bug in dm-thin in the function rebalance_children. If the\ninternal btree node has one entry, the code tries to copy all btree\nentries from the node's child to the node itself and then decrement the\nchild's reference count.\n\nIf the child node is shared (it has reference count > 1), we won't free\nit, so there would be two pointers to each of the grandchildren nodes.\nBut the reference counts of the grandchildren is not increased, thus the\nreference count doesn't match the number of pointers that point to the\ngrandchildren. This results in \"device mapper: space map common: unable\nto decrement block\" errors.\n\nFix this bug by incrementing reference counts on the grandchildren if the\nbtree node is shared.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46111": {
+                "cve_id": "CVE-2026-46111",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: hci_conn: fix potential UAF in create_big_sync\n\nAdd hci_conn_valid() check in create_big_sync() to detect stale\nconnections before proceeding with BIG creation. Handle the\nresulting -ECANCELED in create_big_complete() and re-validate the\nconnection under hci_dev_lock() before dereferencing, matching the\npattern used by create_le_conn_complete() and create_pa_complete().\n\nKeep the hci_conn object alive across the async boundary by taking\na reference via hci_conn_get() when queueing create_big_sync(), and\ndropping it in the completion callback. The refcount and the lock\nare complementary: the refcount keeps the object allocated, while\nhci_dev_lock() serializes hci_conn_hash_del()'s list_del_rcu() on\nhdev->conn_hash, as required by hci_conn_del().\n\nhci_conn_put() is called outside hci_dev_unlock() so the final put\n(which resolves to kfree() via bt_link_release) does not run under\nhdev->lock, though the release path would be safe either way.\n\nWithout this, create_big_complete() would unconditionally\ndereference the conn pointer on error, causing a use-after-free\nvia hci_connect_cfm() and hci_conn_del().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46113": {
+                "cve_id": "CVE-2026-46113",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: x86: Fix shadow paging use-after-free due to unexpected GFN\n\nThe shadow MMU computes GFNs for direct shadow pages using sp->gfn plus\nthe SPTE index. This assumption breaks for shadow paging if the guest\npage tables are modified between VM entries (similar to commit\naad885e77496, \"KVM: x86/mmu: Drop/zap existing present SPTE even\nwhen creating an MMIO SPTE\", 2026-03-27).  The flow is as follows:\n\n- a PDE is installed for a 2MB mapping, and a page in that area is\n  accessed.  KVM creates a kvm_mmu_page consisting of 512 4KB pages;\n  the kvm_mmu_page is marked by FNAME(fetch) as direct-mapped because\n  the guest's mapping is a huge page (and thus contiguous).\n\n- the PDE mapping is changed from outside the guest.\n\n- the guest accesses another page in the same 2MB area.  KVM installs\n  a new leaf SPTE and rmap entry; the SPTE uses the \"correct\" GFN\n  (i.e. based on the new mapping, as changed in the previous step) but\n  that GFN is outside of the [sp->gfn, sp->gfn + 511] range; therefore\n  the rmap entry cannot be found and removed when the kvm_mmu_page\n  is zapped.\n\n- the memslot that covers the first 2MB mapping is deleted, and the\n  kvm_mmu_page for the now-invalid GPA is zapped.  However, rmap_remove()\n  only looks at the [sp->gfn, sp->gfn + 511] range established in step 1,\n  and fails to find the rmap entry that was recorded by step 3.\n\n- any operation that causes an rmap walk for the same page accessed\n  by step 3 then walks a stale rmap and dereferences a freed kvm_mmu_page.\n  This includes dirty logging or MMU notifier invalidations (e.g., from\n  MADV_DONTNEED).\n\nThe underlying issue is that KVM's walking of shadow PTEs assumes that\nif a SPTE is present when KVM wants to install a non-leaf SPTE, then the\nexisting kvm_mmu_page must be for the correct gfn.  Because the only way\nfor the gfn to be wrong is if KVM messed up and failed to zap a SPTE...\nwhich shouldn't happen, but *actually* only happens in response to a\nguest write.\n\nThat bug dates back literally forever, as even the first version of KVM\nassumes that the GFN matches and walks into the \"wrong\" shadow page.\nHowever, that was only an imprecision until 2032a93d66fa (\"KVM: MMU:\nDon't allocate gfns page for direct mmu pages\") came along.\n\nFix it by checking for a target gfn mismatch and zapping the existing\nSPTE.  That way the old SP and rmap entries are gone, KVM installs\nthe rmap in the right location, and everyone is happy.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46114": {
+                "cve_id": "CVE-2026-46114",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nRDMA/rxe: Reject non-8-byte ATOMIC_WRITE payloads\n\natomic_write_reply() at drivers/infiniband/sw/rxe/rxe_resp.c\nunconditionally dereferences 8 bytes at payload_addr(pkt):\n\n    value = *(u64 *)payload_addr(pkt);\n\ncheck_rkey() previously accepted an ATOMIC_WRITE request with pktlen ==\nresid == 0 because the length validation only compared pktlen against\nresid. A remote initiator that sets the RETH length to 0 therefore reaches\natomic_write_reply() with a zero-byte logical payload, and the responder\nreads sizeof(u64) bytes from past the logical end of the packet into\nskb->head tailroom, then writes those 8 bytes into the attacker's MR via\nrxe_mr_do_atomic_write(). That is a remote disclosure of 4 bytes of kernel\ntailroom per probe (the other 4 bytes are the packet's own trailing ICRC).\n\nIBA oA19-28 defines ATOMIC_WRITE as exactly 8 bytes. Anything else is\nprotocol-invalid. Hoist a strict length check into check_rkey() so the\nresponder never reaches the unchecked dereference, and keep the existing\nWRITE-family length logic for the normal RDMA WRITE path.\n\nReproduced on mainline with an unmodified rxe driver: a sustained\nzero-length ATOMIC_WRITE probe repeatedly leaks adjacent skb head-buffer\nbytes into the attacker's MR, including recognisable kernel strings and\npartial kernel-direct-map pointer words.  With this patch applied the\nresponder rejects the PDU and the MR stays all-zero.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-46115": {
+                "cve_id": "CVE-2026-46115",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nblock: add pgmap check to biovec_phys_mergeable\n\nbiovec_phys_mergeable() is used by the request merge, DMA mapping,\nand integrity merge paths to decide if two physically contiguous\nbvec segments can be coalesced into one. It currently has no check\nfor whether the segments belong to different dev_pagemaps.\n\nWhen zone device memory is registered in multiple chunks, each chunk\ngets its own dev_pagemap. A single bio can legitimately contain\nbvecs from different pgmaps -- iov_iter_extract_bvecs() breaks at\npgmap boundaries but the outer loop in bio_iov_iter_get_pages()\ncontinues filling the same bio. If such bvecs are physically\ncontiguous, biovec_phys_mergeable() will coalesce them, making it\nimpossible to recover the correct pgmap for the merged segment\nvia page_pgmap().\n\nAdd a zone_device_pages_have_same_pgmap() check to prevent merging\nbvec segments that span different pgmaps.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46119": {
+                "cve_id": "CVE-2026-46119",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nlibceph: Fix slab-out-of-bounds access in auth message processing\n\nIf a (potentially corrupted) message of type CEPH_MSG_AUTH_REPLY\ncontains a positive value in its result field, it is treated as an\nerror code by ceph_handle_auth_reply() and returned to\nhandle_auth_reply(). Thereafter, an attempt is made to send the\npreallocated message of type CEPH_MSG_AUTH, where the returned value is\ninterpreted as the size of the front segment to send. If the result\nvalue in the message is greater than the size of the memory buffer\nallocated for the front segment, an out-of-bounds access occurs, and\nthe content of the memory region beyond this buffer is sent out.\n\nThis patch fixes the issue by treating only negative values in the\nresult field as errors. Positive values are therefore treated as success\nin the same way as a zero value. Additionally, a BUG_ON is added to\n__send_prepared_auth_request() comparing the len parameter to\nfront_alloc_len to prevent sending the message if it exceeds the bounds\nof the allocation and to make it easier to catch any logic flaws leading\nto this.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46121": {
+                "cve_id": "CVE-2026-46121",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmm/damon/sysfs-schemes: protect memcg_path kfree() with damon_sysfs_lock\n\nPatch series \"mm/damon/sysfs-schemes: fix use-after-free for [memcg_]path\".\n\nReads of 'memcg_path' and 'path' files in DAMON sysfs interface could race\nwith their writes, results in use-after-free.  Fix those.\n\n\nThis patch (of 2):\n\ndamon_sysfs_scheme_filter->mmecg_path can be read and written by users,\nvia DAMON sysfs memcg_path file.  It can also be indirectly read, for the\nparameters {on,off}line committing to DAMON.  The reads for parameters\ncommitting are protected by damon_sysfs_lock to avoid the sysfs files\nbeing destroyed while any of the parameters are being read.  But the\nuser-driven direct reads and writes are not protected by any lock, while\nthe write is deallocating the memcg_path-pointing buffer.  As a result,\nthe readers could read the already freed buffer (user-after-free).  Note\nthat the user-reads don't race when the same open file is used by the\nwriter, due to kernfs's open file locking.  Nonetheless, doing the reads\nand writes with separate open files would be common.  Fix it by protecting\nboth the user-direct reads and writes with damon_sysfs_lock.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
                     }
                 ]
             },
@@ -72086,7 +72280,7 @@
                 "events": [
                     {
                         "introduced": "6.8.5-301.fc40",
-                        "fixed": "6.12.14-100.fc40",
+                        "fixed": "6.12.15-100.fc40",
                         "identifier": "fc40"
                     },
                     {
@@ -95246,7 +95440,7 @@
                 "cve_id": "CVE-2026-23302",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: annotate data-races around sk->sk_{data_ready,write_space}\n\nskmsg (and probably other layers) are changing these pointers\nwhile other cpus might read them concurrently.\n\nAdd corresponding READ_ONCE()/WRITE_ONCE() annotations\nfor UDP, TCP and AF_UNIX.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -95267,7 +95461,7 @@
                 "cve_id": "CVE-2026-23303",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: Don't log plaintext credentials in cifs_set_cifscreds\n\nWhen debug logging is enabled, cifs_set_cifscreds() logs the key\npayload and exposes the plaintext username and password. Remove the\ndebug log to avoid exposing credentials.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -95330,7 +95524,7 @@
                 "cve_id": "CVE-2026-23310",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf/bonding: reject vlan+srcmac xmit_hash_policy change when XDP is loaded\n\nbond_option_mode_set() already rejects mode changes that would make a\nloaded XDP program incompatible via bond_xdp_check().  However,\nbond_option_xmit_hash_policy_set() has no such guard.\n\nFor 802.3ad and balance-xor modes, bond_xdp_check() returns false when\nxmit_hash_policy is vlan+srcmac, because the 802.1q payload is usually\nabsent due to hardware offload.  This means a user can:\n\n1. Attach a native XDP program to a bond in 802.3ad/balance-xor mode\n   with a compatible xmit_hash_policy (e.g. layer2+3).\n2. Change xmit_hash_policy to vlan+srcmac while XDP remains loaded.\n\nThis leaves bond->xdp_prog set but bond_xdp_check() now returning false\nfor the same device.  When the bond is later destroyed, dev_xdp_uninstall()\ncalls bond_xdp_set(dev, NULL, NULL) to remove the program, which hits\nthe bond_xdp_check() guard and returns -EOPNOTSUPP, triggering:\n\nWARN_ON(dev_xdp_install(dev, mode, bpf_op, NULL, 0, NULL))\n\nFix this by rejecting xmit_hash_policy changes to vlan+srcmac when an\nXDP program is loaded on a bond in 802.3ad or balance-xor mode.\n\ncommit 39a0876d595b (\"net, bonding: Disallow vlan+srcmac with XDP\")\nintroduced bond_xdp_check() which returns false for 802.3ad/balance-xor\nmodes when xmit_hash_policy is vlan+srcmac.  The check was wired into\nbond_xdp_set() to reject XDP attachment with an incompatible policy, but\nthe symmetric path -- preventing xmit_hash_policy from being changed to an\nincompatible value after XDP is already loaded -- was left unguarded in\nbond_option_xmit_hash_policy_set().\n\nNote:\ncommit 094ee6017ea0 (\"bonding: check xdp prog when set bond mode\")\nlater added a similar guard to bond_option_mode_set(), but\nbond_option_xmit_hash_policy_set() remained unprotected.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -106968,11 +107162,53 @@
                     }
                 ]
             },
+            "CVE-2026-46012": {
+                "cve_id": "CVE-2026-46012",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nrxrpc: Fix memory leaks in rxkad_verify_response()\n\nFix rxkad_verify_response() to free the ticket and the server key under all\ncircumstances by initialising the ticket pointer to NULL and then making\nall paths through the function after the first allocation has been done go\nthrough a single common epilogue that just releases everything - where all\nthe releases skip on a NULL pointer.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
             "CVE-2026-46014": {
                 "cve_id": "CVE-2026-46014",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: SVM: Add missing save/restore handling of LBR MSRs\n\nMSR_IA32_DEBUGCTLMSR and LBR MSRs are currently not enumerated by\nKVM_GET_MSR_INDEX_LIST, and LBR MSRs cannot be set with KVM_SET_MSRS. So\nsave/restore is completely broken.\n\nFix it by adding the MSRs to msrs_to_save_base, and allowing writes to\nLBR MSRs from userspace only (as they are read-only MSRs) if LBR\nvirtualization is enabled.  Additionally, to correctly restore L1's LBRs\nwhile L2 is running, make sure the LBRs are copied from the captured\nVMCB01 save area in svm_copy_vmrun_state().\n\nNote, for VMX, this also fixes a flaw where MSR_IA32_DEBUGCTLMSR isn't\nreported as an MSR to save/restore.\n\nNote #2, over-reporting MSR_IA32_LASTxxx on Intel is ok, as KVM already\nhandles unsupported reads and writes thanks to commit b5e2fec0ebc3 (\"KVM:\nIgnore DEBUGCTL MSRs with no effect\") (kvm_do_msr_access() will morph the\nunsupported userspace write into a nop).\n\n[sean: guard with lbrv checks, massage changelog]",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46015": {
+                "cve_id": "CVE-2026-46015",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntcp: call sk_data_ready() after listener migration\n\nWhen inet_csk_listen_stop() migrates an established child socket from\na closing listener to another socket in the same SO_REUSEPORT group,\nthe target listener gets a new accept-queue entry via\ninet_csk_reqsk_queue_add(), but that path never notifies the target\nlistener's waiters. A nonblocking accept() still works because it\nchecks the queue directly, but poll()/epoll_wait() waiters and\nblocking accept() callers can also remain asleep indefinitely.\n\nCall READ_ONCE(nsk->sk_data_ready)(nsk) after a successful migration\nin inet_csk_listen_stop().\n\nHowever, after inet_csk_reqsk_queue_add() succeeds, the ref acquired\nin reuseport_migrate_sock() is effectively transferred to\nnreq->rsk_listener. Another CPU can then dequeue nreq via accept()\nor listener shutdown, hit reqsk_put(), and drop that listener ref.\nSince listeners are SOCK_RCU_FREE, wrap the post-queue_add()\ndereferences of nsk in rcu_read_lock()/rcu_read_unlock(), which also\ncovers the existing sock_net(nsk) access in that path.\n\nThe reqsk_timer_handler() path does not need the same changes for two\nreasons: half-open requests become readable only after the final ACK,\nwhere tcp_child_process() already wakes the listener; and once nreq is\nvisible via inet_ehash_insert(), the success path no longer touches\nnsk directly.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -107850,6 +108086,27 @@
                     }
                 ]
             },
+            "CVE-2026-46094": {
+                "cve_id": "CVE-2026-46094",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\next4: fix bounds check in check_xattrs() to prevent out-of-bounds access\n\nThe bounds check for the next xattr entry in check_xattrs() uses\n(void *)next >= end, which allows next to point within sizeof(u32)\nbytes of end. On the next loop iteration, IS_LAST_ENTRY() reads 4\nbytes via *(__u32 *)(entry), which can overrun the valid xattr region.\n\nFor example, if next lands at end - 1, the check passes since\nnext < end, but IS_LAST_ENTRY() reads 4 bytes starting at end - 1,\naccessing 3 bytes beyond the valid region.\n\nFix this by changing the check to (void *)next + sizeof(u32) > end,\nensuring there is always enough space for the IS_LAST_ENTRY() read\non the subsequent iteration.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
             "CVE-2026-46099": {
                 "cve_id": "CVE-2026-46099",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -107896,6 +108153,111 @@
                 "cve_id": "CVE-2026-46102",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: strparser: fix skb_head leak in strp_abort_strp()\n\nWhen the stream parser is aborted, for example after a message assembly timeout,\nit can still hold a reference to a partially assembled message in\nstrp->skb_head.\n\nThat skb is not released in strp_abort_strp(), which leaks the partially\nassembled message and can be triggered repeatedly to exhaust memory.\n\nFix this by freeing strp->skb_head and resetting the parser state in the\nabort path. Leave strp_stop() unchanged so final cleanup still happens in\nstrp_done() after the work and timer have been synchronized.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46107": {
+                "cve_id": "CVE-2026-46107",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndm-thin: fix metadata refcount underflow\n\nThere's a bug in dm-thin in the function rebalance_children. If the\ninternal btree node has one entry, the code tries to copy all btree\nentries from the node's child to the node itself and then decrement the\nchild's reference count.\n\nIf the child node is shared (it has reference count > 1), we won't free\nit, so there would be two pointers to each of the grandchildren nodes.\nBut the reference counts of the grandchildren is not increased, thus the\nreference count doesn't match the number of pointers that point to the\ngrandchildren. This results in \"device mapper: space map common: unable\nto decrement block\" errors.\n\nFix this bug by incrementing reference counts on the grandchildren if the\nbtree node is shared.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46111": {
+                "cve_id": "CVE-2026-46111",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: hci_conn: fix potential UAF in create_big_sync\n\nAdd hci_conn_valid() check in create_big_sync() to detect stale\nconnections before proceeding with BIG creation. Handle the\nresulting -ECANCELED in create_big_complete() and re-validate the\nconnection under hci_dev_lock() before dereferencing, matching the\npattern used by create_le_conn_complete() and create_pa_complete().\n\nKeep the hci_conn object alive across the async boundary by taking\na reference via hci_conn_get() when queueing create_big_sync(), and\ndropping it in the completion callback. The refcount and the lock\nare complementary: the refcount keeps the object allocated, while\nhci_dev_lock() serializes hci_conn_hash_del()'s list_del_rcu() on\nhdev->conn_hash, as required by hci_conn_del().\n\nhci_conn_put() is called outside hci_dev_unlock() so the final put\n(which resolves to kfree() via bt_link_release) does not run under\nhdev->lock, though the release path would be safe either way.\n\nWithout this, create_big_complete() would unconditionally\ndereference the conn pointer on error, causing a use-after-free\nvia hci_connect_cfm() and hci_conn_del().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46113": {
+                "cve_id": "CVE-2026-46113",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: x86: Fix shadow paging use-after-free due to unexpected GFN\n\nThe shadow MMU computes GFNs for direct shadow pages using sp->gfn plus\nthe SPTE index. This assumption breaks for shadow paging if the guest\npage tables are modified between VM entries (similar to commit\naad885e77496, \"KVM: x86/mmu: Drop/zap existing present SPTE even\nwhen creating an MMIO SPTE\", 2026-03-27).  The flow is as follows:\n\n- a PDE is installed for a 2MB mapping, and a page in that area is\n  accessed.  KVM creates a kvm_mmu_page consisting of 512 4KB pages;\n  the kvm_mmu_page is marked by FNAME(fetch) as direct-mapped because\n  the guest's mapping is a huge page (and thus contiguous).\n\n- the PDE mapping is changed from outside the guest.\n\n- the guest accesses another page in the same 2MB area.  KVM installs\n  a new leaf SPTE and rmap entry; the SPTE uses the \"correct\" GFN\n  (i.e. based on the new mapping, as changed in the previous step) but\n  that GFN is outside of the [sp->gfn, sp->gfn + 511] range; therefore\n  the rmap entry cannot be found and removed when the kvm_mmu_page\n  is zapped.\n\n- the memslot that covers the first 2MB mapping is deleted, and the\n  kvm_mmu_page for the now-invalid GPA is zapped.  However, rmap_remove()\n  only looks at the [sp->gfn, sp->gfn + 511] range established in step 1,\n  and fails to find the rmap entry that was recorded by step 3.\n\n- any operation that causes an rmap walk for the same page accessed\n  by step 3 then walks a stale rmap and dereferences a freed kvm_mmu_page.\n  This includes dirty logging or MMU notifier invalidations (e.g., from\n  MADV_DONTNEED).\n\nThe underlying issue is that KVM's walking of shadow PTEs assumes that\nif a SPTE is present when KVM wants to install a non-leaf SPTE, then the\nexisting kvm_mmu_page must be for the correct gfn.  Because the only way\nfor the gfn to be wrong is if KVM messed up and failed to zap a SPTE...\nwhich shouldn't happen, but *actually* only happens in response to a\nguest write.\n\nThat bug dates back literally forever, as even the first version of KVM\nassumes that the GFN matches and walks into the \"wrong\" shadow page.\nHowever, that was only an imprecision until 2032a93d66fa (\"KVM: MMU:\nDon't allocate gfns page for direct mmu pages\") came along.\n\nFix it by checking for a target gfn mismatch and zapping the existing\nSPTE.  That way the old SP and rmap entries are gone, KVM installs\nthe rmap in the right location, and everyone is happy.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46115": {
+                "cve_id": "CVE-2026-46115",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nblock: add pgmap check to biovec_phys_mergeable\n\nbiovec_phys_mergeable() is used by the request merge, DMA mapping,\nand integrity merge paths to decide if two physically contiguous\nbvec segments can be coalesced into one. It currently has no check\nfor whether the segments belong to different dev_pagemaps.\n\nWhen zone device memory is registered in multiple chunks, each chunk\ngets its own dev_pagemap. A single bio can legitimately contain\nbvecs from different pgmaps -- iov_iter_extract_bvecs() breaks at\npgmap boundaries but the outer loop in bio_iov_iter_get_pages()\ncontinues filling the same bio. If such bvecs are physically\ncontiguous, biovec_phys_mergeable() will coalesce them, making it\nimpossible to recover the correct pgmap for the merged segment\nvia page_pgmap().\n\nAdd a zone_device_pages_have_same_pgmap() check to prevent merging\nbvec segments that span different pgmaps.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46119": {
+                "cve_id": "CVE-2026-46119",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nlibceph: Fix slab-out-of-bounds access in auth message processing\n\nIf a (potentially corrupted) message of type CEPH_MSG_AUTH_REPLY\ncontains a positive value in its result field, it is treated as an\nerror code by ceph_handle_auth_reply() and returned to\nhandle_auth_reply(). Thereafter, an attempt is made to send the\npreallocated message of type CEPH_MSG_AUTH, where the returned value is\ninterpreted as the size of the front segment to send. If the result\nvalue in the message is greater than the size of the memory buffer\nallocated for the front segment, an out-of-bounds access occurs, and\nthe content of the memory region beyond this buffer is sent out.\n\nThis patch fixes the issue by treating only negative values in the\nresult field as errors. Positive values are therefore treated as success\nin the same way as a zero value. Additionally, a BUG_ON is added to\n__send_prepared_auth_request() comparing the len parameter to\nfront_alloc_len to prevent sending the message if it exceeds the bounds\nof the allocation and to make it easier to catch any logic flaws leading\nto this.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
