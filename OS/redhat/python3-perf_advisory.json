@@ -55127,7 +55127,7 @@
                 "cve_id": "CVE-2026-23259",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nio_uring/rw: free potentially allocated iovec on cache put failure\n\nIf a read/write request goes through io_req_rw_cleanup() and has an\nallocated iovec attached and fails to put to the rw_cache, then it may\nend up with an unaccounted iovec pointer. Have io_rw_recycle() return\nwhether it recycled the request or not, and use that to gauge whether to\nfree a potential iovec or not.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -55148,7 +55148,7 @@
                 "cve_id": "CVE-2026-23260",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nregmap: maple: free entry on mas_store_gfp() failure\n\nregcache_maple_write() allocates a new block ('entry') to merge\nadjacent ranges and then stores it with mas_store_gfp().\nWhen mas_store_gfp() fails, the new 'entry' remains allocated and\nis never freed, leaking memory.\n\nFree 'entry' on the failure path; on success continue freeing the\nreplaced neighbor blocks ('lower', 'upper').",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -55385,7 +55385,7 @@
                 "cve_id": "CVE-2026-23290",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: usb: pegasus: validate USB endpoints\n\nThe pegasus driver should validate that the device it is probing has the\nproper number and types of USB endpoints it is expecting before it binds\nto it.  If a malicious device were to not have the same urbs the driver\nwill crash later on when it blindly accesses these endpoints.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -55469,7 +55469,7 @@
                 "cve_id": "CVE-2026-23297",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnfsd: Fix cred ref leak in nfsd_nl_threads_set_doit().\n\nsyzbot reported memory leak of struct cred. [0]\n\nnfsd_nl_threads_set_doit() passes get_current_cred() to\nnfsd_svc(), but put_cred() is not called after that.\n\nThe cred is finally passed down to _svc_xprt_create(),\nwhich calls get_cred() with the cred for struct svc_xprt.\n\nThe ownership of the refcount by get_current_cred() is not\ntransferred to anywhere and is just leaked.\n\nnfsd_svc() is also called from write_threads(), but it does\nnot bump file->f_cred there.\n\nnfsd_nl_threads_set_doit() is called from sendmsg() and\ncurrent->cred does not go away.\n\nLet's use current_cred() in nfsd_nl_threads_set_doit().\n\n[0]:\nBUG: memory leak\nunreferenced object 0xffff888108b89480 (size 184):\n  comm \"syz-executor\", pid 5994, jiffies 4294943386\n  hex dump (first 32 bytes):\n    01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................\n    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................\n  backtrace (crc 369454a7):\n    kmemleak_alloc_recursive include/linux/kmemleak.h:44 [inline]\n    slab_post_alloc_hook mm/slub.c:4958 [inline]\n    slab_alloc_node mm/slub.c:5263 [inline]\n    kmem_cache_alloc_noprof+0x412/0x580 mm/slub.c:5270\n    prepare_creds+0x22/0x600 kernel/cred.c:185\n    copy_creds+0x44/0x290 kernel/cred.c:286\n    copy_process+0x7a7/0x2870 kernel/fork.c:2086\n    kernel_clone+0xac/0x6e0 kernel/fork.c:2651\n    __do_sys_clone+0x7f/0xb0 kernel/fork.c:2792\n    do_syscall_x64 arch/x86/entry/syscall_64.c:63 [inline]\n    do_syscall_64+0xa4/0xf80 arch/x86/entry/syscall_64.c:94\n    entry_SYSCALL_64_after_hwframe+0x77/0x7f",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -62545,7 +62545,7 @@
                 "cve_id": "CVE-2026-43066",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\next4: fix iloc.bh leak in ext4_fc_replay_inode() error paths\n\nDuring code review, Joseph found that ext4_fc_replay_inode() calls\next4_get_fc_inode_loc() to get the inode location, which holds a\nreference to iloc.bh that must be released via brelse().\n\nHowever, several error paths jump to the 'out' label without\nreleasing iloc.bh:\n\n - ext4_handle_dirty_metadata() failure\n - sync_dirty_buffer() failure\n - ext4_mark_inode_used() failure\n - ext4_iget() failure\n\nFix this by introducing an 'out_brelse' label placed just before\nthe existing 'out' label to ensure iloc.bh is always released.\n\nAdditionally, make ext4_fc_replay_inode() propagate errors\nproperly instead of always returning 0.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -69191,6 +69191,27 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe: Fix dma-buf attachment leak in xe_gem_prime_import()\n\nWhen xe_dma_buf_init_obj() fails, the attachment from\ndma_buf_dynamic_attach() is not detached. Add dma_buf_detach() before\nreturning the error. Note: we cannot use goto out_err here because\nxe_dma_buf_init_obj() already frees bo on failure, and out_err would\ndouble-free it.\n\n(cherry picked from commit a828eb185aac41800df8eae4b60501ccc0dbbe51)",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46214": {
+                "cve_id": "CVE-2026-46214",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: fix accept queue count leak on transport mismatch\n\nvirtio_transport_recv_listen() calls sk_acceptq_added() before\nvsock_assign_transport(). If vsock_assign_transport() fails or\nselects a different transport, the error path returns without\ncalling sk_acceptq_removed(), permanently incrementing\nsk_ack_backlog.\n\nAfter approximately backlog+1 such failures, sk_acceptq_is_full()\nreturns true, causing the listener to reject all new connections.\n\nFix by moving sk_acceptq_added() to after the transport validation,\nmatching the pattern used by vmci_transport and hyperv_transport.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -109419,7 +109440,7 @@
                 "cve_id": "CVE-2026-23259",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nio_uring/rw: free potentially allocated iovec on cache put failure\n\nIf a read/write request goes through io_req_rw_cleanup() and has an\nallocated iovec attached and fails to put to the rw_cache, then it may\nend up with an unaccounted iovec pointer. Have io_rw_recycle() return\nwhether it recycled the request or not, and use that to gauge whether to\nfree a potential iovec or not.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -109436,7 +109457,7 @@
                 "cve_id": "CVE-2026-23260",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nregmap: maple: free entry on mas_store_gfp() failure\n\nregcache_maple_write() allocates a new block ('entry') to merge\nadjacent ranges and then stores it with mas_store_gfp().\nWhen mas_store_gfp() fails, the new 'entry' remains allocated and\nis never freed, leaking memory.\n\nFree 'entry' on the failure path; on success continue freeing the\nreplaced neighbor blocks ('lower', 'upper').",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -109652,7 +109673,7 @@
                 "cve_id": "CVE-2026-23290",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: usb: pegasus: validate USB endpoints\n\nThe pegasus driver should validate that the device it is probing has the\nproper number and types of USB endpoints it is expecting before it binds\nto it.  If a malicious device were to not have the same urbs the driver\nwill crash later on when it blindly accesses these endpoints.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -109732,7 +109753,7 @@
                 "cve_id": "CVE-2026-23297",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnfsd: Fix cred ref leak in nfsd_nl_threads_set_doit().\n\nsyzbot reported memory leak of struct cred. [0]\n\nnfsd_nl_threads_set_doit() passes get_current_cred() to\nnfsd_svc(), but put_cred() is not called after that.\n\nThe cred is finally passed down to _svc_xprt_create(),\nwhich calls get_cred() with the cred for struct svc_xprt.\n\nThe ownership of the refcount by get_current_cred() is not\ntransferred to anywhere and is just leaked.\n\nnfsd_svc() is also called from write_threads(), but it does\nnot bump file->f_cred there.\n\nnfsd_nl_threads_set_doit() is called from sendmsg() and\ncurrent->cred does not go away.\n\nLet's use current_cred() in nfsd_nl_threads_set_doit().\n\n[0]:\nBUG: memory leak\nunreferenced object 0xffff888108b89480 (size 184):\n  comm \"syz-executor\", pid 5994, jiffies 4294943386\n  hex dump (first 32 bytes):\n    01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................\n    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................\n  backtrace (crc 369454a7):\n    kmemleak_alloc_recursive include/linux/kmemleak.h:44 [inline]\n    slab_post_alloc_hook mm/slub.c:4958 [inline]\n    slab_alloc_node mm/slub.c:5263 [inline]\n    kmem_cache_alloc_noprof+0x412/0x580 mm/slub.c:5270\n    prepare_creds+0x22/0x600 kernel/cred.c:185\n    copy_creds+0x44/0x290 kernel/cred.c:286\n    copy_process+0x7a7/0x2870 kernel/fork.c:2086\n    kernel_clone+0xac/0x6e0 kernel/fork.c:2651\n    __do_sys_clone+0x7f/0xb0 kernel/fork.c:2792\n    do_syscall_x64 arch/x86/entry/syscall_64.c:63 [inline]\n    do_syscall_64+0xa4/0xf80 arch/x86/entry/syscall_64.c:94\n    entry_SYSCALL_64_after_hwframe+0x77/0x7f",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -116308,7 +116329,7 @@
                 "cve_id": "CVE-2026-43066",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\next4: fix iloc.bh leak in ext4_fc_replay_inode() error paths\n\nDuring code review, Joseph found that ext4_fc_replay_inode() calls\next4_get_fc_inode_loc() to get the inode location, which holds a\nreference to iloc.bh that must be released via brelse().\n\nHowever, several error paths jump to the 'out' label without\nreleasing iloc.bh:\n\n - ext4_handle_dirty_metadata() failure\n - sync_dirty_buffer() failure\n - ext4_mark_inode_used() failure\n - ext4_iget() failure\n\nFix this by introducing an 'out_brelse' label placed just before\nthe existing 'out' label to ensure iloc.bh is always released.\n\nAdditionally, make ext4_fc_replay_inode() propagate errors\nproperly instead of always returning 0.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -122395,6 +122416,27 @@
                 "severity": "LOW",
                 "status": "open",
                 "events": [
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46214": {
+                "cve_id": "CVE-2026-46214",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: fix accept queue count leak on transport mismatch\n\nvirtio_transport_recv_listen() calls sk_acceptq_added() before\nvsock_assign_transport(). If vsock_assign_transport() fails or\nselects a different transport, the error path returns without\ncalling sk_acceptq_removed(), permanently incrementing\nsk_ack_backlog.\n\nAfter approximately backlog+1 such failures, sk_acceptq_is_full()\nreturns true, causing the listener to reject all new connections.\n\nFix by moving sk_acceptq_added() to after the transport validation,\nmatching the pattern used by vmci_transport and hyperv_transport.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "6.8.5-301.fc40",
                         "identifier": "fc40"
@@ -147862,7 +147904,7 @@
                 "cve_id": "CVE-2026-23259",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nio_uring/rw: free potentially allocated iovec on cache put failure\n\nIf a read/write request goes through io_req_rw_cleanup() and has an\nallocated iovec attached and fails to put to the rw_cache, then it may\nend up with an unaccounted iovec pointer. Have io_rw_recycle() return\nwhether it recycled the request or not, and use that to gauge whether to\nfree a potential iovec or not.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -147883,7 +147925,7 @@
                 "cve_id": "CVE-2026-23260",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nregmap: maple: free entry on mas_store_gfp() failure\n\nregcache_maple_write() allocates a new block ('entry') to merge\nadjacent ranges and then stores it with mas_store_gfp().\nWhen mas_store_gfp() fails, the new 'entry' remains allocated and\nis never freed, leaking memory.\n\nFree 'entry' on the failure path; on success continue freeing the\nreplaced neighbor blocks ('lower', 'upper').",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -148093,7 +148135,7 @@
                 "cve_id": "CVE-2026-23290",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: usb: pegasus: validate USB endpoints\n\nThe pegasus driver should validate that the device it is probing has the\nproper number and types of USB endpoints it is expecting before it binds\nto it.  If a malicious device were to not have the same urbs the driver\nwill crash later on when it blindly accesses these endpoints.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -148177,7 +148219,7 @@
                 "cve_id": "CVE-2026-23297",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnfsd: Fix cred ref leak in nfsd_nl_threads_set_doit().\n\nsyzbot reported memory leak of struct cred. [0]\n\nnfsd_nl_threads_set_doit() passes get_current_cred() to\nnfsd_svc(), but put_cred() is not called after that.\n\nThe cred is finally passed down to _svc_xprt_create(),\nwhich calls get_cred() with the cred for struct svc_xprt.\n\nThe ownership of the refcount by get_current_cred() is not\ntransferred to anywhere and is just leaked.\n\nnfsd_svc() is also called from write_threads(), but it does\nnot bump file->f_cred there.\n\nnfsd_nl_threads_set_doit() is called from sendmsg() and\ncurrent->cred does not go away.\n\nLet's use current_cred() in nfsd_nl_threads_set_doit().\n\n[0]:\nBUG: memory leak\nunreferenced object 0xffff888108b89480 (size 184):\n  comm \"syz-executor\", pid 5994, jiffies 4294943386\n  hex dump (first 32 bytes):\n    01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................\n    00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  ................\n  backtrace (crc 369454a7):\n    kmemleak_alloc_recursive include/linux/kmemleak.h:44 [inline]\n    slab_post_alloc_hook mm/slub.c:4958 [inline]\n    slab_alloc_node mm/slub.c:5263 [inline]\n    kmem_cache_alloc_noprof+0x412/0x580 mm/slub.c:5270\n    prepare_creds+0x22/0x600 kernel/cred.c:185\n    copy_creds+0x44/0x290 kernel/cred.c:286\n    copy_process+0x7a7/0x2870 kernel/fork.c:2086\n    kernel_clone+0xac/0x6e0 kernel/fork.c:2651\n    __do_sys_clone+0x7f/0xb0 kernel/fork.c:2792\n    do_syscall_x64 arch/x86/entry/syscall_64.c:63 [inline]\n    do_syscall_64+0xa4/0xf80 arch/x86/entry/syscall_64.c:94\n    entry_SYSCALL_64_after_hwframe+0x77/0x7f",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -154952,7 +154994,7 @@
                 "cve_id": "CVE-2026-43066",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\next4: fix iloc.bh leak in ext4_fc_replay_inode() error paths\n\nDuring code review, Joseph found that ext4_fc_replay_inode() calls\next4_get_fc_inode_loc() to get the inode location, which holds a\nreference to iloc.bh that must be released via brelse().\n\nHowever, several error paths jump to the 'out' label without\nreleasing iloc.bh:\n\n - ext4_handle_dirty_metadata() failure\n - sync_dirty_buffer() failure\n - ext4_mark_inode_used() failure\n - ext4_iget() failure\n\nFix this by introducing an 'out_brelse' label placed just before\nthe existing 'out' label to ensure iloc.bh is always released.\n\nAdditionally, make ext4_fc_replay_inode() propagate errors\nproperly instead of always returning 0.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -161248,6 +161290,27 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe: Fix dma-buf attachment leak in xe_gem_prime_import()\n\nWhen xe_dma_buf_init_obj() fails, the attachment from\ndma_buf_dynamic_attach() is not detached. Add dma_buf_detach() before\nreturning the error. Note: we cannot use goto out_err here because\nxe_dma_buf_init_obj() already frees bo on failure, and out_err would\ndouble-free it.\n\n(cherry picked from commit a828eb185aac41800df8eae4b60501ccc0dbbe51)",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.8.5-301.fc40",
+                        "identifier": "fc40"
+                    },
+                    {
+                        "introduced": "6.11.4-301.fc41",
+                        "identifier": "fc41"
+                    }
+                ]
+            },
+            "CVE-2026-46214": {
+                "cve_id": "CVE-2026-46214",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: fix accept queue count leak on transport mismatch\n\nvirtio_transport_recv_listen() calls sk_acceptq_added() before\nvsock_assign_transport(). If vsock_assign_transport() fails or\nselects a different transport, the error path returns without\ncalling sk_acceptq_removed(), permanently incrementing\nsk_ack_backlog.\n\nAfter approximately backlog+1 such failures, sk_acceptq_is_full()\nreturns true, causing the listener to reject all new connections.\n\nFix by moving sk_acceptq_added() to after the transport validation,\nmatching the pattern used by vmci_transport and hyperv_transport.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
