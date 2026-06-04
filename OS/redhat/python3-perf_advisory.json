@@ -24227,40 +24227,6 @@
                     }
                 ]
             },
-            "CVE-2026-43037": {
-                "cve_id": "CVE-2026-43037",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nip6_tunnel: clear skb2->cb[] in ip4ip6_err()\n\nOskar Kjos reported the following problem.\n\nip4ip6_err() calls icmp_send() on a cloned skb whose cb[] was written\nby the IPv6 receive path as struct inet6_skb_parm. icmp_send() passes\nIPCB(skb2) to __ip_options_echo(), which interprets that cb[] region\nas struct inet_skb_parm (IPv4). The layouts differ: inet6_skb_parm.nhoff\nat offset 14 overlaps inet_skb_parm.opt.rr, producing a non-zero rr\nvalue. __ip_options_echo() then reads optlen from attacker-controlled\npacket data at sptr[rr+1] and copies that many bytes into dopt->__data,\na fixed 40-byte stack buffer (IP_OPTIONS_DATA_FIXED_SIZE).\n\nTo fix this we clear skb2->cb[], as suggested by Oskar Kjos.\n\nAlso add minimal IPv4 header validation (version == 4, ihl >= 5).",
-                "severity": "CRITICAL",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-43038": {
-                "cve_id": "CVE-2026-43038",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: icmp: clear skb2->cb[] in ip6_err_gen_icmpv6_unreach()\n\nSashiko AI-review observed:\n\n  In ip6_err_gen_icmpv6_unreach(), the skb is an outer IPv4 ICMP error packet\n  where its cb contains an IPv4 inet_skb_parm. When skb is cloned into skb2\n  and passed to icmp6_send(), it uses IP6CB(skb2).\n\n  IP6CB interprets the IPv4 inet_skb_parm as an inet6_skb_parm. The cipso\n  offset in inet_skb_parm.opt directly overlaps with dsthao in inet6_skb_parm\n  at offset 18.\n\n  If an attacker sends a forged ICMPv4 error with a CIPSO IP option, dsthao\n  would be a non-zero offset. Inside icmp6_send(), mip6_addr_swap() is called\n  and uses ipv6_find_tlv(skb, opt->dsthao, IPV6_TLV_HAO).\n\n  This would scan the inner, attacker-controlled IPv6 packet starting at that\n  offset, potentially returning a fake TLV without checking if the remaining\n  packet length can hold the full 18-byte struct ipv6_destopt_hao.\n\n  Could mip6_addr_swap() then perform a 16-byte swap that extends past the end\n  of the packet data into skb_shared_info?\n\n  Should the cb array also be cleared in ip6_err_gen_icmpv6_unreach() and\n  ip6ip6_err() to prevent this?\n\nThis patch implements the first suggestion.\n\nI am not sure if ip6ip6_err() needs to be changed.\nA separate patch would be better anyway.",
-                "severity": "CRITICAL",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-43040": {
                 "cve_id": "CVE-2026-43040",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -29304,7 +29270,7 @@
                 "cve_id": "CVE-2026-46086",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: bridge: use a stable FDB dst snapshot in RCU readers\n\nLocal FDB entries can be rewritten in place by `fdb_delete_local()`, which\nupdates `f->dst` to another port or to `NULL` while keeping the entry\nalive. Several bridge RCU readers inspect `f->dst`, including\n`br_fdb_fillbuf()` through the `brforward_read()` sysfs path.\n\nThese readers currently load `f->dst` multiple times and can therefore\nobserve inconsistent values across the check and later dereference.\nIn `br_fdb_fillbuf()`, this means a concurrent local-FDB update can change\n`f->dst` after the NULL check and before the `port_no` dereference,\nleading to a NULL-ptr-deref.\n\nFix this by taking a single `READ_ONCE()` snapshot of `f->dst` in each\naffected RCU reader and using that snapshot for the rest of the access\nsequence. Also publish the in-place `f->dst` updates in `fdb_delete_local()`\nwith `WRITE_ONCE()` so the readers and writer use matching access patterns.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -54262,40 +54228,6 @@
                     }
                 ]
             },
-            "CVE-2026-43037": {
-                "cve_id": "CVE-2026-43037",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nip6_tunnel: clear skb2->cb[] in ip4ip6_err()\n\nOskar Kjos reported the following problem.\n\nip4ip6_err() calls icmp_send() on a cloned skb whose cb[] was written\nby the IPv6 receive path as struct inet6_skb_parm. icmp_send() passes\nIPCB(skb2) to __ip_options_echo(), which interprets that cb[] region\nas struct inet_skb_parm (IPv4). The layouts differ: inet6_skb_parm.nhoff\nat offset 14 overlaps inet_skb_parm.opt.rr, producing a non-zero rr\nvalue. __ip_options_echo() then reads optlen from attacker-controlled\npacket data at sptr[rr+1] and copies that many bytes into dopt->__data,\na fixed 40-byte stack buffer (IP_OPTIONS_DATA_FIXED_SIZE).\n\nTo fix this we clear skb2->cb[], as suggested by Oskar Kjos.\n\nAlso add minimal IPv4 header validation (version == 4, ihl >= 5).",
-                "severity": "CRITICAL",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-43038": {
-                "cve_id": "CVE-2026-43038",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: icmp: clear skb2->cb[] in ip6_err_gen_icmpv6_unreach()\n\nSashiko AI-review observed:\n\n  In ip6_err_gen_icmpv6_unreach(), the skb is an outer IPv4 ICMP error packet\n  where its cb contains an IPv4 inet_skb_parm. When skb is cloned into skb2\n  and passed to icmp6_send(), it uses IP6CB(skb2).\n\n  IP6CB interprets the IPv4 inet_skb_parm as an inet6_skb_parm. The cipso\n  offset in inet_skb_parm.opt directly overlaps with dsthao in inet6_skb_parm\n  at offset 18.\n\n  If an attacker sends a forged ICMPv4 error with a CIPSO IP option, dsthao\n  would be a non-zero offset. Inside icmp6_send(), mip6_addr_swap() is called\n  and uses ipv6_find_tlv(skb, opt->dsthao, IPV6_TLV_HAO).\n\n  This would scan the inner, attacker-controlled IPv6 packet starting at that\n  offset, potentially returning a fake TLV without checking if the remaining\n  packet length can hold the full 18-byte struct ipv6_destopt_hao.\n\n  Could mip6_addr_swap() then perform a 16-byte swap that extends past the end\n  of the packet data into skb_shared_info?\n\n  Should the cb array also be cleared in ip6_err_gen_icmpv6_unreach() and\n  ip6ip6_err() to prevent this?\n\nThis patch implements the first suggestion.\n\nI am not sure if ip6ip6_err() needs to be changed.\nA separate patch would be better anyway.",
-                "severity": "CRITICAL",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-43040": {
                 "cve_id": "CVE-2026-43040",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -59339,7 +59271,7 @@
                 "cve_id": "CVE-2026-46086",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: bridge: use a stable FDB dst snapshot in RCU readers\n\nLocal FDB entries can be rewritten in place by `fdb_delete_local()`, which\nupdates `f->dst` to another port or to `NULL` while keeping the entry\nalive. Several bridge RCU readers inspect `f->dst`, including\n`br_fdb_fillbuf()` through the `brforward_read()` sysfs path.\n\nThese readers currently load `f->dst` multiple times and can therefore\nobserve inconsistent values across the check and later dereference.\nIn `br_fdb_fillbuf()`, this means a concurrent local-FDB update can change\n`f->dst` after the NULL check and before the `port_no` dereference,\nleading to a NULL-ptr-deref.\n\nFix this by taking a single `READ_ONCE()` snapshot of `f->dst` in each\naffected RCU reader and using that snapshot for the rest of the access\nsequence. Also publish the in-place `f->dst` updates in `fdb_delete_local()`\nwith `WRITE_ONCE()` so the readers and writer use matching access patterns.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -81965,40 +81897,6 @@
                     }
                 ]
             },
-            "CVE-2026-43037": {
-                "cve_id": "CVE-2026-43037",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nip6_tunnel: clear skb2->cb[] in ip4ip6_err()\n\nOskar Kjos reported the following problem.\n\nip4ip6_err() calls icmp_send() on a cloned skb whose cb[] was written\nby the IPv6 receive path as struct inet6_skb_parm. icmp_send() passes\nIPCB(skb2) to __ip_options_echo(), which interprets that cb[] region\nas struct inet_skb_parm (IPv4). The layouts differ: inet6_skb_parm.nhoff\nat offset 14 overlaps inet_skb_parm.opt.rr, producing a non-zero rr\nvalue. __ip_options_echo() then reads optlen from attacker-controlled\npacket data at sptr[rr+1] and copies that many bytes into dopt->__data,\na fixed 40-byte stack buffer (IP_OPTIONS_DATA_FIXED_SIZE).\n\nTo fix this we clear skb2->cb[], as suggested by Oskar Kjos.\n\nAlso add minimal IPv4 header validation (version == 4, ihl >= 5).",
-                "severity": "CRITICAL",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-43038": {
-                "cve_id": "CVE-2026-43038",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: icmp: clear skb2->cb[] in ip6_err_gen_icmpv6_unreach()\n\nSashiko AI-review observed:\n\n  In ip6_err_gen_icmpv6_unreach(), the skb is an outer IPv4 ICMP error packet\n  where its cb contains an IPv4 inet_skb_parm. When skb is cloned into skb2\n  and passed to icmp6_send(), it uses IP6CB(skb2).\n\n  IP6CB interprets the IPv4 inet_skb_parm as an inet6_skb_parm. The cipso\n  offset in inet_skb_parm.opt directly overlaps with dsthao in inet6_skb_parm\n  at offset 18.\n\n  If an attacker sends a forged ICMPv4 error with a CIPSO IP option, dsthao\n  would be a non-zero offset. Inside icmp6_send(), mip6_addr_swap() is called\n  and uses ipv6_find_tlv(skb, opt->dsthao, IPV6_TLV_HAO).\n\n  This would scan the inner, attacker-controlled IPv6 packet starting at that\n  offset, potentially returning a fake TLV without checking if the remaining\n  packet length can hold the full 18-byte struct ipv6_destopt_hao.\n\n  Could mip6_addr_swap() then perform a 16-byte swap that extends past the end\n  of the packet data into skb_shared_info?\n\n  Should the cb array also be cleared in ip6_err_gen_icmpv6_unreach() and\n  ip6ip6_err() to prevent this?\n\nThis patch implements the first suggestion.\n\nI am not sure if ip6ip6_err() needs to be changed.\nA separate patch would be better anyway.",
-                "severity": "CRITICAL",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-43040": {
                 "cve_id": "CVE-2026-43040",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -86670,7 +86568,7 @@
                 "cve_id": "CVE-2026-46086",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: bridge: use a stable FDB dst snapshot in RCU readers\n\nLocal FDB entries can be rewritten in place by `fdb_delete_local()`, which\nupdates `f->dst` to another port or to `NULL` while keeping the entry\nalive. Several bridge RCU readers inspect `f->dst`, including\n`br_fdb_fillbuf()` through the `brforward_read()` sysfs path.\n\nThese readers currently load `f->dst` multiple times and can therefore\nobserve inconsistent values across the check and later dereference.\nIn `br_fdb_fillbuf()`, this means a concurrent local-FDB update can change\n`f->dst` after the NULL check and before the `port_no` dereference,\nleading to a NULL-ptr-deref.\n\nFix this by taking a single `READ_ONCE()` snapshot of `f->dst` in each\naffected RCU reader and using that snapshot for the rest of the access\nsequence. Also publish the in-place `f->dst` updates in `fdb_delete_local()`\nwith `WRITE_ONCE()` so the readers and writer use matching access patterns.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
