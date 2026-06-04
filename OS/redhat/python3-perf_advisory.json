@@ -29538,6 +29538,23 @@
                     }
                 ]
             },
+            "CVE-2026-46120": {
+                "cve_id": "CVE-2026-46120",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nip6_gre: Use cached t->net in ip6erspan_changelink().\n\nAfter commit 5e72ce3e3980 (\"net: ipv6: Use link netns in newlink() of\nrtnl_link_ops\"), ip6erspan_newlink() correctly resolves the per-netns\nip6gre hash via link_net. ip6erspan_changelink() was not converted in\nthat series and still uses dev_net(dev), which diverges from the\ndevice's creation netns after IFLA_NET_NS_FD migration.\n\nThis re-inserts the tunnel into the wrong per-netns hash. The\noriginal netns keeps a stale entry. When that netns is later\ndestroyed, ip6gre_exit_rtnl_net() walks the stale entry, producing a\nslab-use-after-free reported by KASAN, followed by a kernel BUG at\nnet/core/dev.c (LIST_POISON1) in unregister_netdevice_many_notify().\n\nReachable from an unprivileged user namespace (unshare --user\n--map-root-user --net).\n\nip6gre_changelink() earlier in the same file already uses the cached\nt->net; only ip6erspan_changelink() has the wrong shape.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46131": {
                 "cve_id": "CVE-2026-46131",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -29725,6 +29742,23 @@
                     }
                 ]
             },
+            "CVE-2026-46227": {
+                "cve_id": "CVE-2026-46227",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: revalidate list cursor after sctp_sendmsg_to_asoc() in SCTP_SENDALL\n\nThe SCTP_SENDALL path in sctp_sendmsg() iterates ep->asocs with\nlist_for_each_entry_safe(), which caches the next entry in @tmp before\nthe loop body runs.  The body calls sctp_sendmsg_to_asoc(), which may\ndrop the socket lock inside sctp_wait_for_sndbuf().\n\nWhile the lock is dropped, another thread can SCTP_SOCKOPT_PEELOFF the\nassociation cached in @tmp, migrating it to a new endpoint via\nsctp_sock_migrate() (list_del_init() + list_add_tail() to\nnewep->asocs), and optionally close the new socket which frees the\nassociation via kfree_rcu().  The cached @tmp can also be freed by a\nnetwork ABORT for that association, processed in softirq while the\nlock is dropped.\n\nsctp_wait_for_sndbuf() revalidates @asoc (the current entry) on re-lock\nvia the \"sk != asoc->base.sk\" and \"asoc->base.dead\" checks, but nothing\nrevalidates @tmp.  After a successful return, the iterator advances to\nthe stale @tmp, yielding either a use-after-free (if the peeled socket\nwas closed) or a list-walk onto the new endpoint's list head (type\nconfusion of &newep->asocs as a struct sctp_association *).\n\nBoth are reachable from CapEff=0; the type-confusion path gives\ncontrolled indirect call via the outqueue.sched->init_sid pointer.\n\nFix by re-deriving @tmp from @asoc after sctp_sendmsg_to_asoc()\nreturns.  @asoc is known to still be on ep->asocs at that point: the\nonly callers that list_del an association from ep->asocs are\nsctp_association_free() (which sets asoc->base.dead) and\nsctp_assoc_migrate() (which changes asoc->base.sk), and\nsctp_wait_for_sndbuf() checks both under the lock before any\nsuccessful return; a tripped check propagates as err < 0 and the loop\nbails before the re-derive.\n\nThe SCTP_ABORT path in sctp_sendmsg_check_sflags() returns 0 and the\nloop hits 'continue' before sctp_sendmsg_to_asoc() is ever called, so\nthe @tmp cached by list_for_each_entry_safe() still covers the\nlock-held free that ba59fb027307 (\"sctp: walk the list of asoc\nsafely\") was added for.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46242": {
                 "cve_id": "CVE-2026-46242",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -29747,6 +29781,176 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: reject userspace cifs.spnego descriptions\n\ncifs.spnego key descriptions contain authority-bearing fields such as\npid, uid, creduid, and upcall_target that cifs.upcall treats as\nkernel-originating inputs. However, userspace can also create keys of\nthis type through request_key(2) or add_key(2), allowing those fields to\nbe supplied without CIFS origin.\n\nOnly accept cifs.spnego descriptions while CIFS is using its private\nspnego_cred to request the key.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46244": {
+                "cve_id": "CVE-2026-46244",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nft_inner: Fix IPv6 inner_thoff desync\n\nIn nft_inner_parse_l2l3(), when processing inner IPv6 packets,\nipv6_find_hdr() correctly computes the transport header offset\ntraversing all extension headers, but the result is immediately\noverwritten with nhoff + sizeof(_ip6h) (40 bytes), which only\naccounts for the IPv6 base header. This creates a desync between\ninner_thoff (wrong \u2014 points to extension header start) and l4proto\n(correct \u2014 e.g., IPPROTO_TCP), enabling transport header forgery\nand potential firewall bypass. This issue affects stable versions\nfrom Linux 6.2.\n\nFor comparison, the normal (non-inner) IPv6 path correctly\npreserves ipv6_find_hdr()'s result. Removing the incorrect overwrite\nensures that ipv6_find_hdr()'s calculated transport header offset is\npreserved, thereby fixing the desynchronization.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46248": {
+                "cve_id": "CVE-2026-46248",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath12k: clear stale link mapping of ahvif->links_map\n\nWhen an arvif is initialized in non-AP STA mode but MLO connection\npreparation fails before the arvif is created\n(arvif->is_created remains false), the error path attempts to delete all\nlinks. However, link deletion only executes when arvif->is_created is true.\nAs a result, ahvif retains a stale entry of arvif that is initialized but\nnot created.\n\nWhen a new arvif is initialized with the same link id, this stale mapping\ntriggers the following WARN_ON.\n\nWARNING: drivers/net/wireless/ath/ath12k/mac.c:4271 at ath12k_mac_op_change_vif_links+0x140/0x180 [ath12k], CPU#3: wpa_supplicant/275\n\nCall trace:\n ath12k_mac_op_change_vif_links+0x140/0x180 [ath12k] (P)\n drv_change_vif_links+0xbc/0x1a4 [mac80211]\n ieee80211_vif_update_links+0x54c/0x6a0 [mac80211]\n ieee80211_vif_set_links+0x40/0x70 [mac80211]\n ieee80211_prep_connection+0x84/0x450 [mac80211]\n ieee80211_mgd_auth+0x200/0x480 [mac80211]\n ieee80211_auth+0x14/0x20 [mac80211]\n cfg80211_mlme_auth+0x90/0xf0 [cfg80211]\n nl80211_authenticate+0x32c/0x380 [cfg80211]\n genl_family_rcv_msg_doit+0xc8/0x134\n\nFix this issue by unassigning the link vif and clearing ahvif->links_map\nif arvif is only initialized but not created.\n\nTested-on: QCN9274 hw2.0 PCI WLAN.WBE.1.5-01651-QCAHKSWPL_SILICONZ-1",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46249": {
+                "cve_id": "CVE-2026-46249",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nocteontx2-af: Fix PF driver crash with kexec kernel booting\n\nDuring a kexec reboot the hardware is not power-cycled, so AF state from\nthe old kernel can persist into the new kernel. When AF and PF drivers\nare built as modules, the PF driver may probe before AF reinitializes\nthe hardware.\n\nThe PF driver treats the RVUM block revision as an indication that AF\ninitialization is complete. If this value is left uncleared at shutdown,\nPF may incorrectly assume AF is ready and access stale hardware state,\nleading to a crash.\n\nClear the RVUM block revision during AF shutdown to avoid PF\nmis-detecting AF readiness after kexec.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46252": {
+                "cve_id": "CVE-2026-46252",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nregulator: core: fix locking in regulator_resolve_supply() error path\n\nIf late enabling of a supply regulator fails in\nregulator_resolve_supply(), the code currently triggers a lockdep\nwarning:\n\n    WARNING: drivers/regulator/core.c:2649 at _regulator_put+0x80/0xa0, CPU#6: kworker/u32:4/596\n    ...\n    Call trace:\n     _regulator_put+0x80/0xa0 (P)\n     regulator_resolve_supply+0x7cc/0xbe0\n     regulator_register_resolve_supply+0x28/0xb8\n\nas the regulator_list_mutex must be held when calling _regulator_put().\n\nTo solve this, simply switch to using regulator_put().\n\nWhile at it, we should also make sure that no concurrent access happens\nto our rdev while we clear out the supply pointer. Add appropriate\nlocking to ensure that.\n\nWhile the code in question will be removed altogether in a follow-up\ncommit, I believe it is still beneficial to have this corrected before\nremoval for future reference.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46253": {
+                "cve_id": "CVE-2026-46253",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npstore/ram: fix buffer overflow in persistent_ram_save_old()\n\npersistent_ram_save_old() can be called multiple times for the same\npersistent_ram_zone (e.g., via ramoops_pstore_read -> ramoops_get_next_prz\nfor PSTORE_TYPE_DMESG records).\n\nCurrently, the function only allocates prz->old_log when it is NULL,\nbut it unconditionally updates prz->old_log_size to the current buffer\nsize and then performs memcpy_fromio() using this new size. If the\nbuffer size has grown since the first allocation (which can happen\nacross different kernel boot cycles), this leads to:\n\n1. A heap buffer overflow (OOB write) in the memcpy_fromio() calls\n2. A subsequent OOB read when ramoops_pstore_read() accesses the buffer\n   using the incorrect (larger) old_log_size\n\nThe KASAN splat would look similar to:\n  BUG: KASAN: slab-out-of-bounds in ramoops_pstore_read+0x...\n  Read of size N at addr ... by task ...\n\nThe conditions are likely extremely hard to hit:\n\n  0. Crash with a ramoops write of less-than-record-max-size bytes.\n  1. Reboot: ramoops registers, pstore_get_records(0) reads old crash,\n     allocates old_log with size X\n  2. Crash handler registered, timer started (if pstore_update_ms >= 0)\n  3. Oops happens (non-fatal, system continues)\n  4. pstore_dump() writes oops via ramoops_pstore_write() size Y (>X)\n  5. pstore_new_entry = 1, pstore_timer_kick() called\n  6. System continues running (not a panic oops)\n  7. Timer fires after pstore_update_ms milliseconds\n  8. pstore_timefunc() \u2192 schedule_work() \u2192 pstore_dowork() \u2192 pstore_get_records(1)\n  9. ramoops_get_next_prz() \u2192 persistent_ram_save_old()\n 10. buffer_size() returns Y, but old_log is X bytes\n 11. Y > X: memcpy_fromio() overflows heap\n\n  Requirements:\n  - a prior crash record exists that did not fill the record size\n    (almost impossible since the crash handler writes as much as it\n    can possibly fit into the record, capped by max record size and\n    the kmsg buffer almost always exceeds the max record size)\n  - pstore_update_ms >= 0 (disabled by default)\n  - Non-fatal oops (system survives)\n\nFree and reallocate the buffer when the new size differs from the\npreviously allocated size. This ensures old_log always has sufficient\nspace for the data being copied.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46259": {
+                "cve_id": "CVE-2026-46259",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nprocfs: fix missing RCU protection when reading real_parent in do_task_stat()\n\nWhen reading /proc/[pid]/stat, do_task_stat() accesses task->real_parent\nwithout proper RCU protection, which leads to:\n\n  cpu 0                               cpu 1\n  -----                               -----\n  do_task_stat\n    var = task->real_parent\n                                      release_task\n                                        call_rcu(delayed_put_task_struct)\n    task_tgid_nr_ns(var)\n      rcu_read_lock   <--- Too late to protect task->real_parent!\n      task_pid_ptr    <--- UAF!\n      rcu_read_unlock\n\nThis patch uses task_ppid_nr_ns() instead of task_tgid_nr_ns() to add\nproper RCU protection for accessing task->real_parent.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46262": {
+                "cve_id": "CVE-2026-46262",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: fsl_xcvr: Revert fix missing lock in fsl_xcvr_mode_put()\n\nThis reverts commit f51424872760 (\"ASoC: fsl_xcvr: fix missing lock in fsl_xcvr_mode_put()\").\n\nThe original patch attempted to acquire the card->controls_rwsem lock in\nfsl_xcvr_mode_put(). However, this function is called from the upper ALSA\ncore function snd_ctl_elem_write(), which already holds the write lock on\ncontrols_rwsem for the whole put operation. So there is no need to simply\nhold the lock for fsl_xcvr_activate_ctl() again.\n\nAcquiring the read lock while holding the write lock in the same thread\nresults in a deadlock and a hung task, as reported by Alexander Stein.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46266": {
+                "cve_id": "CVE-2026-46266",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ninet: RAW sockets using IPPROTO_RAW MUST drop incoming ICMP\n\nYizhou Zhao reported that simply having one RAW socket on protocol\nIPPROTO_RAW (255) was dangerous.\n\n  socket(AF_INET, SOCK_RAW, 255);\n\nA malicious incoming ICMP packet can set the protocol field to 255\nand match this socket, leading to FNHE cache changes.\n\ninner = IP(src=\"192.168.2.1\", dst=\"8.8.8.8\", proto=255)/Raw(\"TEST\")\npkt = IP(src=\"192.168.1.1\", dst=\"192.168.2.1\")/ICMP(type=3, code=4, nexthopmtu=576)/inner\n\n\"man 7 raw\" states:\n\n  A protocol of IPPROTO_RAW implies enabled IP_HDRINCL and is able\n  to send any IP protocol that is specified in the passed header.\n  Receiving of all IP protocols via IPPROTO_RAW is not possible\n  using raw sockets.\n\nMake sure we drop these malicious packets.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46271": {
+                "cve_id": "CVE-2026-46271",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath12k: do WoW offloads only on primary link\n\nIn case of multi-link connection, WCN7850 firmware crashes due to WoW\noffloads enabled on both primary and secondary links.\n\nChange to do it only on primary link to fix it.\n\nTested-on: WCN7850 hw2.0 PCI WLAN.HMT.1.1.c5-00284-QCAHMTSWPL_V1.0_V2.0_SILICONZ-1",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46273": {
+                "cve_id": "CVE-2026-46273",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nibmveth: Disable GSO for packets with small MSS\n\nSome physical adapters on Power systems do not support segmentation\noffload when the MSS is less than 224 bytes. Attempting to send such\npackets causes the adapter to freeze, stopping all traffic until\nmanually reset.\n\nImplement ndo_features_check to disable GSO for packets with small MSS\nvalues. The network stack will perform software segmentation instead.\n\nThe 224-byte minimum matches ibmvnic\ncommit <f10b09ef687f> (\"ibmvnic: Enforce stronger sanity checks\non GSO packets\")\nwhich uses the same physical adapters in SEA configurations.\n\nThe issue occurs specifically when the hardware attempts to perform\nsegmentation (gso_segs > 1) with a small MSS. Single-segment GSO packets\n(gso_segs == 1) do not trigger the problematic LSO code path and are\ntransmitted normally without segmentation.\n\nAdd an ndo_features_check callback to disable GSO when MSS < 224 bytes.\nAlso call vlan_features_check() to ensure proper handling of VLAN packets,\nparticularly QinQ (802.1ad) configurations where the hardware parser may\nnot support certain offload features.\n\nValidated using iptables to force small MSS values. Without the fix,\nthe adapter freezes. With the fix, packets are segmented in software\nand transmission succeeds. Comprehensive regression testing completedd\n(MSS tests, performance, stability).",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -59369,6 +59573,23 @@
                     }
                 ]
             },
+            "CVE-2026-46120": {
+                "cve_id": "CVE-2026-46120",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nip6_gre: Use cached t->net in ip6erspan_changelink().\n\nAfter commit 5e72ce3e3980 (\"net: ipv6: Use link netns in newlink() of\nrtnl_link_ops\"), ip6erspan_newlink() correctly resolves the per-netns\nip6gre hash via link_net. ip6erspan_changelink() was not converted in\nthat series and still uses dev_net(dev), which diverges from the\ndevice's creation netns after IFLA_NET_NS_FD migration.\n\nThis re-inserts the tunnel into the wrong per-netns hash. The\noriginal netns keeps a stale entry. When that netns is later\ndestroyed, ip6gre_exit_rtnl_net() walks the stale entry, producing a\nslab-use-after-free reported by KASAN, followed by a kernel BUG at\nnet/core/dev.c (LIST_POISON1) in unregister_netdevice_many_notify().\n\nReachable from an unprivileged user namespace (unshare --user\n--map-root-user --net).\n\nip6gre_changelink() earlier in the same file already uses the cached\nt->net; only ip6erspan_changelink() has the wrong shape.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46131": {
                 "cve_id": "CVE-2026-46131",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -59556,6 +59777,23 @@
                     }
                 ]
             },
+            "CVE-2026-46227": {
+                "cve_id": "CVE-2026-46227",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: revalidate list cursor after sctp_sendmsg_to_asoc() in SCTP_SENDALL\n\nThe SCTP_SENDALL path in sctp_sendmsg() iterates ep->asocs with\nlist_for_each_entry_safe(), which caches the next entry in @tmp before\nthe loop body runs.  The body calls sctp_sendmsg_to_asoc(), which may\ndrop the socket lock inside sctp_wait_for_sndbuf().\n\nWhile the lock is dropped, another thread can SCTP_SOCKOPT_PEELOFF the\nassociation cached in @tmp, migrating it to a new endpoint via\nsctp_sock_migrate() (list_del_init() + list_add_tail() to\nnewep->asocs), and optionally close the new socket which frees the\nassociation via kfree_rcu().  The cached @tmp can also be freed by a\nnetwork ABORT for that association, processed in softirq while the\nlock is dropped.\n\nsctp_wait_for_sndbuf() revalidates @asoc (the current entry) on re-lock\nvia the \"sk != asoc->base.sk\" and \"asoc->base.dead\" checks, but nothing\nrevalidates @tmp.  After a successful return, the iterator advances to\nthe stale @tmp, yielding either a use-after-free (if the peeled socket\nwas closed) or a list-walk onto the new endpoint's list head (type\nconfusion of &newep->asocs as a struct sctp_association *).\n\nBoth are reachable from CapEff=0; the type-confusion path gives\ncontrolled indirect call via the outqueue.sched->init_sid pointer.\n\nFix by re-deriving @tmp from @asoc after sctp_sendmsg_to_asoc()\nreturns.  @asoc is known to still be on ep->asocs at that point: the\nonly callers that list_del an association from ep->asocs are\nsctp_association_free() (which sets asoc->base.dead) and\nsctp_assoc_migrate() (which changes asoc->base.sk), and\nsctp_wait_for_sndbuf() checks both under the lock before any\nsuccessful return; a tripped check propagates as err < 0 and the loop\nbails before the re-derive.\n\nThe SCTP_ABORT path in sctp_sendmsg_check_sflags() returns 0 and the\nloop hits 'continue' before sctp_sendmsg_to_asoc() is ever called, so\nthe @tmp cached by list_for_each_entry_safe() still covers the\nlock-held free that ba59fb027307 (\"sctp: walk the list of asoc\nsafely\") was added for.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46242": {
                 "cve_id": "CVE-2026-46242",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -59578,6 +59816,176 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: reject userspace cifs.spnego descriptions\n\ncifs.spnego key descriptions contain authority-bearing fields such as\npid, uid, creduid, and upcall_target that cifs.upcall treats as\nkernel-originating inputs. However, userspace can also create keys of\nthis type through request_key(2) or add_key(2), allowing those fields to\nbe supplied without CIFS origin.\n\nOnly accept cifs.spnego descriptions while CIFS is using its private\nspnego_cred to request the key.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46244": {
+                "cve_id": "CVE-2026-46244",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nft_inner: Fix IPv6 inner_thoff desync\n\nIn nft_inner_parse_l2l3(), when processing inner IPv6 packets,\nipv6_find_hdr() correctly computes the transport header offset\ntraversing all extension headers, but the result is immediately\noverwritten with nhoff + sizeof(_ip6h) (40 bytes), which only\naccounts for the IPv6 base header. This creates a desync between\ninner_thoff (wrong \u2014 points to extension header start) and l4proto\n(correct \u2014 e.g., IPPROTO_TCP), enabling transport header forgery\nand potential firewall bypass. This issue affects stable versions\nfrom Linux 6.2.\n\nFor comparison, the normal (non-inner) IPv6 path correctly\npreserves ipv6_find_hdr()'s result. Removing the incorrect overwrite\nensures that ipv6_find_hdr()'s calculated transport header offset is\npreserved, thereby fixing the desynchronization.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46248": {
+                "cve_id": "CVE-2026-46248",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath12k: clear stale link mapping of ahvif->links_map\n\nWhen an arvif is initialized in non-AP STA mode but MLO connection\npreparation fails before the arvif is created\n(arvif->is_created remains false), the error path attempts to delete all\nlinks. However, link deletion only executes when arvif->is_created is true.\nAs a result, ahvif retains a stale entry of arvif that is initialized but\nnot created.\n\nWhen a new arvif is initialized with the same link id, this stale mapping\ntriggers the following WARN_ON.\n\nWARNING: drivers/net/wireless/ath/ath12k/mac.c:4271 at ath12k_mac_op_change_vif_links+0x140/0x180 [ath12k], CPU#3: wpa_supplicant/275\n\nCall trace:\n ath12k_mac_op_change_vif_links+0x140/0x180 [ath12k] (P)\n drv_change_vif_links+0xbc/0x1a4 [mac80211]\n ieee80211_vif_update_links+0x54c/0x6a0 [mac80211]\n ieee80211_vif_set_links+0x40/0x70 [mac80211]\n ieee80211_prep_connection+0x84/0x450 [mac80211]\n ieee80211_mgd_auth+0x200/0x480 [mac80211]\n ieee80211_auth+0x14/0x20 [mac80211]\n cfg80211_mlme_auth+0x90/0xf0 [cfg80211]\n nl80211_authenticate+0x32c/0x380 [cfg80211]\n genl_family_rcv_msg_doit+0xc8/0x134\n\nFix this issue by unassigning the link vif and clearing ahvif->links_map\nif arvif is only initialized but not created.\n\nTested-on: QCN9274 hw2.0 PCI WLAN.WBE.1.5-01651-QCAHKSWPL_SILICONZ-1",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46249": {
+                "cve_id": "CVE-2026-46249",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nocteontx2-af: Fix PF driver crash with kexec kernel booting\n\nDuring a kexec reboot the hardware is not power-cycled, so AF state from\nthe old kernel can persist into the new kernel. When AF and PF drivers\nare built as modules, the PF driver may probe before AF reinitializes\nthe hardware.\n\nThe PF driver treats the RVUM block revision as an indication that AF\ninitialization is complete. If this value is left uncleared at shutdown,\nPF may incorrectly assume AF is ready and access stale hardware state,\nleading to a crash.\n\nClear the RVUM block revision during AF shutdown to avoid PF\nmis-detecting AF readiness after kexec.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46252": {
+                "cve_id": "CVE-2026-46252",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nregulator: core: fix locking in regulator_resolve_supply() error path\n\nIf late enabling of a supply regulator fails in\nregulator_resolve_supply(), the code currently triggers a lockdep\nwarning:\n\n    WARNING: drivers/regulator/core.c:2649 at _regulator_put+0x80/0xa0, CPU#6: kworker/u32:4/596\n    ...\n    Call trace:\n     _regulator_put+0x80/0xa0 (P)\n     regulator_resolve_supply+0x7cc/0xbe0\n     regulator_register_resolve_supply+0x28/0xb8\n\nas the regulator_list_mutex must be held when calling _regulator_put().\n\nTo solve this, simply switch to using regulator_put().\n\nWhile at it, we should also make sure that no concurrent access happens\nto our rdev while we clear out the supply pointer. Add appropriate\nlocking to ensure that.\n\nWhile the code in question will be removed altogether in a follow-up\ncommit, I believe it is still beneficial to have this corrected before\nremoval for future reference.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46253": {
+                "cve_id": "CVE-2026-46253",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npstore/ram: fix buffer overflow in persistent_ram_save_old()\n\npersistent_ram_save_old() can be called multiple times for the same\npersistent_ram_zone (e.g., via ramoops_pstore_read -> ramoops_get_next_prz\nfor PSTORE_TYPE_DMESG records).\n\nCurrently, the function only allocates prz->old_log when it is NULL,\nbut it unconditionally updates prz->old_log_size to the current buffer\nsize and then performs memcpy_fromio() using this new size. If the\nbuffer size has grown since the first allocation (which can happen\nacross different kernel boot cycles), this leads to:\n\n1. A heap buffer overflow (OOB write) in the memcpy_fromio() calls\n2. A subsequent OOB read when ramoops_pstore_read() accesses the buffer\n   using the incorrect (larger) old_log_size\n\nThe KASAN splat would look similar to:\n  BUG: KASAN: slab-out-of-bounds in ramoops_pstore_read+0x...\n  Read of size N at addr ... by task ...\n\nThe conditions are likely extremely hard to hit:\n\n  0. Crash with a ramoops write of less-than-record-max-size bytes.\n  1. Reboot: ramoops registers, pstore_get_records(0) reads old crash,\n     allocates old_log with size X\n  2. Crash handler registered, timer started (if pstore_update_ms >= 0)\n  3. Oops happens (non-fatal, system continues)\n  4. pstore_dump() writes oops via ramoops_pstore_write() size Y (>X)\n  5. pstore_new_entry = 1, pstore_timer_kick() called\n  6. System continues running (not a panic oops)\n  7. Timer fires after pstore_update_ms milliseconds\n  8. pstore_timefunc() \u2192 schedule_work() \u2192 pstore_dowork() \u2192 pstore_get_records(1)\n  9. ramoops_get_next_prz() \u2192 persistent_ram_save_old()\n 10. buffer_size() returns Y, but old_log is X bytes\n 11. Y > X: memcpy_fromio() overflows heap\n\n  Requirements:\n  - a prior crash record exists that did not fill the record size\n    (almost impossible since the crash handler writes as much as it\n    can possibly fit into the record, capped by max record size and\n    the kmsg buffer almost always exceeds the max record size)\n  - pstore_update_ms >= 0 (disabled by default)\n  - Non-fatal oops (system survives)\n\nFree and reallocate the buffer when the new size differs from the\npreviously allocated size. This ensures old_log always has sufficient\nspace for the data being copied.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46259": {
+                "cve_id": "CVE-2026-46259",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nprocfs: fix missing RCU protection when reading real_parent in do_task_stat()\n\nWhen reading /proc/[pid]/stat, do_task_stat() accesses task->real_parent\nwithout proper RCU protection, which leads to:\n\n  cpu 0                               cpu 1\n  -----                               -----\n  do_task_stat\n    var = task->real_parent\n                                      release_task\n                                        call_rcu(delayed_put_task_struct)\n    task_tgid_nr_ns(var)\n      rcu_read_lock   <--- Too late to protect task->real_parent!\n      task_pid_ptr    <--- UAF!\n      rcu_read_unlock\n\nThis patch uses task_ppid_nr_ns() instead of task_tgid_nr_ns() to add\nproper RCU protection for accessing task->real_parent.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46262": {
+                "cve_id": "CVE-2026-46262",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: fsl_xcvr: Revert fix missing lock in fsl_xcvr_mode_put()\n\nThis reverts commit f51424872760 (\"ASoC: fsl_xcvr: fix missing lock in fsl_xcvr_mode_put()\").\n\nThe original patch attempted to acquire the card->controls_rwsem lock in\nfsl_xcvr_mode_put(). However, this function is called from the upper ALSA\ncore function snd_ctl_elem_write(), which already holds the write lock on\ncontrols_rwsem for the whole put operation. So there is no need to simply\nhold the lock for fsl_xcvr_activate_ctl() again.\n\nAcquiring the read lock while holding the write lock in the same thread\nresults in a deadlock and a hung task, as reported by Alexander Stein.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46266": {
+                "cve_id": "CVE-2026-46266",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ninet: RAW sockets using IPPROTO_RAW MUST drop incoming ICMP\n\nYizhou Zhao reported that simply having one RAW socket on protocol\nIPPROTO_RAW (255) was dangerous.\n\n  socket(AF_INET, SOCK_RAW, 255);\n\nA malicious incoming ICMP packet can set the protocol field to 255\nand match this socket, leading to FNHE cache changes.\n\ninner = IP(src=\"192.168.2.1\", dst=\"8.8.8.8\", proto=255)/Raw(\"TEST\")\npkt = IP(src=\"192.168.1.1\", dst=\"192.168.2.1\")/ICMP(type=3, code=4, nexthopmtu=576)/inner\n\n\"man 7 raw\" states:\n\n  A protocol of IPPROTO_RAW implies enabled IP_HDRINCL and is able\n  to send any IP protocol that is specified in the passed header.\n  Receiving of all IP protocols via IPPROTO_RAW is not possible\n  using raw sockets.\n\nMake sure we drop these malicious packets.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46271": {
+                "cve_id": "CVE-2026-46271",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath12k: do WoW offloads only on primary link\n\nIn case of multi-link connection, WCN7850 firmware crashes due to WoW\noffloads enabled on both primary and secondary links.\n\nChange to do it only on primary link to fix it.\n\nTested-on: WCN7850 hw2.0 PCI WLAN.HMT.1.1.c5-00284-QCAHMTSWPL_V1.0_V2.0_SILICONZ-1",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46273": {
+                "cve_id": "CVE-2026-46273",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nibmveth: Disable GSO for packets with small MSS\n\nSome physical adapters on Power systems do not support segmentation\noffload when the MSS is less than 224 bytes. Attempting to send such\npackets causes the adapter to freeze, stopping all traffic until\nmanually reset.\n\nImplement ndo_features_check to disable GSO for packets with small MSS\nvalues. The network stack will perform software segmentation instead.\n\nThe 224-byte minimum matches ibmvnic\ncommit <f10b09ef687f> (\"ibmvnic: Enforce stronger sanity checks\non GSO packets\")\nwhich uses the same physical adapters in SEA configurations.\n\nThe issue occurs specifically when the hardware attempts to perform\nsegmentation (gso_segs > 1) with a small MSS. Single-segment GSO packets\n(gso_segs == 1) do not trigger the problematic LSO code path and are\ntransmitted normally without segmentation.\n\nAdd an ndo_features_check callback to disable GSO when MSS < 224 bytes.\nAlso call vlan_features_check() to ensure proper handling of VLAN packets,\nparticularly QinQ (802.1ad) configurations where the hardware parser may\nnot support certain offload features.\n\nValidated using iptables to force small MSS values. Without the fix,\nthe adapter freezes. With the fix, packets are segmented in software\nand transmission succeeds. Comprehensive regression testing completedd\n(MSS tests, performance, stability).",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -86472,6 +86880,23 @@
                     }
                 ]
             },
+            "CVE-2026-46120": {
+                "cve_id": "CVE-2026-46120",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nip6_gre: Use cached t->net in ip6erspan_changelink().\n\nAfter commit 5e72ce3e3980 (\"net: ipv6: Use link netns in newlink() of\nrtnl_link_ops\"), ip6erspan_newlink() correctly resolves the per-netns\nip6gre hash via link_net. ip6erspan_changelink() was not converted in\nthat series and still uses dev_net(dev), which diverges from the\ndevice's creation netns after IFLA_NET_NS_FD migration.\n\nThis re-inserts the tunnel into the wrong per-netns hash. The\noriginal netns keeps a stale entry. When that netns is later\ndestroyed, ip6gre_exit_rtnl_net() walks the stale entry, producing a\nslab-use-after-free reported by KASAN, followed by a kernel BUG at\nnet/core/dev.c (LIST_POISON1) in unregister_netdevice_many_notify().\n\nReachable from an unprivileged user namespace (unshare --user\n--map-root-user --net).\n\nip6gre_changelink() earlier in the same file already uses the cached\nt->net; only ip6erspan_changelink() has the wrong shape.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46131": {
                 "cve_id": "CVE-2026-46131",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -86643,6 +87068,23 @@
                     }
                 ]
             },
+            "CVE-2026-46227": {
+                "cve_id": "CVE-2026-46227",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: revalidate list cursor after sctp_sendmsg_to_asoc() in SCTP_SENDALL\n\nThe SCTP_SENDALL path in sctp_sendmsg() iterates ep->asocs with\nlist_for_each_entry_safe(), which caches the next entry in @tmp before\nthe loop body runs.  The body calls sctp_sendmsg_to_asoc(), which may\ndrop the socket lock inside sctp_wait_for_sndbuf().\n\nWhile the lock is dropped, another thread can SCTP_SOCKOPT_PEELOFF the\nassociation cached in @tmp, migrating it to a new endpoint via\nsctp_sock_migrate() (list_del_init() + list_add_tail() to\nnewep->asocs), and optionally close the new socket which frees the\nassociation via kfree_rcu().  The cached @tmp can also be freed by a\nnetwork ABORT for that association, processed in softirq while the\nlock is dropped.\n\nsctp_wait_for_sndbuf() revalidates @asoc (the current entry) on re-lock\nvia the \"sk != asoc->base.sk\" and \"asoc->base.dead\" checks, but nothing\nrevalidates @tmp.  After a successful return, the iterator advances to\nthe stale @tmp, yielding either a use-after-free (if the peeled socket\nwas closed) or a list-walk onto the new endpoint's list head (type\nconfusion of &newep->asocs as a struct sctp_association *).\n\nBoth are reachable from CapEff=0; the type-confusion path gives\ncontrolled indirect call via the outqueue.sched->init_sid pointer.\n\nFix by re-deriving @tmp from @asoc after sctp_sendmsg_to_asoc()\nreturns.  @asoc is known to still be on ep->asocs at that point: the\nonly callers that list_del an association from ep->asocs are\nsctp_association_free() (which sets asoc->base.dead) and\nsctp_assoc_migrate() (which changes asoc->base.sk), and\nsctp_wait_for_sndbuf() checks both under the lock before any\nsuccessful return; a tripped check propagates as err < 0 and the loop\nbails before the re-derive.\n\nThe SCTP_ABORT path in sctp_sendmsg_check_sflags() returns 0 and the\nloop hits 'continue' before sctp_sendmsg_to_asoc() is ever called, so\nthe @tmp cached by list_for_each_entry_safe() still covers the\nlock-held free that ba59fb027307 (\"sctp: walk the list of asoc\nsafely\") was added for.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46242": {
                 "cve_id": "CVE-2026-46242",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -86661,6 +87103,152 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: reject userspace cifs.spnego descriptions\n\ncifs.spnego key descriptions contain authority-bearing fields such as\npid, uid, creduid, and upcall_target that cifs.upcall treats as\nkernel-originating inputs. However, userspace can also create keys of\nthis type through request_key(2) or add_key(2), allowing those fields to\nbe supplied without CIFS origin.\n\nOnly accept cifs.spnego descriptions while CIFS is using its private\nspnego_cred to request the key.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46244": {
+                "cve_id": "CVE-2026-46244",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nft_inner: Fix IPv6 inner_thoff desync\n\nIn nft_inner_parse_l2l3(), when processing inner IPv6 packets,\nipv6_find_hdr() correctly computes the transport header offset\ntraversing all extension headers, but the result is immediately\noverwritten with nhoff + sizeof(_ip6h) (40 bytes), which only\naccounts for the IPv6 base header. This creates a desync between\ninner_thoff (wrong \u2014 points to extension header start) and l4proto\n(correct \u2014 e.g., IPPROTO_TCP), enabling transport header forgery\nand potential firewall bypass. This issue affects stable versions\nfrom Linux 6.2.\n\nFor comparison, the normal (non-inner) IPv6 path correctly\npreserves ipv6_find_hdr()'s result. Removing the incorrect overwrite\nensures that ipv6_find_hdr()'s calculated transport header offset is\npreserved, thereby fixing the desynchronization.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46248": {
+                "cve_id": "CVE-2026-46248",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath12k: clear stale link mapping of ahvif->links_map\n\nWhen an arvif is initialized in non-AP STA mode but MLO connection\npreparation fails before the arvif is created\n(arvif->is_created remains false), the error path attempts to delete all\nlinks. However, link deletion only executes when arvif->is_created is true.\nAs a result, ahvif retains a stale entry of arvif that is initialized but\nnot created.\n\nWhen a new arvif is initialized with the same link id, this stale mapping\ntriggers the following WARN_ON.\n\nWARNING: drivers/net/wireless/ath/ath12k/mac.c:4271 at ath12k_mac_op_change_vif_links+0x140/0x180 [ath12k], CPU#3: wpa_supplicant/275\n\nCall trace:\n ath12k_mac_op_change_vif_links+0x140/0x180 [ath12k] (P)\n drv_change_vif_links+0xbc/0x1a4 [mac80211]\n ieee80211_vif_update_links+0x54c/0x6a0 [mac80211]\n ieee80211_vif_set_links+0x40/0x70 [mac80211]\n ieee80211_prep_connection+0x84/0x450 [mac80211]\n ieee80211_mgd_auth+0x200/0x480 [mac80211]\n ieee80211_auth+0x14/0x20 [mac80211]\n cfg80211_mlme_auth+0x90/0xf0 [cfg80211]\n nl80211_authenticate+0x32c/0x380 [cfg80211]\n genl_family_rcv_msg_doit+0xc8/0x134\n\nFix this issue by unassigning the link vif and clearing ahvif->links_map\nif arvif is only initialized but not created.\n\nTested-on: QCN9274 hw2.0 PCI WLAN.WBE.1.5-01651-QCAHKSWPL_SILICONZ-1",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46249": {
+                "cve_id": "CVE-2026-46249",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nocteontx2-af: Fix PF driver crash with kexec kernel booting\n\nDuring a kexec reboot the hardware is not power-cycled, so AF state from\nthe old kernel can persist into the new kernel. When AF and PF drivers\nare built as modules, the PF driver may probe before AF reinitializes\nthe hardware.\n\nThe PF driver treats the RVUM block revision as an indication that AF\ninitialization is complete. If this value is left uncleared at shutdown,\nPF may incorrectly assume AF is ready and access stale hardware state,\nleading to a crash.\n\nClear the RVUM block revision during AF shutdown to avoid PF\nmis-detecting AF readiness after kexec.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46252": {
+                "cve_id": "CVE-2026-46252",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nregulator: core: fix locking in regulator_resolve_supply() error path\n\nIf late enabling of a supply regulator fails in\nregulator_resolve_supply(), the code currently triggers a lockdep\nwarning:\n\n    WARNING: drivers/regulator/core.c:2649 at _regulator_put+0x80/0xa0, CPU#6: kworker/u32:4/596\n    ...\n    Call trace:\n     _regulator_put+0x80/0xa0 (P)\n     regulator_resolve_supply+0x7cc/0xbe0\n     regulator_register_resolve_supply+0x28/0xb8\n\nas the regulator_list_mutex must be held when calling _regulator_put().\n\nTo solve this, simply switch to using regulator_put().\n\nWhile at it, we should also make sure that no concurrent access happens\nto our rdev while we clear out the supply pointer. Add appropriate\nlocking to ensure that.\n\nWhile the code in question will be removed altogether in a follow-up\ncommit, I believe it is still beneficial to have this corrected before\nremoval for future reference.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46253": {
+                "cve_id": "CVE-2026-46253",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npstore/ram: fix buffer overflow in persistent_ram_save_old()\n\npersistent_ram_save_old() can be called multiple times for the same\npersistent_ram_zone (e.g., via ramoops_pstore_read -> ramoops_get_next_prz\nfor PSTORE_TYPE_DMESG records).\n\nCurrently, the function only allocates prz->old_log when it is NULL,\nbut it unconditionally updates prz->old_log_size to the current buffer\nsize and then performs memcpy_fromio() using this new size. If the\nbuffer size has grown since the first allocation (which can happen\nacross different kernel boot cycles), this leads to:\n\n1. A heap buffer overflow (OOB write) in the memcpy_fromio() calls\n2. A subsequent OOB read when ramoops_pstore_read() accesses the buffer\n   using the incorrect (larger) old_log_size\n\nThe KASAN splat would look similar to:\n  BUG: KASAN: slab-out-of-bounds in ramoops_pstore_read+0x...\n  Read of size N at addr ... by task ...\n\nThe conditions are likely extremely hard to hit:\n\n  0. Crash with a ramoops write of less-than-record-max-size bytes.\n  1. Reboot: ramoops registers, pstore_get_records(0) reads old crash,\n     allocates old_log with size X\n  2. Crash handler registered, timer started (if pstore_update_ms >= 0)\n  3. Oops happens (non-fatal, system continues)\n  4. pstore_dump() writes oops via ramoops_pstore_write() size Y (>X)\n  5. pstore_new_entry = 1, pstore_timer_kick() called\n  6. System continues running (not a panic oops)\n  7. Timer fires after pstore_update_ms milliseconds\n  8. pstore_timefunc() \u2192 schedule_work() \u2192 pstore_dowork() \u2192 pstore_get_records(1)\n  9. ramoops_get_next_prz() \u2192 persistent_ram_save_old()\n 10. buffer_size() returns Y, but old_log is X bytes\n 11. Y > X: memcpy_fromio() overflows heap\n\n  Requirements:\n  - a prior crash record exists that did not fill the record size\n    (almost impossible since the crash handler writes as much as it\n    can possibly fit into the record, capped by max record size and\n    the kmsg buffer almost always exceeds the max record size)\n  - pstore_update_ms >= 0 (disabled by default)\n  - Non-fatal oops (system survives)\n\nFree and reallocate the buffer when the new size differs from the\npreviously allocated size. This ensures old_log always has sufficient\nspace for the data being copied.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46259": {
+                "cve_id": "CVE-2026-46259",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nprocfs: fix missing RCU protection when reading real_parent in do_task_stat()\n\nWhen reading /proc/[pid]/stat, do_task_stat() accesses task->real_parent\nwithout proper RCU protection, which leads to:\n\n  cpu 0                               cpu 1\n  -----                               -----\n  do_task_stat\n    var = task->real_parent\n                                      release_task\n                                        call_rcu(delayed_put_task_struct)\n    task_tgid_nr_ns(var)\n      rcu_read_lock   <--- Too late to protect task->real_parent!\n      task_pid_ptr    <--- UAF!\n      rcu_read_unlock\n\nThis patch uses task_ppid_nr_ns() instead of task_tgid_nr_ns() to add\nproper RCU protection for accessing task->real_parent.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46262": {
+                "cve_id": "CVE-2026-46262",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: fsl_xcvr: Revert fix missing lock in fsl_xcvr_mode_put()\n\nThis reverts commit f51424872760 (\"ASoC: fsl_xcvr: fix missing lock in fsl_xcvr_mode_put()\").\n\nThe original patch attempted to acquire the card->controls_rwsem lock in\nfsl_xcvr_mode_put(). However, this function is called from the upper ALSA\ncore function snd_ctl_elem_write(), which already holds the write lock on\ncontrols_rwsem for the whole put operation. So there is no need to simply\nhold the lock for fsl_xcvr_activate_ctl() again.\n\nAcquiring the read lock while holding the write lock in the same thread\nresults in a deadlock and a hung task, as reported by Alexander Stein.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46266": {
+                "cve_id": "CVE-2026-46266",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ninet: RAW sockets using IPPROTO_RAW MUST drop incoming ICMP\n\nYizhou Zhao reported that simply having one RAW socket on protocol\nIPPROTO_RAW (255) was dangerous.\n\n  socket(AF_INET, SOCK_RAW, 255);\n\nA malicious incoming ICMP packet can set the protocol field to 255\nand match this socket, leading to FNHE cache changes.\n\ninner = IP(src=\"192.168.2.1\", dst=\"8.8.8.8\", proto=255)/Raw(\"TEST\")\npkt = IP(src=\"192.168.1.1\", dst=\"192.168.2.1\")/ICMP(type=3, code=4, nexthopmtu=576)/inner\n\n\"man 7 raw\" states:\n\n  A protocol of IPPROTO_RAW implies enabled IP_HDRINCL and is able\n  to send any IP protocol that is specified in the passed header.\n  Receiving of all IP protocols via IPPROTO_RAW is not possible\n  using raw sockets.\n\nMake sure we drop these malicious packets.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46271": {
+                "cve_id": "CVE-2026-46271",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath12k: do WoW offloads only on primary link\n\nIn case of multi-link connection, WCN7850 firmware crashes due to WoW\noffloads enabled on both primary and secondary links.\n\nChange to do it only on primary link to fix it.\n\nTested-on: WCN7850 hw2.0 PCI WLAN.HMT.1.1.c5-00284-QCAHMTSWPL_V1.0_V2.0_SILICONZ-1",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46273": {
+                "cve_id": "CVE-2026-46273",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nibmveth: Disable GSO for packets with small MSS\n\nSome physical adapters on Power systems do not support segmentation\noffload when the MSS is less than 224 bytes. Attempting to send such\npackets causes the adapter to freeze, stopping all traffic until\nmanually reset.\n\nImplement ndo_features_check to disable GSO for packets with small MSS\nvalues. The network stack will perform software segmentation instead.\n\nThe 224-byte minimum matches ibmvnic\ncommit <f10b09ef687f> (\"ibmvnic: Enforce stronger sanity checks\non GSO packets\")\nwhich uses the same physical adapters in SEA configurations.\n\nThe issue occurs specifically when the hardware attempts to perform\nsegmentation (gso_segs > 1) with a small MSS. Single-segment GSO packets\n(gso_segs == 1) do not trigger the problematic LSO code path and are\ntransmitted normally without segmentation.\n\nAdd an ndo_features_check callback to disable GSO when MSS < 224 bytes.\nAlso call vlan_features_check() to ensure proper handling of VLAN packets,\nparticularly QinQ (802.1ad) configurations where the hardware parser may\nnot support certain offload features.\n\nValidated using iptables to force small MSS values. Without the fix,\nthe adapter freezes. With the fix, packets are segmented in software\nand transmission succeeds. Comprehensive regression testing completedd\n(MSS tests, performance, stability).",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
