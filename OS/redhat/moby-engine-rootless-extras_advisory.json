@@ -1,6 +1,104 @@
 {
     "package_name": "moby-engine-rootless-extras",
     "advisory": {
+        "6": {
+            "CVE-2026-32288": {
+                "cve_id": "CVE-2026-32288",
+                "title": "tar.Reader can allocate an unbounded amount of memory when readin ...",
+                "description": "tar.Reader can allocate an unbounded amount of memory when reading a maliciously-crafted archive containing a large number of sparse regions encoded in the \"old GNU sparse map\" format.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "29.4.0-1.fc43",
+                        "fixed": "29.5.2-1.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc44",
+                        "identifier": "fc44"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc45",
+                        "identifier": "fc45"
+                    }
+                ]
+            },
+            "CVE-2026-41567": {
+                "cve_id": "CVE-2026-41567",
+                "title": "Moby is an open source container framework. In versions prior to  ...",
+                "description": "Moby is an open source container framework. In versions prior to 29.5.1 and in moby/moby v2 prior to v2.0.0-beta.14, when a compressed archive is uploaded to a container via `PUT /containers/{id}/archive` or piped through `docker cp -`, the daemon resolves decompression binaries (such as `xz` or `unpigz`) from the container's filesystem rather than the host's due to incorrect ordering of operations. A malicious container image containing a trojanized decompression binary can achieve arbitrary code execution with full daemon privileges, including host root UID and unrestricted capabilities, when a user uploads a compressed (xz or gzip) archive into that container. This issue is fixed in Docker Engine 29.5.1 and moby/moby v2.0.0-beta.14. Workarounds include only running containers from trusted images, using authorization plugins to restrict access to the `PUT /containers/{id}/archive` endpoint, and avoiding piping compressed archives into containers created from untrusted images",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "29.4.0-1.fc43",
+                        "fixed": "29.5.2-1.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc44",
+                        "identifier": "fc44"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc45",
+                        "identifier": "fc45"
+                    }
+                ]
+            },
+            "CVE-2026-41568": {
+                "cve_id": "CVE-2026-41568",
+                "title": "Docker: Race condition in docker cp allows creation of arbitrary empty files on the host via symlink swap",
+                "description": "## Summary\n\nA race condition during `docker cp` mount setup allows a malicious container to create empty files or directories at arbitrary absolute paths on the host filesystem.\n\nThis advisory covers the race during mountpoint creation. The related race during the subsequent mount syscall is tracked in GHSA-rg2x-37c3-w2rh\n\n## Details\n\nWhen copying files into a container, the daemon sets up a temporary filesystem view by bind-mounting volumes into a private mount namespace. During this setup, the mount destination path is first resolved within the container's root filesystem using `GetResourcePath`, and then used to create the mountpoint (file or directory) if it does not already exist via `createIfNotExists`.\n\nBetween path resolution and mountpoint creation, a process running inside the container can swap a path component for a symlink pointing to an arbitrary location on the host. Because `createIfNotExists` operates on the already-resolved absolute path using standard `os.MkdirAll` and `os.OpenFile` \u2014 which follow symlinks in intermediate path components \u2014 the symlink is followed and the file or directory is created outside the container root filesystem, as root.\n\n## Impact\n\nA malicious container can create empty files or directories at arbitrary absolute paths on the host filesystem, running as root. This enables persistent denial of service \u2014 for example:\n\n- Converting `/etc/docker/daemon.json` into a directory prevents the daemon from restarting\n- Creating `/etc/nologin` prevents user logins\n- Overwriting critical system paths with empty files can break host services\n\nThe container does not gain read or write access to existing host files \u2014 only the ability to create new empty files or directories at chosen paths.\n\n### Conditions for exploitation\n\n- A container must be running with a process that can rapidly create and swap symlinks at a volume mount destination path.\n- An operator must initiate a `docker cp` into that container, or call the `PUT /containers/{id}/archive` or `HEAD /containers/{id}/archive` API endpoints.\n\n### Not affected\n\n- Containers that do not have volume mounts are not affected, as the race occurs during volume bind-mount setup.\n\n## Patches\n\nMountpoint creation is now scoped to the container root using `os.Root` (Go 1.24+), which refuses to follow symlinks that escape the opened root directory. All filesystem operations in `createIfNotExists` (`MkdirAll`, `OpenFile`) are performed through the `os.Root` handle, so even if a symlink swap occurs after path resolution, the creation stays confined to the container root.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Avoid using `docker cp` with untrusted running containers.\n- Use authorization plugins to restrict access to the archive API endpoints (`PUT /containers/{id}/archive`, `HEAD /containers/{id}/archive`).",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "29.4.0-1.fc43",
+                        "fixed": "29.5.2-1.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc44",
+                        "identifier": "fc44"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc45",
+                        "identifier": "fc45"
+                    }
+                ]
+            },
+            "CVE-2026-42306": {
+                "cve_id": "CVE-2026-42306",
+                "title": "Docker: Race condition in docker cp allows bind mount redirection to host path",
+                "description": "## Summary\n\nA race condition during `docker cp` mount setup allows a malicious container to redirect a bind mount target to an arbitrary host path, potentially overwriting host files or causing denial of service.\n\n## Details\n\nWhen copying files into a container, the daemon sets up a temporary filesystem view by bind-mounting volumes into a private mount namespace. During this setup, the mount destination is created inside the container root and then a bind mount is attached using the container-relative path resolved to an absolute host path.\n\nBetween mountpoint creation and the `mount()` syscall, a process running inside the container can replace the destination (or a parent path component) with a symlink pointing to an arbitrary location on the host. The `mount()` syscall follows the symlink, causing the volume to be bind-mounted onto an arbitrary host path instead of the intended container path.\n\n## Impact\n\nA malicious container can redirect a volume bind mount to an arbitrary host path. The impact depends on the volume content and mount options:\n\n- If the volume is writable, arbitrary host files at the redirected path could be overwritten with the volume's contents.\n- If the volume is read-only, the host path is masked by the mount for the duration of the operation, causing denial of service.\n- In all cases the mount is temporary (torn down after the `docker cp` completes), but the effects of any writes persist.\n\n### Conditions for exploitation\n\n- A container must have at least one volume mount.\n- A process inside the container must be able to rapidly create and swap symlinks at the volume mount destination path.\n- An operator must initiate a `docker cp` into that container, or call the `PUT /containers/{id}/archive` or `HEAD /containers/{id}/archive` API endpoints.\n\n### Not affected\n\n- Containers that do not have volume mounts are not affected, as the race occurs during volume bind-mount setup.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Avoid using `docker cp` with untrusted running containers.\n- Use authorization plugins to restrict access to the archive API endpoints (`PUT /containers/{id}/archive`, `HEAD /containers/{id}/archive`).",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "29.4.0-1.fc43",
+                        "fixed": "29.5.2-1.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc44",
+                        "identifier": "fc44"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc45",
+                        "identifier": "fc45"
+                    }
+                ]
+            }
+        },
         "9": {
             "CVE-2026-32288": {
                 "cve_id": "CVE-2026-32288",
@@ -28,8 +126,8 @@
             },
             "CVE-2026-41567": {
                 "cve_id": "CVE-2026-41567",
-                "title": "Docker: `PUT /containers/{id}/archive` executes container binary on the host",
-                "description": "## Summary\n\nWhen a user uploads a compressed archive into a container, a malicious image can execute arbitrary code with daemon (host root) privileges.\n\n## Details\n\nWhen handling `PUT /containers/{id}/archive` requests with compressed archives, the daemon decompresses them using external system binaries. Due to incorrect ordering of operations, these binaries are resolved from the container's filesystem rather than the host's. A container image that includes a trojanized decompression binary can achieve code execution as the daemon process whenever a compressed archive is uploaded to that container.\n\nThe executed binary runs with the daemon's full privileges, including host root UID and unrestricted capabilities.\n\n## Impact\n\nArbitrary code execution as host root, crossing the container-to-host trust boundary.\n\n### Conditions for exploitation\n\n- A user must run a container from a malicious image that contains a trojanized decompression binary.\n- The user must then upload a compressed archive (xz or gzip) into that container, either by piping a compressed archive via `docker cp -` or by calling the `PUT /containers/{id}/archive` API directly with compressed content.\n\n### Not affected\n\nStandard `docker cp` usage is **not** affected, because the CLI sends uncompressed tar by default:\n\n```\ndocker cp ./file.txt mycontainer:/file.txt\n```\n\nThis can only be exploited when explicitly passing a xz or gzip-compressed archive to `docker cp` or the `PUT /containers/{id}/archive` API, for example:\n\n```\ncat archive.tar.xz | docker cp - mycontainer:/dir\n```\n\nDecompression formats using pure Go implementations (bzip2, zstd, and gzip when the container image does not contain an `unpigz` binary) are also not affected.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Use authorization plugins to limit access to the `PUT /containers/{id}/archive` endpoint.\n- Avoid piping compressed archives into containers created from untrusted images.",
+                "title": "Moby is an open source container framework. In versions prior to  ...",
+                "description": "Moby is an open source container framework. In versions prior to 29.5.1 and in moby/moby v2 prior to v2.0.0-beta.14, when a compressed archive is uploaded to a container via `PUT /containers/{id}/archive` or piped through `docker cp -`, the daemon resolves decompression binaries (such as `xz` or `unpigz`) from the container's filesystem rather than the host's due to incorrect ordering of operations. A malicious container image containing a trojanized decompression binary can achieve arbitrary code execution with full daemon privileges, including host root UID and unrestricted capabilities, when a user uploads a compressed (xz or gzip) archive into that container. This issue is fixed in Docker Engine 29.5.1 and moby/moby v2.0.0-beta.14. Workarounds include only running containers from trusted images, using authorization plugins to restrict access to the `PUT /containers/{id}/archive` endpoint, and avoiding piping compressed archives into containers created from untrusted images",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -126,204 +224,8 @@
             },
             "CVE-2026-41567": {
                 "cve_id": "CVE-2026-41567",
-                "title": "Docker: `PUT /containers/{id}/archive` executes container binary on the host",
-                "description": "## Summary\n\nWhen a user uploads a compressed archive into a container, a malicious image can execute arbitrary code with daemon (host root) privileges.\n\n## Details\n\nWhen handling `PUT /containers/{id}/archive` requests with compressed archives, the daemon decompresses them using external system binaries. Due to incorrect ordering of operations, these binaries are resolved from the container's filesystem rather than the host's. A container image that includes a trojanized decompression binary can achieve code execution as the daemon process whenever a compressed archive is uploaded to that container.\n\nThe executed binary runs with the daemon's full privileges, including host root UID and unrestricted capabilities.\n\n## Impact\n\nArbitrary code execution as host root, crossing the container-to-host trust boundary.\n\n### Conditions for exploitation\n\n- A user must run a container from a malicious image that contains a trojanized decompression binary.\n- The user must then upload a compressed archive (xz or gzip) into that container, either by piping a compressed archive via `docker cp -` or by calling the `PUT /containers/{id}/archive` API directly with compressed content.\n\n### Not affected\n\nStandard `docker cp` usage is **not** affected, because the CLI sends uncompressed tar by default:\n\n```\ndocker cp ./file.txt mycontainer:/file.txt\n```\n\nThis can only be exploited when explicitly passing a xz or gzip-compressed archive to `docker cp` or the `PUT /containers/{id}/archive` API, for example:\n\n```\ncat archive.tar.xz | docker cp - mycontainer:/dir\n```\n\nDecompression formats using pure Go implementations (bzip2, zstd, and gzip when the container image does not contain an `unpigz` binary) are also not affected.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Use authorization plugins to limit access to the `PUT /containers/{id}/archive` endpoint.\n- Avoid piping compressed archives into containers created from untrusted images.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "29.4.0-1.fc43",
-                        "fixed": "29.5.2-1.fc43",
-                        "identifier": "fc43"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc44",
-                        "identifier": "fc44"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc45",
-                        "identifier": "fc45"
-                    }
-                ]
-            },
-            "CVE-2026-41568": {
-                "cve_id": "CVE-2026-41568",
-                "title": "Docker: Race condition in docker cp allows creation of arbitrary empty files on the host via symlink swap",
-                "description": "## Summary\n\nA race condition during `docker cp` mount setup allows a malicious container to create empty files or directories at arbitrary absolute paths on the host filesystem.\n\nThis advisory covers the race during mountpoint creation. The related race during the subsequent mount syscall is tracked in GHSA-rg2x-37c3-w2rh\n\n## Details\n\nWhen copying files into a container, the daemon sets up a temporary filesystem view by bind-mounting volumes into a private mount namespace. During this setup, the mount destination path is first resolved within the container's root filesystem using `GetResourcePath`, and then used to create the mountpoint (file or directory) if it does not already exist via `createIfNotExists`.\n\nBetween path resolution and mountpoint creation, a process running inside the container can swap a path component for a symlink pointing to an arbitrary location on the host. Because `createIfNotExists` operates on the already-resolved absolute path using standard `os.MkdirAll` and `os.OpenFile` \u2014 which follow symlinks in intermediate path components \u2014 the symlink is followed and the file or directory is created outside the container root filesystem, as root.\n\n## Impact\n\nA malicious container can create empty files or directories at arbitrary absolute paths on the host filesystem, running as root. This enables persistent denial of service \u2014 for example:\n\n- Converting `/etc/docker/daemon.json` into a directory prevents the daemon from restarting\n- Creating `/etc/nologin` prevents user logins\n- Overwriting critical system paths with empty files can break host services\n\nThe container does not gain read or write access to existing host files \u2014 only the ability to create new empty files or directories at chosen paths.\n\n### Conditions for exploitation\n\n- A container must be running with a process that can rapidly create and swap symlinks at a volume mount destination path.\n- An operator must initiate a `docker cp` into that container, or call the `PUT /containers/{id}/archive` or `HEAD /containers/{id}/archive` API endpoints.\n\n### Not affected\n\n- Containers that do not have volume mounts are not affected, as the race occurs during volume bind-mount setup.\n\n## Patches\n\nMountpoint creation is now scoped to the container root using `os.Root` (Go 1.24+), which refuses to follow symlinks that escape the opened root directory. All filesystem operations in `createIfNotExists` (`MkdirAll`, `OpenFile`) are performed through the `os.Root` handle, so even if a symlink swap occurs after path resolution, the creation stays confined to the container root.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Avoid using `docker cp` with untrusted running containers.\n- Use authorization plugins to restrict access to the archive API endpoints (`PUT /containers/{id}/archive`, `HEAD /containers/{id}/archive`).",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "29.4.0-1.fc43",
-                        "fixed": "29.5.2-1.fc43",
-                        "identifier": "fc43"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc44",
-                        "identifier": "fc44"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc45",
-                        "identifier": "fc45"
-                    }
-                ]
-            },
-            "CVE-2026-42306": {
-                "cve_id": "CVE-2026-42306",
-                "title": "Docker: Race condition in docker cp allows bind mount redirection to host path",
-                "description": "## Summary\n\nA race condition during `docker cp` mount setup allows a malicious container to redirect a bind mount target to an arbitrary host path, potentially overwriting host files or causing denial of service.\n\n## Details\n\nWhen copying files into a container, the daemon sets up a temporary filesystem view by bind-mounting volumes into a private mount namespace. During this setup, the mount destination is created inside the container root and then a bind mount is attached using the container-relative path resolved to an absolute host path.\n\nBetween mountpoint creation and the `mount()` syscall, a process running inside the container can replace the destination (or a parent path component) with a symlink pointing to an arbitrary location on the host. The `mount()` syscall follows the symlink, causing the volume to be bind-mounted onto an arbitrary host path instead of the intended container path.\n\n## Impact\n\nA malicious container can redirect a volume bind mount to an arbitrary host path. The impact depends on the volume content and mount options:\n\n- If the volume is writable, arbitrary host files at the redirected path could be overwritten with the volume's contents.\n- If the volume is read-only, the host path is masked by the mount for the duration of the operation, causing denial of service.\n- In all cases the mount is temporary (torn down after the `docker cp` completes), but the effects of any writes persist.\n\n### Conditions for exploitation\n\n- A container must have at least one volume mount.\n- A process inside the container must be able to rapidly create and swap symlinks at the volume mount destination path.\n- An operator must initiate a `docker cp` into that container, or call the `PUT /containers/{id}/archive` or `HEAD /containers/{id}/archive` API endpoints.\n\n### Not affected\n\n- Containers that do not have volume mounts are not affected, as the race occurs during volume bind-mount setup.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Avoid using `docker cp` with untrusted running containers.\n- Use authorization plugins to restrict access to the archive API endpoints (`PUT /containers/{id}/archive`, `HEAD /containers/{id}/archive`).",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "29.4.0-1.fc43",
-                        "fixed": "29.5.2-1.fc43",
-                        "identifier": "fc43"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc44",
-                        "identifier": "fc44"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc45",
-                        "identifier": "fc45"
-                    }
-                ]
-            }
-        },
-        "8": {
-            "CVE-2026-32288": {
-                "cve_id": "CVE-2026-32288",
-                "title": "tar.Reader can allocate an unbounded amount of memory when readin ...",
-                "description": "tar.Reader can allocate an unbounded amount of memory when reading a maliciously-crafted archive containing a large number of sparse regions encoded in the \"old GNU sparse map\" format.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "29.4.0-1.fc43",
-                        "fixed": "29.5.2-1.fc43",
-                        "identifier": "fc43"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc44",
-                        "identifier": "fc44"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc45",
-                        "identifier": "fc45"
-                    }
-                ]
-            },
-            "CVE-2026-41567": {
-                "cve_id": "CVE-2026-41567",
-                "title": "Docker: `PUT /containers/{id}/archive` executes container binary on the host",
-                "description": "## Summary\n\nWhen a user uploads a compressed archive into a container, a malicious image can execute arbitrary code with daemon (host root) privileges.\n\n## Details\n\nWhen handling `PUT /containers/{id}/archive` requests with compressed archives, the daemon decompresses them using external system binaries. Due to incorrect ordering of operations, these binaries are resolved from the container's filesystem rather than the host's. A container image that includes a trojanized decompression binary can achieve code execution as the daemon process whenever a compressed archive is uploaded to that container.\n\nThe executed binary runs with the daemon's full privileges, including host root UID and unrestricted capabilities.\n\n## Impact\n\nArbitrary code execution as host root, crossing the container-to-host trust boundary.\n\n### Conditions for exploitation\n\n- A user must run a container from a malicious image that contains a trojanized decompression binary.\n- The user must then upload a compressed archive (xz or gzip) into that container, either by piping a compressed archive via `docker cp -` or by calling the `PUT /containers/{id}/archive` API directly with compressed content.\n\n### Not affected\n\nStandard `docker cp` usage is **not** affected, because the CLI sends uncompressed tar by default:\n\n```\ndocker cp ./file.txt mycontainer:/file.txt\n```\n\nThis can only be exploited when explicitly passing a xz or gzip-compressed archive to `docker cp` or the `PUT /containers/{id}/archive` API, for example:\n\n```\ncat archive.tar.xz | docker cp - mycontainer:/dir\n```\n\nDecompression formats using pure Go implementations (bzip2, zstd, and gzip when the container image does not contain an `unpigz` binary) are also not affected.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Use authorization plugins to limit access to the `PUT /containers/{id}/archive` endpoint.\n- Avoid piping compressed archives into containers created from untrusted images.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "29.4.0-1.fc43",
-                        "fixed": "29.5.2-1.fc43",
-                        "identifier": "fc43"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc44",
-                        "identifier": "fc44"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc45",
-                        "identifier": "fc45"
-                    }
-                ]
-            },
-            "CVE-2026-41568": {
-                "cve_id": "CVE-2026-41568",
-                "title": "Docker: Race condition in docker cp allows creation of arbitrary empty files on the host via symlink swap",
-                "description": "## Summary\n\nA race condition during `docker cp` mount setup allows a malicious container to create empty files or directories at arbitrary absolute paths on the host filesystem.\n\nThis advisory covers the race during mountpoint creation. The related race during the subsequent mount syscall is tracked in GHSA-rg2x-37c3-w2rh\n\n## Details\n\nWhen copying files into a container, the daemon sets up a temporary filesystem view by bind-mounting volumes into a private mount namespace. During this setup, the mount destination path is first resolved within the container's root filesystem using `GetResourcePath`, and then used to create the mountpoint (file or directory) if it does not already exist via `createIfNotExists`.\n\nBetween path resolution and mountpoint creation, a process running inside the container can swap a path component for a symlink pointing to an arbitrary location on the host. Because `createIfNotExists` operates on the already-resolved absolute path using standard `os.MkdirAll` and `os.OpenFile` \u2014 which follow symlinks in intermediate path components \u2014 the symlink is followed and the file or directory is created outside the container root filesystem, as root.\n\n## Impact\n\nA malicious container can create empty files or directories at arbitrary absolute paths on the host filesystem, running as root. This enables persistent denial of service \u2014 for example:\n\n- Converting `/etc/docker/daemon.json` into a directory prevents the daemon from restarting\n- Creating `/etc/nologin` prevents user logins\n- Overwriting critical system paths with empty files can break host services\n\nThe container does not gain read or write access to existing host files \u2014 only the ability to create new empty files or directories at chosen paths.\n\n### Conditions for exploitation\n\n- A container must be running with a process that can rapidly create and swap symlinks at a volume mount destination path.\n- An operator must initiate a `docker cp` into that container, or call the `PUT /containers/{id}/archive` or `HEAD /containers/{id}/archive` API endpoints.\n\n### Not affected\n\n- Containers that do not have volume mounts are not affected, as the race occurs during volume bind-mount setup.\n\n## Patches\n\nMountpoint creation is now scoped to the container root using `os.Root` (Go 1.24+), which refuses to follow symlinks that escape the opened root directory. All filesystem operations in `createIfNotExists` (`MkdirAll`, `OpenFile`) are performed through the `os.Root` handle, so even if a symlink swap occurs after path resolution, the creation stays confined to the container root.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Avoid using `docker cp` with untrusted running containers.\n- Use authorization plugins to restrict access to the archive API endpoints (`PUT /containers/{id}/archive`, `HEAD /containers/{id}/archive`).",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "29.4.0-1.fc43",
-                        "fixed": "29.5.2-1.fc43",
-                        "identifier": "fc43"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc44",
-                        "identifier": "fc44"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc45",
-                        "identifier": "fc45"
-                    }
-                ]
-            },
-            "CVE-2026-42306": {
-                "cve_id": "CVE-2026-42306",
-                "title": "Docker: Race condition in docker cp allows bind mount redirection to host path",
-                "description": "## Summary\n\nA race condition during `docker cp` mount setup allows a malicious container to redirect a bind mount target to an arbitrary host path, potentially overwriting host files or causing denial of service.\n\n## Details\n\nWhen copying files into a container, the daemon sets up a temporary filesystem view by bind-mounting volumes into a private mount namespace. During this setup, the mount destination is created inside the container root and then a bind mount is attached using the container-relative path resolved to an absolute host path.\n\nBetween mountpoint creation and the `mount()` syscall, a process running inside the container can replace the destination (or a parent path component) with a symlink pointing to an arbitrary location on the host. The `mount()` syscall follows the symlink, causing the volume to be bind-mounted onto an arbitrary host path instead of the intended container path.\n\n## Impact\n\nA malicious container can redirect a volume bind mount to an arbitrary host path. The impact depends on the volume content and mount options:\n\n- If the volume is writable, arbitrary host files at the redirected path could be overwritten with the volume's contents.\n- If the volume is read-only, the host path is masked by the mount for the duration of the operation, causing denial of service.\n- In all cases the mount is temporary (torn down after the `docker cp` completes), but the effects of any writes persist.\n\n### Conditions for exploitation\n\n- A container must have at least one volume mount.\n- A process inside the container must be able to rapidly create and swap symlinks at the volume mount destination path.\n- An operator must initiate a `docker cp` into that container, or call the `PUT /containers/{id}/archive` or `HEAD /containers/{id}/archive` API endpoints.\n\n### Not affected\n\n- Containers that do not have volume mounts are not affected, as the race occurs during volume bind-mount setup.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Avoid using `docker cp` with untrusted running containers.\n- Use authorization plugins to restrict access to the archive API endpoints (`PUT /containers/{id}/archive`, `HEAD /containers/{id}/archive`).",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "29.4.0-1.fc43",
-                        "fixed": "29.5.2-1.fc43",
-                        "identifier": "fc43"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc44",
-                        "identifier": "fc44"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc45",
-                        "identifier": "fc45"
-                    }
-                ]
-            }
-        },
-        "7": {
-            "CVE-2026-32288": {
-                "cve_id": "CVE-2026-32288",
-                "title": "tar.Reader can allocate an unbounded amount of memory when readin ...",
-                "description": "tar.Reader can allocate an unbounded amount of memory when reading a maliciously-crafted archive containing a large number of sparse regions encoded in the \"old GNU sparse map\" format.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "29.4.0-1.fc43",
-                        "fixed": "29.5.2-1.fc43",
-                        "identifier": "fc43"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc44",
-                        "identifier": "fc44"
-                    },
-                    {
-                        "introduced": "0",
-                        "fixed": "29.5.2-1.fc45",
-                        "identifier": "fc45"
-                    }
-                ]
-            },
-            "CVE-2026-41567": {
-                "cve_id": "CVE-2026-41567",
-                "title": "Docker: `PUT /containers/{id}/archive` executes container binary on the host",
-                "description": "## Summary\n\nWhen a user uploads a compressed archive into a container, a malicious image can execute arbitrary code with daemon (host root) privileges.\n\n## Details\n\nWhen handling `PUT /containers/{id}/archive` requests with compressed archives, the daemon decompresses them using external system binaries. Due to incorrect ordering of operations, these binaries are resolved from the container's filesystem rather than the host's. A container image that includes a trojanized decompression binary can achieve code execution as the daemon process whenever a compressed archive is uploaded to that container.\n\nThe executed binary runs with the daemon's full privileges, including host root UID and unrestricted capabilities.\n\n## Impact\n\nArbitrary code execution as host root, crossing the container-to-host trust boundary.\n\n### Conditions for exploitation\n\n- A user must run a container from a malicious image that contains a trojanized decompression binary.\n- The user must then upload a compressed archive (xz or gzip) into that container, either by piping a compressed archive via `docker cp -` or by calling the `PUT /containers/{id}/archive` API directly with compressed content.\n\n### Not affected\n\nStandard `docker cp` usage is **not** affected, because the CLI sends uncompressed tar by default:\n\n```\ndocker cp ./file.txt mycontainer:/file.txt\n```\n\nThis can only be exploited when explicitly passing a xz or gzip-compressed archive to `docker cp` or the `PUT /containers/{id}/archive` API, for example:\n\n```\ncat archive.tar.xz | docker cp - mycontainer:/dir\n```\n\nDecompression formats using pure Go implementations (bzip2, zstd, and gzip when the container image does not contain an `unpigz` binary) are also not affected.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Use authorization plugins to limit access to the `PUT /containers/{id}/archive` endpoint.\n- Avoid piping compressed archives into containers created from untrusted images.",
+                "title": "Moby is an open source container framework. In versions prior to  ...",
+                "description": "Moby is an open source container framework. In versions prior to 29.5.1 and in moby/moby v2 prior to v2.0.0-beta.14, when a compressed archive is uploaded to a container via `PUT /containers/{id}/archive` or piped through `docker cp -`, the daemon resolves decompression binaries (such as `xz` or `unpigz`) from the container's filesystem rather than the host's due to incorrect ordering of operations. A malicious container image containing a trojanized decompression binary can achieve arbitrary code execution with full daemon privileges, including host root UID and unrestricted capabilities, when a user uploads a compressed (xz or gzip) archive into that container. This issue is fixed in Docker Engine 29.5.1 and moby/moby v2.0.0-beta.14. Workarounds include only running containers from trusted images, using authorization plugins to restrict access to the `PUT /containers/{id}/archive` endpoint, and avoiding piping compressed archives into containers created from untrusted images",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -420,8 +322,8 @@
             },
             "CVE-2026-41567": {
                 "cve_id": "CVE-2026-41567",
-                "title": "Docker: `PUT /containers/{id}/archive` executes container binary on the host",
-                "description": "## Summary\n\nWhen a user uploads a compressed archive into a container, a malicious image can execute arbitrary code with daemon (host root) privileges.\n\n## Details\n\nWhen handling `PUT /containers/{id}/archive` requests with compressed archives, the daemon decompresses them using external system binaries. Due to incorrect ordering of operations, these binaries are resolved from the container's filesystem rather than the host's. A container image that includes a trojanized decompression binary can achieve code execution as the daemon process whenever a compressed archive is uploaded to that container.\n\nThe executed binary runs with the daemon's full privileges, including host root UID and unrestricted capabilities.\n\n## Impact\n\nArbitrary code execution as host root, crossing the container-to-host trust boundary.\n\n### Conditions for exploitation\n\n- A user must run a container from a malicious image that contains a trojanized decompression binary.\n- The user must then upload a compressed archive (xz or gzip) into that container, either by piping a compressed archive via `docker cp -` or by calling the `PUT /containers/{id}/archive` API directly with compressed content.\n\n### Not affected\n\nStandard `docker cp` usage is **not** affected, because the CLI sends uncompressed tar by default:\n\n```\ndocker cp ./file.txt mycontainer:/file.txt\n```\n\nThis can only be exploited when explicitly passing a xz or gzip-compressed archive to `docker cp` or the `PUT /containers/{id}/archive` API, for example:\n\n```\ncat archive.tar.xz | docker cp - mycontainer:/dir\n```\n\nDecompression formats using pure Go implementations (bzip2, zstd, and gzip when the container image does not contain an `unpigz` binary) are also not affected.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Use authorization plugins to limit access to the `PUT /containers/{id}/archive` endpoint.\n- Avoid piping compressed archives into containers created from untrusted images.",
+                "title": "Moby is an open source container framework. In versions prior to  ...",
+                "description": "Moby is an open source container framework. In versions prior to 29.5.1 and in moby/moby v2 prior to v2.0.0-beta.14, when a compressed archive is uploaded to a container via `PUT /containers/{id}/archive` or piped through `docker cp -`, the daemon resolves decompression binaries (such as `xz` or `unpigz`) from the container's filesystem rather than the host's due to incorrect ordering of operations. A malicious container image containing a trojanized decompression binary can achieve arbitrary code execution with full daemon privileges, including host root UID and unrestricted capabilities, when a user uploads a compressed (xz or gzip) archive into that container. This issue is fixed in Docker Engine 29.5.1 and moby/moby v2.0.0-beta.14. Workarounds include only running containers from trusted images, using authorization plugins to restrict access to the `PUT /containers/{id}/archive` endpoint, and avoiding piping compressed archives into containers created from untrusted images",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -491,7 +393,7 @@
                 ]
             }
         },
-        "6": {
+        "8": {
             "CVE-2026-32288": {
                 "cve_id": "CVE-2026-32288",
                 "title": "tar.Reader can allocate an unbounded amount of memory when readin ...",
@@ -518,8 +420,106 @@
             },
             "CVE-2026-41567": {
                 "cve_id": "CVE-2026-41567",
-                "title": "Docker: `PUT /containers/{id}/archive` executes container binary on the host",
-                "description": "## Summary\n\nWhen a user uploads a compressed archive into a container, a malicious image can execute arbitrary code with daemon (host root) privileges.\n\n## Details\n\nWhen handling `PUT /containers/{id}/archive` requests with compressed archives, the daemon decompresses them using external system binaries. Due to incorrect ordering of operations, these binaries are resolved from the container's filesystem rather than the host's. A container image that includes a trojanized decompression binary can achieve code execution as the daemon process whenever a compressed archive is uploaded to that container.\n\nThe executed binary runs with the daemon's full privileges, including host root UID and unrestricted capabilities.\n\n## Impact\n\nArbitrary code execution as host root, crossing the container-to-host trust boundary.\n\n### Conditions for exploitation\n\n- A user must run a container from a malicious image that contains a trojanized decompression binary.\n- The user must then upload a compressed archive (xz or gzip) into that container, either by piping a compressed archive via `docker cp -` or by calling the `PUT /containers/{id}/archive` API directly with compressed content.\n\n### Not affected\n\nStandard `docker cp` usage is **not** affected, because the CLI sends uncompressed tar by default:\n\n```\ndocker cp ./file.txt mycontainer:/file.txt\n```\n\nThis can only be exploited when explicitly passing a xz or gzip-compressed archive to `docker cp` or the `PUT /containers/{id}/archive` API, for example:\n\n```\ncat archive.tar.xz | docker cp - mycontainer:/dir\n```\n\nDecompression formats using pure Go implementations (bzip2, zstd, and gzip when the container image does not contain an `unpigz` binary) are also not affected.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Use authorization plugins to limit access to the `PUT /containers/{id}/archive` endpoint.\n- Avoid piping compressed archives into containers created from untrusted images.",
+                "title": "Moby is an open source container framework. In versions prior to  ...",
+                "description": "Moby is an open source container framework. In versions prior to 29.5.1 and in moby/moby v2 prior to v2.0.0-beta.14, when a compressed archive is uploaded to a container via `PUT /containers/{id}/archive` or piped through `docker cp -`, the daemon resolves decompression binaries (such as `xz` or `unpigz`) from the container's filesystem rather than the host's due to incorrect ordering of operations. A malicious container image containing a trojanized decompression binary can achieve arbitrary code execution with full daemon privileges, including host root UID and unrestricted capabilities, when a user uploads a compressed (xz or gzip) archive into that container. This issue is fixed in Docker Engine 29.5.1 and moby/moby v2.0.0-beta.14. Workarounds include only running containers from trusted images, using authorization plugins to restrict access to the `PUT /containers/{id}/archive` endpoint, and avoiding piping compressed archives into containers created from untrusted images",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "29.4.0-1.fc43",
+                        "fixed": "29.5.2-1.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc44",
+                        "identifier": "fc44"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc45",
+                        "identifier": "fc45"
+                    }
+                ]
+            },
+            "CVE-2026-41568": {
+                "cve_id": "CVE-2026-41568",
+                "title": "Docker: Race condition in docker cp allows creation of arbitrary empty files on the host via symlink swap",
+                "description": "## Summary\n\nA race condition during `docker cp` mount setup allows a malicious container to create empty files or directories at arbitrary absolute paths on the host filesystem.\n\nThis advisory covers the race during mountpoint creation. The related race during the subsequent mount syscall is tracked in GHSA-rg2x-37c3-w2rh\n\n## Details\n\nWhen copying files into a container, the daemon sets up a temporary filesystem view by bind-mounting volumes into a private mount namespace. During this setup, the mount destination path is first resolved within the container's root filesystem using `GetResourcePath`, and then used to create the mountpoint (file or directory) if it does not already exist via `createIfNotExists`.\n\nBetween path resolution and mountpoint creation, a process running inside the container can swap a path component for a symlink pointing to an arbitrary location on the host. Because `createIfNotExists` operates on the already-resolved absolute path using standard `os.MkdirAll` and `os.OpenFile` \u2014 which follow symlinks in intermediate path components \u2014 the symlink is followed and the file or directory is created outside the container root filesystem, as root.\n\n## Impact\n\nA malicious container can create empty files or directories at arbitrary absolute paths on the host filesystem, running as root. This enables persistent denial of service \u2014 for example:\n\n- Converting `/etc/docker/daemon.json` into a directory prevents the daemon from restarting\n- Creating `/etc/nologin` prevents user logins\n- Overwriting critical system paths with empty files can break host services\n\nThe container does not gain read or write access to existing host files \u2014 only the ability to create new empty files or directories at chosen paths.\n\n### Conditions for exploitation\n\n- A container must be running with a process that can rapidly create and swap symlinks at a volume mount destination path.\n- An operator must initiate a `docker cp` into that container, or call the `PUT /containers/{id}/archive` or `HEAD /containers/{id}/archive` API endpoints.\n\n### Not affected\n\n- Containers that do not have volume mounts are not affected, as the race occurs during volume bind-mount setup.\n\n## Patches\n\nMountpoint creation is now scoped to the container root using `os.Root` (Go 1.24+), which refuses to follow symlinks that escape the opened root directory. All filesystem operations in `createIfNotExists` (`MkdirAll`, `OpenFile`) are performed through the `os.Root` handle, so even if a symlink swap occurs after path resolution, the creation stays confined to the container root.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Avoid using `docker cp` with untrusted running containers.\n- Use authorization plugins to restrict access to the archive API endpoints (`PUT /containers/{id}/archive`, `HEAD /containers/{id}/archive`).",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "29.4.0-1.fc43",
+                        "fixed": "29.5.2-1.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc44",
+                        "identifier": "fc44"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc45",
+                        "identifier": "fc45"
+                    }
+                ]
+            },
+            "CVE-2026-42306": {
+                "cve_id": "CVE-2026-42306",
+                "title": "Docker: Race condition in docker cp allows bind mount redirection to host path",
+                "description": "## Summary\n\nA race condition during `docker cp` mount setup allows a malicious container to redirect a bind mount target to an arbitrary host path, potentially overwriting host files or causing denial of service.\n\n## Details\n\nWhen copying files into a container, the daemon sets up a temporary filesystem view by bind-mounting volumes into a private mount namespace. During this setup, the mount destination is created inside the container root and then a bind mount is attached using the container-relative path resolved to an absolute host path.\n\nBetween mountpoint creation and the `mount()` syscall, a process running inside the container can replace the destination (or a parent path component) with a symlink pointing to an arbitrary location on the host. The `mount()` syscall follows the symlink, causing the volume to be bind-mounted onto an arbitrary host path instead of the intended container path.\n\n## Impact\n\nA malicious container can redirect a volume bind mount to an arbitrary host path. The impact depends on the volume content and mount options:\n\n- If the volume is writable, arbitrary host files at the redirected path could be overwritten with the volume's contents.\n- If the volume is read-only, the host path is masked by the mount for the duration of the operation, causing denial of service.\n- In all cases the mount is temporary (torn down after the `docker cp` completes), but the effects of any writes persist.\n\n### Conditions for exploitation\n\n- A container must have at least one volume mount.\n- A process inside the container must be able to rapidly create and swap symlinks at the volume mount destination path.\n- An operator must initiate a `docker cp` into that container, or call the `PUT /containers/{id}/archive` or `HEAD /containers/{id}/archive` API endpoints.\n\n### Not affected\n\n- Containers that do not have volume mounts are not affected, as the race occurs during volume bind-mount setup.\n\n## Workarounds\n\n- Only run containers from trusted images.\n- Avoid using `docker cp` with untrusted running containers.\n- Use authorization plugins to restrict access to the archive API endpoints (`PUT /containers/{id}/archive`, `HEAD /containers/{id}/archive`).",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "29.4.0-1.fc43",
+                        "fixed": "29.5.2-1.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc44",
+                        "identifier": "fc44"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc45",
+                        "identifier": "fc45"
+                    }
+                ]
+            }
+        },
+        "7": {
+            "CVE-2026-32288": {
+                "cve_id": "CVE-2026-32288",
+                "title": "tar.Reader can allocate an unbounded amount of memory when readin ...",
+                "description": "tar.Reader can allocate an unbounded amount of memory when reading a maliciously-crafted archive containing a large number of sparse regions encoded in the \"old GNU sparse map\" format.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "29.4.0-1.fc43",
+                        "fixed": "29.5.2-1.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc44",
+                        "identifier": "fc44"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "29.5.2-1.fc45",
+                        "identifier": "fc45"
+                    }
+                ]
+            },
+            "CVE-2026-41567": {
+                "cve_id": "CVE-2026-41567",
+                "title": "Moby is an open source container framework. In versions prior to  ...",
+                "description": "Moby is an open source container framework. In versions prior to 29.5.1 and in moby/moby v2 prior to v2.0.0-beta.14, when a compressed archive is uploaded to a container via `PUT /containers/{id}/archive` or piped through `docker cp -`, the daemon resolves decompression binaries (such as `xz` or `unpigz`) from the container's filesystem rather than the host's due to incorrect ordering of operations. A malicious container image containing a trojanized decompression binary can achieve arbitrary code execution with full daemon privileges, including host root UID and unrestricted capabilities, when a user uploads a compressed (xz or gzip) archive into that container. This issue is fixed in Docker Engine 29.5.1 and moby/moby v2.0.0-beta.14. Workarounds include only running containers from trusted images, using authorization plugins to restrict access to the `PUT /containers/{id}/archive` endpoint, and avoiding piping compressed archives into containers created from untrusted images",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
