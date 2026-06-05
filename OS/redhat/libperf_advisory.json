@@ -29572,6 +29572,23 @@
                     }
                 ]
             },
+            "CVE-2026-46135": {
+                "cve_id": "CVE-2026-46135",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnvmet-tcp: fix race between ICReq handling and queue teardown\n\nnvmet_tcp_handle_icreq() updates queue->state after sending an\nInitialization Connection Response (ICResp), but it does so without\nserializing against target-side queue teardown.\n\nIf an NVMe/TCP host sends an Initialization Connection Request\n(ICReq) and immediately closes the connection, target-side teardown\nmay start in softirq context before io_work drains the already\nbuffered ICReq. In that case, nvmet_tcp_schedule_release_queue()\nsets queue->state to NVMET_TCP_Q_DISCONNECTING and drops the queue\nreference under state_lock.\n\nIf io_work later processes that ICReq, nvmet_tcp_handle_icreq() can\nstill overwrite the state back to NVMET_TCP_Q_LIVE. That defeats the\nDISCONNECTING-state guard in nvmet_tcp_schedule_release_queue() and\nallows a later socket state change to re-enter teardown and issue a\nsecond kref_put() on an already released queue.\n\nThe ICResp send failure path has the same problem. If teardown has\nalready moved the queue to DISCONNECTING, a send error can still\noverwrite the state with NVMET_TCP_Q_FAILED, again reopening the\nwindow for a second teardown path to drop the queue reference.\n\nFix this by serializing both post-send state transitions with\nstate_lock and bailing out if teardown has already started.\n\nUse -ESHUTDOWN as an internal sentinel for that bail-out path rather\nthan propagating it as a transport error like -ECONNRESET. Keep\nnvmet_tcp_socket_error() setting rcv_state to NVMET_TCP_RECV_ERR before\nhonoring that sentinel so receive-side parsing stays quiesced until the\nexisting release path completes.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46140": {
                 "cve_id": "CVE-2026-46140",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -29606,11 +29623,45 @@
                     }
                 ]
             },
+            "CVE-2026-46150": {
+                "cve_id": "CVE-2026-46150",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfanotify: fix false positive on permission events\n\nfsnotify_get_mark_safe() may return false for a mark on an unrelated group,\nwhich results in bypassing the permission check.\n\nFix by skipping over detached marks that are not in the current group.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46153": {
                 "cve_id": "CVE-2026-46153",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\n8021q: delete cleared egress QoS mappings\n\nvlan_dev_set_egress_priority() currently keeps cleared egress\npriority mappings in the hash as tombstones. Repeated set/clear cycles\nwith distinct skb priorities therefore accumulate mapping nodes until\ndevice teardown and leak memory.\n\nDelete mappings when vlan_prio is cleared instead of keeping tombstones.\nNow that the egress mapping lists are RCU protected, the node can be\nunlinked safely and freed after a grace period.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46155": {
+                "cve_id": "CVE-2026-46155",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb/client: fix out-of-bounds read in smb2_compound_op()\n\nIf a server sends a truncated response but a large OutputBufferLength, and\nterminates the EA list early, check_wsl_eas() returns success without\nvalidating that the entire OutputBufferLength fits within iov_len.\n\nThen smb2_compound_op() does:\n    memcpy(idata->wsl.eas, data[0], size[0]);\n\nWhere size[0] is OutputBufferLength. If iov_len is smaller than size[0],\nmemcpy can read beyond the end of the rsp_iov allocation and leak adjacent\nkernel heap memory.",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -29645,6 +29696,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: usblp: fix uninitialized heap leak via LPGETSTATUS ioctl\n\nJust like in a previous problem in this driver, usblp_ctrl_msg() will\ncollapse the usb_control_msg() return value to 0/-errno, discarding the\nactual number of bytes transferred.\n\nIdeally that short command should be detected and error out, but many\nprinters are known to send \"incorrect\" responses back so we can't just\ndo that.\n\nstatusbuf is kmalloc(8) at probe time and never filled before the first\nLPGETSTATUS ioctl.\n\nusblp_read_status() requests 1 byte. If a malicious printer responds\nwith zero bytes, *statusbuf is one byte of stale kmalloc heap,\nsign-extended into the local int status, which the LPGETSTATUS path then\ncopy_to_user()s directly to the ioctl caller.\n\nFix this all by just zapping out the memory buffer when allocated at\nprobe time.  If a later call does a short read, the data will be\nidentical to what the device sent it the last time, so there is no\n\"leak\" of information happening.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46173": {
+                "cve_id": "CVE-2026-46173",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nexit: prevent preemption of oopsing TASK_DEAD task\n\nWhen an already-exiting task oopses, make_task_dead() currently calls\ndo_task_dead() with preemption enabled.  That is forbidden:\ndo_task_dead() calls __schedule(), which has a comment saying \"WARNING:\nmust be called with preemption disabled!\".\n\nIf an oopsing task is preempted in do_task_dead(), between becoming\nTASK_DEAD and entering the scheduler explicitly, bad things happen:\nfinish_task_switch() assumes that once the scheduler has switched away\nfrom a TASK_DEAD task, the task can never run again and its stack is no\nlonger needed; but that assumption apparently doesn't hold if the dead\ntask was preempted (the SM_PREEMPT case).\n\nThis means that the scheduler ends up repeatedly dropping references on\nthe dead task's stack, which can lead to use-after-free or double-free\nof the entire task stack; in other words, two tasks can end up running\non the same stack, resulting in various kinds of memory corruption.\n\n(This does not just affect \"recursively oopsing\" tasks; it is enough to\noops once during task exit, for example in a file_operations::release\nhandler)",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -29708,11 +29776,45 @@
                     }
                 ]
             },
+            "CVE-2026-46209": {
+                "cve_id": "CVE-2026-46209",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/gem: Fix inconsistent plane dimension calculation in drm_gem_fb_init_with_funcs()\n\ndrm_gem_fb_init_with_funcs() computes sub-sampled plane dimensions\nusing plain integer division:\n\n  unsigned int width  = mode_cmd->width  / (i ? info->hsub : 1);\n  unsigned int height = mode_cmd->height / (i ? info->vsub : 1);\n\nHowever, the ioctl-level framebuffer_check() in drm_framebuffer.c uses\ndrm_format_info_plane_width/height() which round up dimensions via\nDIV_ROUND_UP(). This inconsistency corrupts the subsequent GEM object\nsize check for certain pixel format and dimension combinations.\n\nFor example, with NV12 (vsub=2) and a 1-pixel-tall framebuffer the\nGEM size validation path sees height=0 instead of height=1. The\nexpression (height - 1) then wraps to UINT_MAX as an unsigned int,\ncausing min_size to overflow and wrap back to a small value. A tiny\nGEM object therefore passes the size guard, yet when the GPU accesses\nthe chroma plane it will read or write memory beyond the object's\nbounds.\n\nFix by replacing the open-coded divisions with drm_format_info_plane_width()\nand drm_format_info_plane_height(), which use DIV_ROUND_UP() and match\nthe calculation already used in framebuffer_check().",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46214": {
                 "cve_id": "CVE-2026-46214",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: fix accept queue count leak on transport mismatch\n\nvirtio_transport_recv_listen() calls sk_acceptq_added() before\nvsock_assign_transport(). If vsock_assign_transport() fails or\nselects a different transport, the error path returns without\ncalling sk_acceptq_removed(), permanently incrementing\nsk_ack_backlog.\n\nAfter approximately backlog+1 such failures, sk_acceptq_is_full()\nreturns true, causing the listener to reject all new connections.\n\nFix by moving sk_acceptq_added() to after the transport validation,\nmatching the pattern used by vmci_transport and hyperv_transport.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46215": {
+                "cve_id": "CVE-2026-46215",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm: Set old handle to NULL before prime swap in change_handle\n\nThere was a potential race condition in change_handle. The ioctl\nbriefly had a single object with two idr entries; a concurrent\ngem_close could delete the object and remove one of the handles\nwhile leaving the other one dangling, which could subsequently\nbe dereferenced for a use-after-free.\n\nTo fix this, do the same dance that gem_close itself does.\n(f6cd7daecff5 drm: Release driver references to handle before making it available again)\nFirst idr_replace the old handle to NULL. Later, if the prime\noperations are successful, actually close it.\n\ncreate_tail required a similar dance to avoid a similar problem.\n(bd46cece51a3 drm/gem: Fix race in drm_gem_handle_create_tail())\nIt idr_allocs the new handle with NULL, then swaps in the correct\nobject later to avoid races. We don't need to do that here, since\nthe only operations that could race are drm_prime, and\nchange_handle holds the prime lock for the entire duration.\n\nv2: cleanups of error paths",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -29763,7 +29865,7 @@
                 "cve_id": "CVE-2026-46242",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\neventpoll: fix ep_remove struct eventpoll / struct file UAF\n\nep_remove() (via ep_remove_file()) cleared file->f_ep under\nfile->f_lock but then kept using @file inside the critical section\n(is_file_epoll(), hlist_del_rcu() through the head, spin_unlock).\nA concurrent __fput() taking the eventpoll_release() fastpath in\nthat window observed the transient NULL, skipped\neventpoll_release_file() and ran to f_op->release / file_free().\n\nFor the epoll-watches-epoll case, f_op->release is\nep_eventpoll_release() -> ep_clear_and_put() -> ep_free(), which\nkfree()s the watched struct eventpoll. Its embedded ->refs\nhlist_head is exactly where epi->fllink.pprev points, so the\nsubsequent hlist_del_rcu()'s \"*pprev = next\" scribbles into freed\nkmalloc-192 memory.\n\nIn addition, struct file is SLAB_TYPESAFE_BY_RCU, so the slot\nbacking @file could be recycled by alloc_empty_file() --\nreinitializing f_lock and f_ep -- while ep_remove() is still\nnominally inside that lock. The upshot is an attacker-controllable\nkmem_cache_free() against the wrong slab cache.\n\nPin @file via epi_fget() at the top of ep_remove() and gate the\ncritical section on the pin succeeding. With the pin held @file\ncannot reach refcount zero, which holds __fput() off and\ntransitively keeps the watched struct eventpoll alive across the\nhlist_del_rcu() and the f_lock use, closing both UAFs.\n\nIf the pin fails @file has already reached refcount zero and its\n__fput() is in flight. Because we bailed before clearing f_ep,\nthat path takes the eventpoll_release() slow path into\neventpoll_release_file() and blocks on ep->mtx until the waiter\nside's ep_clear_and_put() drops it. The bailed epi's share of\nep->refcount stays intact, so the trailing ep_refcount_dec_and_test()\nin ep_clear_and_put() cannot free the eventpoll out from under\neventpoll_release_file(); the orphaned epi is then cleaned up\nthere.\n\nA successful pin also proves we are not racing\neventpoll_release_file() on this epi, so drop the now-redundant\nre-check of epi->dying under f_lock. The cheap lockless\nREAD_ONCE(epi->dying) fast-path bailout stays.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -29780,7 +29882,7 @@
                 "cve_id": "CVE-2026-46244",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nft_inner: Fix IPv6 inner_thoff desync\n\nIn nft_inner_parse_l2l3(), when processing inner IPv6 packets,\nipv6_find_hdr() correctly computes the transport header offset\ntraversing all extension headers, but the result is immediately\noverwritten with nhoff + sizeof(_ip6h) (40 bytes), which only\naccounts for the IPv6 base header. This creates a desync between\ninner_thoff (wrong \u2014 points to extension header start) and l4proto\n(correct \u2014 e.g., IPPROTO_TCP), enabling transport header forgery\nand potential firewall bypass. This issue affects stable versions\nfrom Linux 6.2.\n\nFor comparison, the normal (non-inner) IPv6 path correctly\npreserves ipv6_find_hdr()'s result. Removing the incorrect overwrite\nensures that ipv6_find_hdr()'s calculated transport header offset is\npreserved, thereby fixing the desynchronization.",
-                "severity": "HIGH",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -29848,7 +29950,7 @@
                 "cve_id": "CVE-2026-46253",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npstore/ram: fix buffer overflow in persistent_ram_save_old()\n\npersistent_ram_save_old() can be called multiple times for the same\npersistent_ram_zone (e.g., via ramoops_pstore_read -> ramoops_get_next_prz\nfor PSTORE_TYPE_DMESG records).\n\nCurrently, the function only allocates prz->old_log when it is NULL,\nbut it unconditionally updates prz->old_log_size to the current buffer\nsize and then performs memcpy_fromio() using this new size. If the\nbuffer size has grown since the first allocation (which can happen\nacross different kernel boot cycles), this leads to:\n\n1. A heap buffer overflow (OOB write) in the memcpy_fromio() calls\n2. A subsequent OOB read when ramoops_pstore_read() accesses the buffer\n   using the incorrect (larger) old_log_size\n\nThe KASAN splat would look similar to:\n  BUG: KASAN: slab-out-of-bounds in ramoops_pstore_read+0x...\n  Read of size N at addr ... by task ...\n\nThe conditions are likely extremely hard to hit:\n\n  0. Crash with a ramoops write of less-than-record-max-size bytes.\n  1. Reboot: ramoops registers, pstore_get_records(0) reads old crash,\n     allocates old_log with size X\n  2. Crash handler registered, timer started (if pstore_update_ms >= 0)\n  3. Oops happens (non-fatal, system continues)\n  4. pstore_dump() writes oops via ramoops_pstore_write() size Y (>X)\n  5. pstore_new_entry = 1, pstore_timer_kick() called\n  6. System continues running (not a panic oops)\n  7. Timer fires after pstore_update_ms milliseconds\n  8. pstore_timefunc() \u2192 schedule_work() \u2192 pstore_dowork() \u2192 pstore_get_records(1)\n  9. ramoops_get_next_prz() \u2192 persistent_ram_save_old()\n 10. buffer_size() returns Y, but old_log is X bytes\n 11. Y > X: memcpy_fromio() overflows heap\n\n  Requirements:\n  - a prior crash record exists that did not fill the record size\n    (almost impossible since the crash handler writes as much as it\n    can possibly fit into the record, capped by max record size and\n    the kmsg buffer almost always exceeds the max record size)\n  - pstore_update_ms >= 0 (disabled by default)\n  - Non-fatal oops (system survives)\n\nFree and reallocate the buffer when the new size differs from the\npreviously allocated size. This ensures old_log always has sufficient\nspace for the data being copied.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -29899,7 +30001,7 @@
                 "cve_id": "CVE-2026-46266",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ninet: RAW sockets using IPPROTO_RAW MUST drop incoming ICMP\n\nYizhou Zhao reported that simply having one RAW socket on protocol\nIPPROTO_RAW (255) was dangerous.\n\n  socket(AF_INET, SOCK_RAW, 255);\n\nA malicious incoming ICMP packet can set the protocol field to 255\nand match this socket, leading to FNHE cache changes.\n\ninner = IP(src=\"192.168.2.1\", dst=\"8.8.8.8\", proto=255)/Raw(\"TEST\")\npkt = IP(src=\"192.168.1.1\", dst=\"192.168.2.1\")/ICMP(type=3, code=4, nexthopmtu=576)/inner\n\n\"man 7 raw\" states:\n\n  A protocol of IPPROTO_RAW implies enabled IP_HDRINCL and is able\n  to send any IP protocol that is specified in the passed header.\n  Receiving of all IP protocols via IPPROTO_RAW is not possible\n  using raw sockets.\n\nMake sure we drop these malicious packets.",
-                "severity": "MEDIUM",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -29916,7 +30018,7 @@
                 "cve_id": "CVE-2026-46271",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath12k: do WoW offloads only on primary link\n\nIn case of multi-link connection, WCN7850 firmware crashes due to WoW\noffloads enabled on both primary and secondary links.\n\nChange to do it only on primary link to fix it.\n\nTested-on: WCN7850 hw2.0 PCI WLAN.HMT.1.1.c5-00284-QCAHMTSWPL_V1.0_V2.0_SILICONZ-1",
-                "severity": "LOW",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -29933,7 +30035,7 @@
                 "cve_id": "CVE-2026-46273",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nibmveth: Disable GSO for packets with small MSS\n\nSome physical adapters on Power systems do not support segmentation\noffload when the MSS is less than 224 bytes. Attempting to send such\npackets causes the adapter to freeze, stopping all traffic until\nmanually reset.\n\nImplement ndo_features_check to disable GSO for packets with small MSS\nvalues. The network stack will perform software segmentation instead.\n\nThe 224-byte minimum matches ibmvnic\ncommit <f10b09ef687f> (\"ibmvnic: Enforce stronger sanity checks\non GSO packets\")\nwhich uses the same physical adapters in SEA configurations.\n\nThe issue occurs specifically when the hardware attempts to perform\nsegmentation (gso_segs > 1) with a small MSS. Single-segment GSO packets\n(gso_segs == 1) do not trigger the problematic LSO code path and are\ntransmitted normally without segmentation.\n\nAdd an ndo_features_check callback to disable GSO when MSS < 224 bytes.\nAlso call vlan_features_check() to ensure proper handling of VLAN packets,\nparticularly QinQ (802.1ad) configurations where the hardware parser may\nnot support certain offload features.\n\nValidated using iptables to force small MSS values. Without the fix,\nthe adapter freezes. With the fix, packets are segmented in software\nand transmission succeeds. Comprehensive regression testing completedd\n(MSS tests, performance, stability).",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -59590,6 +59692,23 @@
                     }
                 ]
             },
+            "CVE-2026-46135": {
+                "cve_id": "CVE-2026-46135",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnvmet-tcp: fix race between ICReq handling and queue teardown\n\nnvmet_tcp_handle_icreq() updates queue->state after sending an\nInitialization Connection Response (ICResp), but it does so without\nserializing against target-side queue teardown.\n\nIf an NVMe/TCP host sends an Initialization Connection Request\n(ICReq) and immediately closes the connection, target-side teardown\nmay start in softirq context before io_work drains the already\nbuffered ICReq. In that case, nvmet_tcp_schedule_release_queue()\nsets queue->state to NVMET_TCP_Q_DISCONNECTING and drops the queue\nreference under state_lock.\n\nIf io_work later processes that ICReq, nvmet_tcp_handle_icreq() can\nstill overwrite the state back to NVMET_TCP_Q_LIVE. That defeats the\nDISCONNECTING-state guard in nvmet_tcp_schedule_release_queue() and\nallows a later socket state change to re-enter teardown and issue a\nsecond kref_put() on an already released queue.\n\nThe ICResp send failure path has the same problem. If teardown has\nalready moved the queue to DISCONNECTING, a send error can still\noverwrite the state with NVMET_TCP_Q_FAILED, again reopening the\nwindow for a second teardown path to drop the queue reference.\n\nFix this by serializing both post-send state transitions with\nstate_lock and bailing out if teardown has already started.\n\nUse -ESHUTDOWN as an internal sentinel for that bail-out path rather\nthan propagating it as a transport error like -ECONNRESET. Keep\nnvmet_tcp_socket_error() setting rcv_state to NVMET_TCP_RECV_ERR before\nhonoring that sentinel so receive-side parsing stays quiesced until the\nexisting release path completes.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46140": {
                 "cve_id": "CVE-2026-46140",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -59624,11 +59743,45 @@
                     }
                 ]
             },
+            "CVE-2026-46150": {
+                "cve_id": "CVE-2026-46150",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfanotify: fix false positive on permission events\n\nfsnotify_get_mark_safe() may return false for a mark on an unrelated group,\nwhich results in bypassing the permission check.\n\nFix by skipping over detached marks that are not in the current group.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46153": {
                 "cve_id": "CVE-2026-46153",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\n8021q: delete cleared egress QoS mappings\n\nvlan_dev_set_egress_priority() currently keeps cleared egress\npriority mappings in the hash as tombstones. Repeated set/clear cycles\nwith distinct skb priorities therefore accumulate mapping nodes until\ndevice teardown and leak memory.\n\nDelete mappings when vlan_prio is cleared instead of keeping tombstones.\nNow that the egress mapping lists are RCU protected, the node can be\nunlinked safely and freed after a grace period.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46155": {
+                "cve_id": "CVE-2026-46155",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb/client: fix out-of-bounds read in smb2_compound_op()\n\nIf a server sends a truncated response but a large OutputBufferLength, and\nterminates the EA list early, check_wsl_eas() returns success without\nvalidating that the entire OutputBufferLength fits within iov_len.\n\nThen smb2_compound_op() does:\n    memcpy(idata->wsl.eas, data[0], size[0]);\n\nWhere size[0] is OutputBufferLength. If iov_len is smaller than size[0],\nmemcpy can read beyond the end of the rsp_iov allocation and leak adjacent\nkernel heap memory.",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -59663,6 +59816,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: usblp: fix uninitialized heap leak via LPGETSTATUS ioctl\n\nJust like in a previous problem in this driver, usblp_ctrl_msg() will\ncollapse the usb_control_msg() return value to 0/-errno, discarding the\nactual number of bytes transferred.\n\nIdeally that short command should be detected and error out, but many\nprinters are known to send \"incorrect\" responses back so we can't just\ndo that.\n\nstatusbuf is kmalloc(8) at probe time and never filled before the first\nLPGETSTATUS ioctl.\n\nusblp_read_status() requests 1 byte. If a malicious printer responds\nwith zero bytes, *statusbuf is one byte of stale kmalloc heap,\nsign-extended into the local int status, which the LPGETSTATUS path then\ncopy_to_user()s directly to the ioctl caller.\n\nFix this all by just zapping out the memory buffer when allocated at\nprobe time.  If a later call does a short read, the data will be\nidentical to what the device sent it the last time, so there is no\n\"leak\" of information happening.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46173": {
+                "cve_id": "CVE-2026-46173",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nexit: prevent preemption of oopsing TASK_DEAD task\n\nWhen an already-exiting task oopses, make_task_dead() currently calls\ndo_task_dead() with preemption enabled.  That is forbidden:\ndo_task_dead() calls __schedule(), which has a comment saying \"WARNING:\nmust be called with preemption disabled!\".\n\nIf an oopsing task is preempted in do_task_dead(), between becoming\nTASK_DEAD and entering the scheduler explicitly, bad things happen:\nfinish_task_switch() assumes that once the scheduler has switched away\nfrom a TASK_DEAD task, the task can never run again and its stack is no\nlonger needed; but that assumption apparently doesn't hold if the dead\ntask was preempted (the SM_PREEMPT case).\n\nThis means that the scheduler ends up repeatedly dropping references on\nthe dead task's stack, which can lead to use-after-free or double-free\nof the entire task stack; in other words, two tasks can end up running\non the same stack, resulting in various kinds of memory corruption.\n\n(This does not just affect \"recursively oopsing\" tasks; it is enough to\noops once during task exit, for example in a file_operations::release\nhandler)",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -59726,11 +59896,45 @@
                     }
                 ]
             },
+            "CVE-2026-46209": {
+                "cve_id": "CVE-2026-46209",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/gem: Fix inconsistent plane dimension calculation in drm_gem_fb_init_with_funcs()\n\ndrm_gem_fb_init_with_funcs() computes sub-sampled plane dimensions\nusing plain integer division:\n\n  unsigned int width  = mode_cmd->width  / (i ? info->hsub : 1);\n  unsigned int height = mode_cmd->height / (i ? info->vsub : 1);\n\nHowever, the ioctl-level framebuffer_check() in drm_framebuffer.c uses\ndrm_format_info_plane_width/height() which round up dimensions via\nDIV_ROUND_UP(). This inconsistency corrupts the subsequent GEM object\nsize check for certain pixel format and dimension combinations.\n\nFor example, with NV12 (vsub=2) and a 1-pixel-tall framebuffer the\nGEM size validation path sees height=0 instead of height=1. The\nexpression (height - 1) then wraps to UINT_MAX as an unsigned int,\ncausing min_size to overflow and wrap back to a small value. A tiny\nGEM object therefore passes the size guard, yet when the GPU accesses\nthe chroma plane it will read or write memory beyond the object's\nbounds.\n\nFix by replacing the open-coded divisions with drm_format_info_plane_width()\nand drm_format_info_plane_height(), which use DIV_ROUND_UP() and match\nthe calculation already used in framebuffer_check().",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46214": {
                 "cve_id": "CVE-2026-46214",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: fix accept queue count leak on transport mismatch\n\nvirtio_transport_recv_listen() calls sk_acceptq_added() before\nvsock_assign_transport(). If vsock_assign_transport() fails or\nselects a different transport, the error path returns without\ncalling sk_acceptq_removed(), permanently incrementing\nsk_ack_backlog.\n\nAfter approximately backlog+1 such failures, sk_acceptq_is_full()\nreturns true, causing the listener to reject all new connections.\n\nFix by moving sk_acceptq_added() to after the transport validation,\nmatching the pattern used by vmci_transport and hyperv_transport.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46215": {
+                "cve_id": "CVE-2026-46215",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm: Set old handle to NULL before prime swap in change_handle\n\nThere was a potential race condition in change_handle. The ioctl\nbriefly had a single object with two idr entries; a concurrent\ngem_close could delete the object and remove one of the handles\nwhile leaving the other one dangling, which could subsequently\nbe dereferenced for a use-after-free.\n\nTo fix this, do the same dance that gem_close itself does.\n(f6cd7daecff5 drm: Release driver references to handle before making it available again)\nFirst idr_replace the old handle to NULL. Later, if the prime\noperations are successful, actually close it.\n\ncreate_tail required a similar dance to avoid a similar problem.\n(bd46cece51a3 drm/gem: Fix race in drm_gem_handle_create_tail())\nIt idr_allocs the new handle with NULL, then swaps in the correct\nobject later to avoid races. We don't need to do that here, since\nthe only operations that could race are drm_prime, and\nchange_handle holds the prime lock for the entire duration.\n\nv2: cleanups of error paths",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -59781,7 +59985,7 @@
                 "cve_id": "CVE-2026-46242",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\neventpoll: fix ep_remove struct eventpoll / struct file UAF\n\nep_remove() (via ep_remove_file()) cleared file->f_ep under\nfile->f_lock but then kept using @file inside the critical section\n(is_file_epoll(), hlist_del_rcu() through the head, spin_unlock).\nA concurrent __fput() taking the eventpoll_release() fastpath in\nthat window observed the transient NULL, skipped\neventpoll_release_file() and ran to f_op->release / file_free().\n\nFor the epoll-watches-epoll case, f_op->release is\nep_eventpoll_release() -> ep_clear_and_put() -> ep_free(), which\nkfree()s the watched struct eventpoll. Its embedded ->refs\nhlist_head is exactly where epi->fllink.pprev points, so the\nsubsequent hlist_del_rcu()'s \"*pprev = next\" scribbles into freed\nkmalloc-192 memory.\n\nIn addition, struct file is SLAB_TYPESAFE_BY_RCU, so the slot\nbacking @file could be recycled by alloc_empty_file() --\nreinitializing f_lock and f_ep -- while ep_remove() is still\nnominally inside that lock. The upshot is an attacker-controllable\nkmem_cache_free() against the wrong slab cache.\n\nPin @file via epi_fget() at the top of ep_remove() and gate the\ncritical section on the pin succeeding. With the pin held @file\ncannot reach refcount zero, which holds __fput() off and\ntransitively keeps the watched struct eventpoll alive across the\nhlist_del_rcu() and the f_lock use, closing both UAFs.\n\nIf the pin fails @file has already reached refcount zero and its\n__fput() is in flight. Because we bailed before clearing f_ep,\nthat path takes the eventpoll_release() slow path into\neventpoll_release_file() and blocks on ep->mtx until the waiter\nside's ep_clear_and_put() drops it. The bailed epi's share of\nep->refcount stays intact, so the trailing ep_refcount_dec_and_test()\nin ep_clear_and_put() cannot free the eventpoll out from under\neventpoll_release_file(); the orphaned epi is then cleaned up\nthere.\n\nA successful pin also proves we are not racing\neventpoll_release_file() on this epi, so drop the now-redundant\nre-check of epi->dying under f_lock. The cheap lockless\nREAD_ONCE(epi->dying) fast-path bailout stays.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -59798,7 +60002,7 @@
                 "cve_id": "CVE-2026-46244",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nft_inner: Fix IPv6 inner_thoff desync\n\nIn nft_inner_parse_l2l3(), when processing inner IPv6 packets,\nipv6_find_hdr() correctly computes the transport header offset\ntraversing all extension headers, but the result is immediately\noverwritten with nhoff + sizeof(_ip6h) (40 bytes), which only\naccounts for the IPv6 base header. This creates a desync between\ninner_thoff (wrong \u2014 points to extension header start) and l4proto\n(correct \u2014 e.g., IPPROTO_TCP), enabling transport header forgery\nand potential firewall bypass. This issue affects stable versions\nfrom Linux 6.2.\n\nFor comparison, the normal (non-inner) IPv6 path correctly\npreserves ipv6_find_hdr()'s result. Removing the incorrect overwrite\nensures that ipv6_find_hdr()'s calculated transport header offset is\npreserved, thereby fixing the desynchronization.",
-                "severity": "HIGH",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -59866,7 +60070,7 @@
                 "cve_id": "CVE-2026-46253",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npstore/ram: fix buffer overflow in persistent_ram_save_old()\n\npersistent_ram_save_old() can be called multiple times for the same\npersistent_ram_zone (e.g., via ramoops_pstore_read -> ramoops_get_next_prz\nfor PSTORE_TYPE_DMESG records).\n\nCurrently, the function only allocates prz->old_log when it is NULL,\nbut it unconditionally updates prz->old_log_size to the current buffer\nsize and then performs memcpy_fromio() using this new size. If the\nbuffer size has grown since the first allocation (which can happen\nacross different kernel boot cycles), this leads to:\n\n1. A heap buffer overflow (OOB write) in the memcpy_fromio() calls\n2. A subsequent OOB read when ramoops_pstore_read() accesses the buffer\n   using the incorrect (larger) old_log_size\n\nThe KASAN splat would look similar to:\n  BUG: KASAN: slab-out-of-bounds in ramoops_pstore_read+0x...\n  Read of size N at addr ... by task ...\n\nThe conditions are likely extremely hard to hit:\n\n  0. Crash with a ramoops write of less-than-record-max-size bytes.\n  1. Reboot: ramoops registers, pstore_get_records(0) reads old crash,\n     allocates old_log with size X\n  2. Crash handler registered, timer started (if pstore_update_ms >= 0)\n  3. Oops happens (non-fatal, system continues)\n  4. pstore_dump() writes oops via ramoops_pstore_write() size Y (>X)\n  5. pstore_new_entry = 1, pstore_timer_kick() called\n  6. System continues running (not a panic oops)\n  7. Timer fires after pstore_update_ms milliseconds\n  8. pstore_timefunc() \u2192 schedule_work() \u2192 pstore_dowork() \u2192 pstore_get_records(1)\n  9. ramoops_get_next_prz() \u2192 persistent_ram_save_old()\n 10. buffer_size() returns Y, but old_log is X bytes\n 11. Y > X: memcpy_fromio() overflows heap\n\n  Requirements:\n  - a prior crash record exists that did not fill the record size\n    (almost impossible since the crash handler writes as much as it\n    can possibly fit into the record, capped by max record size and\n    the kmsg buffer almost always exceeds the max record size)\n  - pstore_update_ms >= 0 (disabled by default)\n  - Non-fatal oops (system survives)\n\nFree and reallocate the buffer when the new size differs from the\npreviously allocated size. This ensures old_log always has sufficient\nspace for the data being copied.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -59917,7 +60121,7 @@
                 "cve_id": "CVE-2026-46266",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ninet: RAW sockets using IPPROTO_RAW MUST drop incoming ICMP\n\nYizhou Zhao reported that simply having one RAW socket on protocol\nIPPROTO_RAW (255) was dangerous.\n\n  socket(AF_INET, SOCK_RAW, 255);\n\nA malicious incoming ICMP packet can set the protocol field to 255\nand match this socket, leading to FNHE cache changes.\n\ninner = IP(src=\"192.168.2.1\", dst=\"8.8.8.8\", proto=255)/Raw(\"TEST\")\npkt = IP(src=\"192.168.1.1\", dst=\"192.168.2.1\")/ICMP(type=3, code=4, nexthopmtu=576)/inner\n\n\"man 7 raw\" states:\n\n  A protocol of IPPROTO_RAW implies enabled IP_HDRINCL and is able\n  to send any IP protocol that is specified in the passed header.\n  Receiving of all IP protocols via IPPROTO_RAW is not possible\n  using raw sockets.\n\nMake sure we drop these malicious packets.",
-                "severity": "MEDIUM",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -59934,7 +60138,7 @@
                 "cve_id": "CVE-2026-46271",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath12k: do WoW offloads only on primary link\n\nIn case of multi-link connection, WCN7850 firmware crashes due to WoW\noffloads enabled on both primary and secondary links.\n\nChange to do it only on primary link to fix it.\n\nTested-on: WCN7850 hw2.0 PCI WLAN.HMT.1.1.c5-00284-QCAHMTSWPL_V1.0_V2.0_SILICONZ-1",
-                "severity": "LOW",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -59951,7 +60155,7 @@
                 "cve_id": "CVE-2026-46273",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nibmveth: Disable GSO for packets with small MSS\n\nSome physical adapters on Power systems do not support segmentation\noffload when the MSS is less than 224 bytes. Attempting to send such\npackets causes the adapter to freeze, stopping all traffic until\nmanually reset.\n\nImplement ndo_features_check to disable GSO for packets with small MSS\nvalues. The network stack will perform software segmentation instead.\n\nThe 224-byte minimum matches ibmvnic\ncommit <f10b09ef687f> (\"ibmvnic: Enforce stronger sanity checks\non GSO packets\")\nwhich uses the same physical adapters in SEA configurations.\n\nThe issue occurs specifically when the hardware attempts to perform\nsegmentation (gso_segs > 1) with a small MSS. Single-segment GSO packets\n(gso_segs == 1) do not trigger the problematic LSO code path and are\ntransmitted normally without segmentation.\n\nAdd an ndo_features_check callback to disable GSO when MSS < 224 bytes.\nAlso call vlan_features_check() to ensure proper handling of VLAN packets,\nparticularly QinQ (802.1ad) configurations where the hardware parser may\nnot support certain offload features.\n\nValidated using iptables to force small MSS values. Without the fix,\nthe adapter freezes. With the fix, packets are segmented in software\nand transmission succeeds. Comprehensive regression testing completedd\n(MSS tests, performance, stability).",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
