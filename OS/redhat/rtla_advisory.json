@@ -17002,6 +17002,23 @@
                     }
                 ]
             },
+            "CVE-2025-71315": {
+                "cve_id": "CVE-2025-71315",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/vkms: Convert to DRM's vblank timer\n\nReplace vkms' vblank timer with the DRM implementation. The DRM\ncode is identical in concept, but differs in implementation.\n\nVblank timers are covered in vblank helpers and initializer macros,\nso remove the corresponding hrtimer in struct vkms_output. The\nvblank timer calls vkms' custom timeout code via handle_vblank_timeout\nin struct drm_crtc_helper_funcs.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-22976": {
                 "cve_id": "CVE-2026-22976",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -23887,23 +23904,6 @@
                     }
                 ]
             },
-            "CVE-2026-31786": {
-                "cve_id": "CVE-2026-31786",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBuffer overflow in drivers/xen/sys-hypervisor.c\n\nThe build id returned by HYPERVISOR_xen_version(XENVER_build_id) is\nneither NUL terminated nor a string.\n\nThe first causes a buffer overflow as sprintf in buildid_show will\nread and copy till it finds a NUL.\n\n00000000  f4 91 51 f4 dd 38 9e 9d  65 47 52 eb 10 71 db 50  |..Q..8..eGR..q.P|\n00000010  b9 a8 01 42 6f 2e 32                              |...Bo.2|\n00000017\n\nSo use a memcpy instead of sprintf to have the correct value:\n\n00000000  f4 91 51 f4 dd 00 9e 9d  65 47 52 eb 10 71 db 50  |..Q.....eGR..q.P|\n00000010  b9 a8 01 42                                       |...B|\n00000014\n\n(the above have a hack to embed a zero inside and check it's\nreturned correctly).\n\nThis is XSA-485 / CVE-2026-31786",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-31787": {
                 "cve_id": "CVE-2026-31787",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -30031,6 +30031,125 @@
                     }
                 ]
             },
+            "CVE-2026-46274": {
+                "cve_id": "CVE-2026-46274",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nio-wq: check that the predecessor is hashed in io_wq_remove_pending()\n\nio_wq_remove_pending() needs to fix up wq->hash_tail[] if the cancelled\nwork was the tail of its hash bucket. When doing this, it checks whether\nthe preceding entry in acct->work_list has the same hash value, but\nnever checks that the predecessor is hashed at all. io_get_work_hash()\nis simply atomic_read(&work->flags) >> IO_WQ_HASH_SHIFT, and the hash\nbits are never set for non-hashed work, so it returns 0. Thus, when a\nhashed bucket-0 work is cancelled while a non-hashed work is its list\npredecessor, the check spuriously passes and a pointer to the non-hashed\nio_kiocb is stored in wq->hash_tail[0].\n\nBecause non-hashed work is dequeued via the fast path in\nio_get_next_work(), which never touches hash_tail[], the stale pointer\nis never cleared. Therefore, after the non-hashed io_kiocb completes and\nis freed back to req_cachep, wq->hash_tail[0] is a dangling pointer. The\nio_wq is per-task (tctx->io_wq) and survives ring open/close, so the\ndangling pointer persists for the lifetime of the task; the next hashed\nbucket-0 enqueue dereferences it in io_wq_insert_work() and\nwq_list_add_after() writes through freed memory.\n\nAdd the missing io_wq_is_hashed() check so a non-hashed predecessor\nnever inherits a hash_tail[] slot.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46275": {
+                "cve_id": "CVE-2026-46275",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: hci_uart: fix UAFs and race conditions in close and init paths\n\nVulnerabilities leading to Use-After-Free (UAF) and Null Pointer\nDereference (NPD) conditions were observed in the lifecycle management\nof hci_uart.\n\nThe primary issue arises because the workqueues (init_ready and\nwrite_work) are only flushed/cancelled if the HCI_UART_PROTO_READY\nflag is set during TTY close. If a hangup occurs before setup completes,\nhci_uart_tty_close() skips the teardown of these workqueues and\nproceeds to free the `hu` struct. When the scheduled work executes\nlater, it blindly dereferences the freed `hu` struct.\n\nFurthermore, several data races and UAFs were identified in the teardown\nsequence:\n1. Calling hci_uart_flush() from hci_uart_close() without effectively\n   disabling write_work causes a race condition where both can concurrently\n   double-free hu->tx_skb. This happens because protocol timers can\n   concurrently invoke hci_uart_tx_wakeup() and requeue write_work.\n2. Calling hci_free_dev(hdev) before hu->proto->close(hu) causes a UAF\n   when vendor specific protocol close callbacks dereference hu->hdev.\n3. In the initialization error paths, failing to take the proto_lock\n   write lock before clearing PROTO_READY leads to races with active\n   readers. Additionally, hci_uart_tty_receive() accesses hu->hdev\n   outside the read lock, leading to UAFs if the initialization error\n   path frees hdev concurrently.\n\nFix these synchronization and lifecycle issues by:\n1. Re-ordering hci_uart_tty_close() to clear HCI_UART_PROTO_READY first,\n   followed immediately by a cancel_work_sync(&hu->write_work). Clearing\n   the flag locks out concurrent protocol timers from successfully invoking\n   hci_uart_tx_wakeup(), effectively rendering the cancellation permanent\n   and preventing the tx_skb double-free.\n2. Note: Clearing PROTO_READY early causes hci_uart_close() to skip\n   hu->proto->flush(). This is perfectly safe in the tty_close path\n   because hu->proto->close() executes shortly after, which intrinsically\n   purges all protocol SKB queues and tears down the state.\n3. Relocating hu->proto->close(hu) strictly prior to hci_free_dev(hdev)\n   across all close and error paths to prevent vendor-level UAFs.\n4. Moving the hdev->stat.byte_rx increment in hci_uart_tty_receive()\n   inside the proto_lock read-side critical section to safely synchronize\n   with device unregistration.\n5. Adding cancel_work_sync(&hu->write_work) to hci_uart_close() to safely\n   flush the workqueue before hci_uart_flush() is invoked via the HCI core.\n6. Utilizing cancel_work_sync() instead of disable_work_sync() across\n   all paths to prevent permanently breaking user-space retry capabilities.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46280": {
+                "cve_id": "CVE-2026-46280",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nlib: test_hmm: evict device pages on file close to avoid use-after-free\n\nPatch series \"Minor hmm_test fixes and cleanups\".\n\nTwo bugfixes a cleanup for the HMM kernel selftests.  These were mostly\nreported by Zenghui Yu with special thanks to Lorenzo for analysing and\npointing out the problems.\n\n\nThis patch (of 3):\n\nWhen dmirror_fops_release() is called it frees the dmirror struct but\ndoesn't migrate device private pages back to system memory first.  This\nleaves those pages with a dangling zone_device_data pointer to the freed\ndmirror.\n\nIf a subsequent fault occurs on those pages (eg.  during coredump) the\ndmirror_devmem_fault() callback dereferences the stale pointer causing a\nkernel panic.  This was reported [1] when running mm/ksft_hmm.sh on arm64,\nwhere a test failure triggered SIGABRT and the resulting coredump walked\nthe VMAs faulting in the stale device private pages.\n\nFix this by calling dmirror_device_evict_chunk() for each devmem chunk in\ndmirror_fops_release() to migrate all device private pages back to system\nmemory before freeing the dmirror struct.  The function is moved earlier\nin the file to avoid a forward declaration.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46291": {
+                "cve_id": "CVE-2026-46291",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncrypto: caam - guard HMAC key hex dumps in hash_digest_key\n\nUse print_hex_dump_devel() for dumping sensitive HMAC key bytes in\nhash_digest_key() to avoid leaking secrets at runtime when\nCONFIG_DYNAMIC_DEBUG is enabled.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46292": {
+                "cve_id": "CVE-2026-46292",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npmdomain: core: Fix detach procedure for virtual devices in genpd\n\nIf a device is attached to a PM domain through genpd_dev_pm_attach_by_id(),\ngenpd calls pm_runtime_enable() for the corresponding virtual device that\nit registers. While this avoids boilerplate code in drivers, there is no\ncorresponding call to pm_runtime_disable() in genpd_dev_pm_detach().\n\nThis means these virtual devices are typically detached from its genpd,\nwhile runtime PM remains enabled for them, which is not how things are\ndesigned to work. In worst cases it may lead to critical errors, like a\nNULL pointer dereference bug in genpd_runtime_suspend(), which was recently\nreported. For another case, we may end up keeping an unnecessary vote for a\nperformance state for the device.\n\nTo fix these problems, let's add this missing call to pm_runtime_disable()\nin genpd_dev_pm_detach().",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46294": {
+                "cve_id": "CVE-2026-46294",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndm: fix a buffer overflow in ioctl processing\n\nTony Asleson (using Claude) found a buffer overflow in dm-ioctl in the\nfunction retrieve_status:\n\n1. The code in retrieve_status checks that the output string fits into\n   the output buffer and writes the output string there\n2. Then, the code aligns the \"outptr\" variable to the next 8-byte\n   boundary:\n\toutptr = align_ptr(outptr);\n3. The alignment doesn't check overflow, so outptr could point past the\n   buffer end\n4. The \"for\" loop is iterated again, it executes:\n\tremaining = len - (outptr - outbuf);\n5. If \"outptr\" points past \"outbuf + len\", the arithmetics wraps around\n   and the variable \"remaining\" contains unusually high number\n6. With \"remaining\" being high, the code writes more data past the end of\n   the buffer\n\nLuckily, this bug has no security implications because:\n1. Only root can issue device mapper ioctls\n2. The commonly used libraries that communicate with device mapper\n   (libdevmapper and devicemapper-rs) use buffer size that is aligned to\n   8 bytes - thus, \"outptr = align_ptr(outptr)\" can't overshoot the input\n   buffer and the bug can't happen accidentally",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46298": {
+                "cve_id": "CVE-2026-46298",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npseries/papr-hvpipe: Fix race with interrupt handler\n\nWhile executing ->ioctl handler or ->release handler, if an interrupt\nfires on the same cpu, then we can enter into a deadlock.\n\nThis patch fixes both these handlers to take spin_lock_irq{save|restore}\nversions of the lock to prevent this deadlock.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46300": {
                 "cve_id": "CVE-2026-46300",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -30052,6 +30171,74 @@
                         "introduced": "0",
                         "fixed": "7.0.6-200.fc44",
                         "identifier": "fc44"
+                    }
+                ]
+            },
+            "CVE-2026-46302": {
+                "cve_id": "CVE-2026-46302",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nselinux: allow multiple opens of /sys/fs/selinux/policy\n\nCurrently there can only be a single open of /sys/fs/selinux/policy at\nany time. This allows any process to block any other process from\nreading the kernel policy. The original motivation seems to have been\na mix of preventing an inconsistent view of the policy size and\npreventing userspace from allocating kernel memory without bound, but\nthis is arguably equally bad. Eliminate the policy_opened flag and\nshrink the critical section that the policy mutex is held. While we\nare making changes here, drop a couple of extraneous BUG_ONs.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46304": {
+                "cve_id": "CVE-2026-46304",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnvmet: avoid recursive nvmet-wq flush in nvmet_ctrl_free\n\nnvmet_tcp_release_queue_work() runs on nvmet-wq and can drop the\nfinal controller reference through nvmet_cq_put(). If that triggers\nnvmet_ctrl_free(), the teardown path flushes ctrl->async_event_work on\nthe same nvmet-wq.\n\nCall chain:\n\n nvmet_tcp_schedule_release_queue()\n   kref_put(&queue->kref, nvmet_tcp_release_queue)\n     nvmet_tcp_release_queue()\n       queue_work(nvmet_wq, &queue->release_work) <--- nvmet_wq\n         process_one_work()\n           nvmet_tcp_release_queue_work()\n             nvmet_cq_put(&queue->nvme_cq)\n               nvmet_cq_destroy()\n                 nvmet_ctrl_put(cq->ctrl)\n                   nvmet_ctrl_free()\n                     flush_work(&ctrl->async_event_work) <--- nvmet_wq\n\n                      Previously Scheduled by :-\n\t\t        nvmet_add_async_event\n\t\t          queue_work(nvmet_wq, &ctrl->async_event_work);\n\nThis trips lockdep with a possible recursive locking warning.\n\n[ 5223.015876] run blktests nvme/003 at 2026-04-07 20:53:55\n[ 5223.061801] loop0: detected capacity change from 0 to 2097152\n[ 5223.072206] nvmet: adding nsid 1 to subsystem blktests-subsystem-1\n[ 5223.088368] nvmet_tcp: enabling port 0 (127.0.0.1:4420)\n[ 5223.126086] nvmet: Created discovery controller 1 for subsystem nqn.2014-08.org.nvmexpress.discovery for NQN nqn.2014-08.org.nvmexpress:uuid:0f01fb42-9f7f-4856-b0b3-51e60b8de349.\n[ 5223.128453] nvme nvme1: new ctrl: NQN \"nqn.2014-08.org.nvmexpress.discovery\", addr 127.0.0.1:4420, hostnqn: nqn.2014-08.org.nvmexpress:uuid:0f01fb42-9f7f-4856-b0b3-51e60b8de349\n[ 5233.199447] nvme nvme1: Removing ctrl: NQN \"nqn.2014-08.org.nvmexpress.discovery\"\n\n[ 5233.227718] ============================================\n[ 5233.231283] WARNING: possible recursive locking detected\n[ 5233.234696] 7.0.0-rc3nvme+ #20 Tainted: G           O     N\n[ 5233.238434] --------------------------------------------\n[ 5233.241852] kworker/u192:6/2413 is trying to acquire lock:\n[ 5233.245429] ffff888111632548 ((wq_completion)nvmet-wq){+.+.}-{0:0}, at: touch_wq_lockdep_map+0x26/0x90\n[ 5233.251438]\n               but task is already holding lock:\n[ 5233.255254] ffff888111632548 ((wq_completion)nvmet-wq){+.+.}-{0:0}, at: process_one_work+0x5cc/0x6e0\n[ 5233.261125]\n               other info that might help us debug this:\n[ 5233.265333]  Possible unsafe locking scenario:\n\n[ 5233.269217]        CPU0\n[ 5233.270795]        ----\n[ 5233.272436]   lock((wq_completion)nvmet-wq);\n[ 5233.275241]   lock((wq_completion)nvmet-wq);\n[ 5233.278020]\n                *** DEADLOCK ***\n\n[ 5233.281793]  May be due to missing lock nesting notation\n\n[ 5233.286195] 3 locks held by kworker/u192:6/2413:\n[ 5233.289192]  #0: ffff888111632548 ((wq_completion)nvmet-wq){+.+.}-{0:0}, at: process_one_work+0x5cc/0x6e0\n[ 5233.294569]  #1: ffffc9000e2a7e40 ((work_completion)(&queue->release_work)){+.+.}-{0:0}, at: process_one_work+0x1c5/0x6e0\n[ 5233.300128]  #2: ffffffff82d7dc40 (rcu_read_lock){....}-{1:3}, at: __flush_work+0x62/0x530\n[ 5233.304290]\n               stack backtrace:\n[ 5233.306520] CPU: 4 UID: 0 PID: 2413 Comm: kworker/u192:6 Tainted: G           O     N  7.0.0-rc3nvme+ #20 PREEMPT(full)\n[ 5233.306524] Tainted: [O]=OOT_MODULE, [N]=TEST\n[ 5233.306525] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS rel-1.17.0-0-gb52ca86e094d-prebuilt.qemu.org 04/01/2014\n[ 5233.306527] Workqueue: nvmet-wq nvmet_tcp_release_queue_work [nvmet_tcp]\n[ 5233.306532] Call Trace:\n[ 5233.306534]  <TASK>\n[ 5233.306536]  dump_stack_lvl+0x73/0xb0\n[ 5233.306552]  print_deadlock_bug+0x225/0x2f0\n[ 5233.306556]  __lock_acquire+0x13f0/0x2290\n[ 5233.306563]  lock_acquire+0xd0/0x300\n[ 5233.306565]  ? touch_wq_lockdep_map+0x26/0x90\n[ 5233.306571]  ? __flush_work+0x20b/0x530\n[ 5233.306573]  ? touch_wq_lockdep_map+0x26/0x90\n[ 5233.306577]  touch_wq_lockdep_map+0x3b/0x90\n[ 5233.306580]  ? touch_wq_lockdep_map+0x26/0x90\n[ 52\n---truncated---",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46306": {
+                "cve_id": "CVE-2026-46306",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nflow_dissector: do not dissect PPPoE PFC frames\n\nRFC 2516 Section 7 states that Protocol Field Compression (PFC) is NOT\nRECOMMENDED for PPPoE. In practice, pppd does not support negotiating\nPFC for PPPoE sessions, and the flow dissector driver has assumed an\nuncompressed frame until the blamed commit.\n\nDuring the review process of that commit [1], support for PFC is\nsuggested. However, having a compressed (1-byte) protocol field means\nthe subsequent PPP payload is shifted by one byte, causing 4-byte\nmisalignment for the network header and an unaligned access exception\non some architectures.\n\nThe exception can be reproduced by sending a PPPoE PFC frame to an\nethernet interface of a MIPS board, with RPS enabled, even if no PPPoE\nsession is active on that interface:\n\n$ 0   : 00000000 80c40000 00000000 85144817\n$ 4   : 00000008 00000100 80a75758 81dc9bb8\n$ 8   : 00000010 8087ae2c 0000003d 00000000\n$12   : 000000e0 00000039 00000000 00000000\n$16   : 85043240 80a75758 81dc9bb8 00006488\n$20   : 0000002f 00000007 85144810 80a70000\n$24   : 81d1bda0 00000000\n$28   : 81dc8000 81dc9aa8 00000000 805ead08\nHi    : 00009d51\nLo    : 2163358a\nepc   : 805e91f0 __skb_flow_dissect+0x1b0/0x1b50\nra    : 805ead08 __skb_get_hash_net+0x74/0x12c\nStatus: 11000403        KERNEL EXL IE\nCause : 40800010 (ExcCode 04)\nBadVA : 85144817\nPrId  : 0001992f (MIPS 1004Kc)\nCall Trace:\n[<805e91f0>] __skb_flow_dissect+0x1b0/0x1b50\n[<805ead08>] __skb_get_hash_net+0x74/0x12c\n[<805ef330>] get_rps_cpu+0x1b8/0x3fc\n[<805fca70>] netif_receive_skb_list_internal+0x324/0x364\n[<805fd120>] napi_complete_done+0x68/0x2a4\n[<8058de5c>] mtk_napi_rx+0x228/0xfec\n[<805fd398>] __napi_poll+0x3c/0x1c4\n[<805fd754>] napi_threaded_poll_loop+0x234/0x29c\n[<805fd848>] napi_threaded_poll+0x8c/0xb0\n[<80053544>] kthread+0x104/0x12c\n[<80002bd8>] ret_from_kernel_thread+0x14/0x1c\n\nCode: 02d51821  1060045b  00000000 <8c640000> 3084000f  2c820005  144001a2  00042080  8e220000\n\nTo reduce the attack surface and maintain performance, do not process\nPPPoE PFC frames.\n\n[1] https://lore.kernel.org/r/20220630231016.GA392@debian.home",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46309": {
+                "cve_id": "CVE-2026-46309",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe/uapi: Reject coh_none PAT index for CPU cached memory in madvise\n\nAdd validation in xe_vm_madvise_ioctl() to reject PAT indices with\nXE_COH_NONE coherency mode when applied to CPU cached memory.\n\nUsing coh_none with CPU cached buffers is a security issue. When the\nkernel clears pages before reallocation, the clear operation stays in\nCPU cache (dirty). GPU with coh_none can bypass CPU caches and read\nstale sensitive data directly from DRAM, potentially leaking data from\npreviously freed pages of other processes.\n\nThis aligns with the existing validation in vm_bind path\n(xe_vm_bind_ioctl_validate_bo).\n\nv2(Matthew brost)\n- Add fixes\n- Move one debug print to better place\n\nv3(Matthew Auld)\n- Should be drm/xe/uapi\n- More Cc\n\nv4(Shuicheng Lin)\n- Fix kmem leak issues by the way\n\nv5\n- Remove kmem leak because it has been merged by another patch\n\nv6\n- Remove the fix which is not related to current fix\n\nv7\n- No change\n\nv8\n- Rebase\n\nv9\n- Limit the restrictions to iGPU\n\nv10\n- No change\n\n(cherry picked from commit 016ccdb674b8c899940b3944952c96a6a490d10a)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
                     }
                 ]
             },
@@ -47105,6 +47292,23 @@
                     }
                 ]
             },
+            "CVE-2025-71315": {
+                "cve_id": "CVE-2025-71315",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/vkms: Convert to DRM's vblank timer\n\nReplace vkms' vblank timer with the DRM implementation. The DRM\ncode is identical in concept, but differs in implementation.\n\nVblank timers are covered in vblank helpers and initializer macros,\nso remove the corresponding hrtimer in struct vkms_output. The\nvblank timer calls vkms' custom timeout code via handle_vblank_timeout\nin struct drm_crtc_helper_funcs.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-22976": {
                 "cve_id": "CVE-2026-22976",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -53990,23 +54194,6 @@
                     }
                 ]
             },
-            "CVE-2026-31786": {
-                "cve_id": "CVE-2026-31786",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBuffer overflow in drivers/xen/sys-hypervisor.c\n\nThe build id returned by HYPERVISOR_xen_version(XENVER_build_id) is\nneither NUL terminated nor a string.\n\nThe first causes a buffer overflow as sprintf in buildid_show will\nread and copy till it finds a NUL.\n\n00000000  f4 91 51 f4 dd 38 9e 9d  65 47 52 eb 10 71 db 50  |..Q..8..eGR..q.P|\n00000010  b9 a8 01 42 6f 2e 32                              |...Bo.2|\n00000017\n\nSo use a memcpy instead of sprintf to have the correct value:\n\n00000000  f4 91 51 f4 dd 00 9e 9d  65 47 52 eb 10 71 db 50  |..Q.....eGR..q.P|\n00000010  b9 a8 01 42                                       |...B|\n00000014\n\n(the above have a hack to embed a zero inside and check it's\nreturned correctly).\n\nThis is XSA-485 / CVE-2026-31786",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-31787": {
                 "cve_id": "CVE-2026-31787",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -60134,6 +60321,125 @@
                     }
                 ]
             },
+            "CVE-2026-46274": {
+                "cve_id": "CVE-2026-46274",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nio-wq: check that the predecessor is hashed in io_wq_remove_pending()\n\nio_wq_remove_pending() needs to fix up wq->hash_tail[] if the cancelled\nwork was the tail of its hash bucket. When doing this, it checks whether\nthe preceding entry in acct->work_list has the same hash value, but\nnever checks that the predecessor is hashed at all. io_get_work_hash()\nis simply atomic_read(&work->flags) >> IO_WQ_HASH_SHIFT, and the hash\nbits are never set for non-hashed work, so it returns 0. Thus, when a\nhashed bucket-0 work is cancelled while a non-hashed work is its list\npredecessor, the check spuriously passes and a pointer to the non-hashed\nio_kiocb is stored in wq->hash_tail[0].\n\nBecause non-hashed work is dequeued via the fast path in\nio_get_next_work(), which never touches hash_tail[], the stale pointer\nis never cleared. Therefore, after the non-hashed io_kiocb completes and\nis freed back to req_cachep, wq->hash_tail[0] is a dangling pointer. The\nio_wq is per-task (tctx->io_wq) and survives ring open/close, so the\ndangling pointer persists for the lifetime of the task; the next hashed\nbucket-0 enqueue dereferences it in io_wq_insert_work() and\nwq_list_add_after() writes through freed memory.\n\nAdd the missing io_wq_is_hashed() check so a non-hashed predecessor\nnever inherits a hash_tail[] slot.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46275": {
+                "cve_id": "CVE-2026-46275",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: hci_uart: fix UAFs and race conditions in close and init paths\n\nVulnerabilities leading to Use-After-Free (UAF) and Null Pointer\nDereference (NPD) conditions were observed in the lifecycle management\nof hci_uart.\n\nThe primary issue arises because the workqueues (init_ready and\nwrite_work) are only flushed/cancelled if the HCI_UART_PROTO_READY\nflag is set during TTY close. If a hangup occurs before setup completes,\nhci_uart_tty_close() skips the teardown of these workqueues and\nproceeds to free the `hu` struct. When the scheduled work executes\nlater, it blindly dereferences the freed `hu` struct.\n\nFurthermore, several data races and UAFs were identified in the teardown\nsequence:\n1. Calling hci_uart_flush() from hci_uart_close() without effectively\n   disabling write_work causes a race condition where both can concurrently\n   double-free hu->tx_skb. This happens because protocol timers can\n   concurrently invoke hci_uart_tx_wakeup() and requeue write_work.\n2. Calling hci_free_dev(hdev) before hu->proto->close(hu) causes a UAF\n   when vendor specific protocol close callbacks dereference hu->hdev.\n3. In the initialization error paths, failing to take the proto_lock\n   write lock before clearing PROTO_READY leads to races with active\n   readers. Additionally, hci_uart_tty_receive() accesses hu->hdev\n   outside the read lock, leading to UAFs if the initialization error\n   path frees hdev concurrently.\n\nFix these synchronization and lifecycle issues by:\n1. Re-ordering hci_uart_tty_close() to clear HCI_UART_PROTO_READY first,\n   followed immediately by a cancel_work_sync(&hu->write_work). Clearing\n   the flag locks out concurrent protocol timers from successfully invoking\n   hci_uart_tx_wakeup(), effectively rendering the cancellation permanent\n   and preventing the tx_skb double-free.\n2. Note: Clearing PROTO_READY early causes hci_uart_close() to skip\n   hu->proto->flush(). This is perfectly safe in the tty_close path\n   because hu->proto->close() executes shortly after, which intrinsically\n   purges all protocol SKB queues and tears down the state.\n3. Relocating hu->proto->close(hu) strictly prior to hci_free_dev(hdev)\n   across all close and error paths to prevent vendor-level UAFs.\n4. Moving the hdev->stat.byte_rx increment in hci_uart_tty_receive()\n   inside the proto_lock read-side critical section to safely synchronize\n   with device unregistration.\n5. Adding cancel_work_sync(&hu->write_work) to hci_uart_close() to safely\n   flush the workqueue before hci_uart_flush() is invoked via the HCI core.\n6. Utilizing cancel_work_sync() instead of disable_work_sync() across\n   all paths to prevent permanently breaking user-space retry capabilities.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46280": {
+                "cve_id": "CVE-2026-46280",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nlib: test_hmm: evict device pages on file close to avoid use-after-free\n\nPatch series \"Minor hmm_test fixes and cleanups\".\n\nTwo bugfixes a cleanup for the HMM kernel selftests.  These were mostly\nreported by Zenghui Yu with special thanks to Lorenzo for analysing and\npointing out the problems.\n\n\nThis patch (of 3):\n\nWhen dmirror_fops_release() is called it frees the dmirror struct but\ndoesn't migrate device private pages back to system memory first.  This\nleaves those pages with a dangling zone_device_data pointer to the freed\ndmirror.\n\nIf a subsequent fault occurs on those pages (eg.  during coredump) the\ndmirror_devmem_fault() callback dereferences the stale pointer causing a\nkernel panic.  This was reported [1] when running mm/ksft_hmm.sh on arm64,\nwhere a test failure triggered SIGABRT and the resulting coredump walked\nthe VMAs faulting in the stale device private pages.\n\nFix this by calling dmirror_device_evict_chunk() for each devmem chunk in\ndmirror_fops_release() to migrate all device private pages back to system\nmemory before freeing the dmirror struct.  The function is moved earlier\nin the file to avoid a forward declaration.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46291": {
+                "cve_id": "CVE-2026-46291",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncrypto: caam - guard HMAC key hex dumps in hash_digest_key\n\nUse print_hex_dump_devel() for dumping sensitive HMAC key bytes in\nhash_digest_key() to avoid leaking secrets at runtime when\nCONFIG_DYNAMIC_DEBUG is enabled.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46292": {
+                "cve_id": "CVE-2026-46292",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npmdomain: core: Fix detach procedure for virtual devices in genpd\n\nIf a device is attached to a PM domain through genpd_dev_pm_attach_by_id(),\ngenpd calls pm_runtime_enable() for the corresponding virtual device that\nit registers. While this avoids boilerplate code in drivers, there is no\ncorresponding call to pm_runtime_disable() in genpd_dev_pm_detach().\n\nThis means these virtual devices are typically detached from its genpd,\nwhile runtime PM remains enabled for them, which is not how things are\ndesigned to work. In worst cases it may lead to critical errors, like a\nNULL pointer dereference bug in genpd_runtime_suspend(), which was recently\nreported. For another case, we may end up keeping an unnecessary vote for a\nperformance state for the device.\n\nTo fix these problems, let's add this missing call to pm_runtime_disable()\nin genpd_dev_pm_detach().",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46294": {
+                "cve_id": "CVE-2026-46294",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndm: fix a buffer overflow in ioctl processing\n\nTony Asleson (using Claude) found a buffer overflow in dm-ioctl in the\nfunction retrieve_status:\n\n1. The code in retrieve_status checks that the output string fits into\n   the output buffer and writes the output string there\n2. Then, the code aligns the \"outptr\" variable to the next 8-byte\n   boundary:\n\toutptr = align_ptr(outptr);\n3. The alignment doesn't check overflow, so outptr could point past the\n   buffer end\n4. The \"for\" loop is iterated again, it executes:\n\tremaining = len - (outptr - outbuf);\n5. If \"outptr\" points past \"outbuf + len\", the arithmetics wraps around\n   and the variable \"remaining\" contains unusually high number\n6. With \"remaining\" being high, the code writes more data past the end of\n   the buffer\n\nLuckily, this bug has no security implications because:\n1. Only root can issue device mapper ioctls\n2. The commonly used libraries that communicate with device mapper\n   (libdevmapper and devicemapper-rs) use buffer size that is aligned to\n   8 bytes - thus, \"outptr = align_ptr(outptr)\" can't overshoot the input\n   buffer and the bug can't happen accidentally",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46298": {
+                "cve_id": "CVE-2026-46298",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npseries/papr-hvpipe: Fix race with interrupt handler\n\nWhile executing ->ioctl handler or ->release handler, if an interrupt\nfires on the same cpu, then we can enter into a deadlock.\n\nThis patch fixes both these handlers to take spin_lock_irq{save|restore}\nversions of the lock to prevent this deadlock.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46300": {
                 "cve_id": "CVE-2026-46300",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -60155,6 +60461,74 @@
                         "introduced": "0",
                         "fixed": "7.0.6-200.fc44",
                         "identifier": "fc44"
+                    }
+                ]
+            },
+            "CVE-2026-46302": {
+                "cve_id": "CVE-2026-46302",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nselinux: allow multiple opens of /sys/fs/selinux/policy\n\nCurrently there can only be a single open of /sys/fs/selinux/policy at\nany time. This allows any process to block any other process from\nreading the kernel policy. The original motivation seems to have been\na mix of preventing an inconsistent view of the policy size and\npreventing userspace from allocating kernel memory without bound, but\nthis is arguably equally bad. Eliminate the policy_opened flag and\nshrink the critical section that the policy mutex is held. While we\nare making changes here, drop a couple of extraneous BUG_ONs.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46304": {
+                "cve_id": "CVE-2026-46304",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnvmet: avoid recursive nvmet-wq flush in nvmet_ctrl_free\n\nnvmet_tcp_release_queue_work() runs on nvmet-wq and can drop the\nfinal controller reference through nvmet_cq_put(). If that triggers\nnvmet_ctrl_free(), the teardown path flushes ctrl->async_event_work on\nthe same nvmet-wq.\n\nCall chain:\n\n nvmet_tcp_schedule_release_queue()\n   kref_put(&queue->kref, nvmet_tcp_release_queue)\n     nvmet_tcp_release_queue()\n       queue_work(nvmet_wq, &queue->release_work) <--- nvmet_wq\n         process_one_work()\n           nvmet_tcp_release_queue_work()\n             nvmet_cq_put(&queue->nvme_cq)\n               nvmet_cq_destroy()\n                 nvmet_ctrl_put(cq->ctrl)\n                   nvmet_ctrl_free()\n                     flush_work(&ctrl->async_event_work) <--- nvmet_wq\n\n                      Previously Scheduled by :-\n\t\t        nvmet_add_async_event\n\t\t          queue_work(nvmet_wq, &ctrl->async_event_work);\n\nThis trips lockdep with a possible recursive locking warning.\n\n[ 5223.015876] run blktests nvme/003 at 2026-04-07 20:53:55\n[ 5223.061801] loop0: detected capacity change from 0 to 2097152\n[ 5223.072206] nvmet: adding nsid 1 to subsystem blktests-subsystem-1\n[ 5223.088368] nvmet_tcp: enabling port 0 (127.0.0.1:4420)\n[ 5223.126086] nvmet: Created discovery controller 1 for subsystem nqn.2014-08.org.nvmexpress.discovery for NQN nqn.2014-08.org.nvmexpress:uuid:0f01fb42-9f7f-4856-b0b3-51e60b8de349.\n[ 5223.128453] nvme nvme1: new ctrl: NQN \"nqn.2014-08.org.nvmexpress.discovery\", addr 127.0.0.1:4420, hostnqn: nqn.2014-08.org.nvmexpress:uuid:0f01fb42-9f7f-4856-b0b3-51e60b8de349\n[ 5233.199447] nvme nvme1: Removing ctrl: NQN \"nqn.2014-08.org.nvmexpress.discovery\"\n\n[ 5233.227718] ============================================\n[ 5233.231283] WARNING: possible recursive locking detected\n[ 5233.234696] 7.0.0-rc3nvme+ #20 Tainted: G           O     N\n[ 5233.238434] --------------------------------------------\n[ 5233.241852] kworker/u192:6/2413 is trying to acquire lock:\n[ 5233.245429] ffff888111632548 ((wq_completion)nvmet-wq){+.+.}-{0:0}, at: touch_wq_lockdep_map+0x26/0x90\n[ 5233.251438]\n               but task is already holding lock:\n[ 5233.255254] ffff888111632548 ((wq_completion)nvmet-wq){+.+.}-{0:0}, at: process_one_work+0x5cc/0x6e0\n[ 5233.261125]\n               other info that might help us debug this:\n[ 5233.265333]  Possible unsafe locking scenario:\n\n[ 5233.269217]        CPU0\n[ 5233.270795]        ----\n[ 5233.272436]   lock((wq_completion)nvmet-wq);\n[ 5233.275241]   lock((wq_completion)nvmet-wq);\n[ 5233.278020]\n                *** DEADLOCK ***\n\n[ 5233.281793]  May be due to missing lock nesting notation\n\n[ 5233.286195] 3 locks held by kworker/u192:6/2413:\n[ 5233.289192]  #0: ffff888111632548 ((wq_completion)nvmet-wq){+.+.}-{0:0}, at: process_one_work+0x5cc/0x6e0\n[ 5233.294569]  #1: ffffc9000e2a7e40 ((work_completion)(&queue->release_work)){+.+.}-{0:0}, at: process_one_work+0x1c5/0x6e0\n[ 5233.300128]  #2: ffffffff82d7dc40 (rcu_read_lock){....}-{1:3}, at: __flush_work+0x62/0x530\n[ 5233.304290]\n               stack backtrace:\n[ 5233.306520] CPU: 4 UID: 0 PID: 2413 Comm: kworker/u192:6 Tainted: G           O     N  7.0.0-rc3nvme+ #20 PREEMPT(full)\n[ 5233.306524] Tainted: [O]=OOT_MODULE, [N]=TEST\n[ 5233.306525] Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS rel-1.17.0-0-gb52ca86e094d-prebuilt.qemu.org 04/01/2014\n[ 5233.306527] Workqueue: nvmet-wq nvmet_tcp_release_queue_work [nvmet_tcp]\n[ 5233.306532] Call Trace:\n[ 5233.306534]  <TASK>\n[ 5233.306536]  dump_stack_lvl+0x73/0xb0\n[ 5233.306552]  print_deadlock_bug+0x225/0x2f0\n[ 5233.306556]  __lock_acquire+0x13f0/0x2290\n[ 5233.306563]  lock_acquire+0xd0/0x300\n[ 5233.306565]  ? touch_wq_lockdep_map+0x26/0x90\n[ 5233.306571]  ? __flush_work+0x20b/0x530\n[ 5233.306573]  ? touch_wq_lockdep_map+0x26/0x90\n[ 5233.306577]  touch_wq_lockdep_map+0x3b/0x90\n[ 5233.306580]  ? touch_wq_lockdep_map+0x26/0x90\n[ 52\n---truncated---",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46306": {
+                "cve_id": "CVE-2026-46306",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nflow_dissector: do not dissect PPPoE PFC frames\n\nRFC 2516 Section 7 states that Protocol Field Compression (PFC) is NOT\nRECOMMENDED for PPPoE. In practice, pppd does not support negotiating\nPFC for PPPoE sessions, and the flow dissector driver has assumed an\nuncompressed frame until the blamed commit.\n\nDuring the review process of that commit [1], support for PFC is\nsuggested. However, having a compressed (1-byte) protocol field means\nthe subsequent PPP payload is shifted by one byte, causing 4-byte\nmisalignment for the network header and an unaligned access exception\non some architectures.\n\nThe exception can be reproduced by sending a PPPoE PFC frame to an\nethernet interface of a MIPS board, with RPS enabled, even if no PPPoE\nsession is active on that interface:\n\n$ 0   : 00000000 80c40000 00000000 85144817\n$ 4   : 00000008 00000100 80a75758 81dc9bb8\n$ 8   : 00000010 8087ae2c 0000003d 00000000\n$12   : 000000e0 00000039 00000000 00000000\n$16   : 85043240 80a75758 81dc9bb8 00006488\n$20   : 0000002f 00000007 85144810 80a70000\n$24   : 81d1bda0 00000000\n$28   : 81dc8000 81dc9aa8 00000000 805ead08\nHi    : 00009d51\nLo    : 2163358a\nepc   : 805e91f0 __skb_flow_dissect+0x1b0/0x1b50\nra    : 805ead08 __skb_get_hash_net+0x74/0x12c\nStatus: 11000403        KERNEL EXL IE\nCause : 40800010 (ExcCode 04)\nBadVA : 85144817\nPrId  : 0001992f (MIPS 1004Kc)\nCall Trace:\n[<805e91f0>] __skb_flow_dissect+0x1b0/0x1b50\n[<805ead08>] __skb_get_hash_net+0x74/0x12c\n[<805ef330>] get_rps_cpu+0x1b8/0x3fc\n[<805fca70>] netif_receive_skb_list_internal+0x324/0x364\n[<805fd120>] napi_complete_done+0x68/0x2a4\n[<8058de5c>] mtk_napi_rx+0x228/0xfec\n[<805fd398>] __napi_poll+0x3c/0x1c4\n[<805fd754>] napi_threaded_poll_loop+0x234/0x29c\n[<805fd848>] napi_threaded_poll+0x8c/0xb0\n[<80053544>] kthread+0x104/0x12c\n[<80002bd8>] ret_from_kernel_thread+0x14/0x1c\n\nCode: 02d51821  1060045b  00000000 <8c640000> 3084000f  2c820005  144001a2  00042080  8e220000\n\nTo reduce the attack surface and maintain performance, do not process\nPPPoE PFC frames.\n\n[1] https://lore.kernel.org/r/20220630231016.GA392@debian.home",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46309": {
+                "cve_id": "CVE-2026-46309",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe/uapi: Reject coh_none PAT index for CPU cached memory in madvise\n\nAdd validation in xe_vm_madvise_ioctl() to reject PAT indices with\nXE_COH_NONE coherency mode when applied to CPU cached memory.\n\nUsing coh_none with CPU cached buffers is a security issue. When the\nkernel clears pages before reallocation, the clear operation stays in\nCPU cache (dirty). GPU with coh_none can bypass CPU caches and read\nstale sensitive data directly from DRAM, potentially leaking data from\npreviously freed pages of other processes.\n\nThis aligns with the existing validation in vm_bind path\n(xe_vm_bind_ioctl_validate_bo).\n\nv2(Matthew brost)\n- Add fixes\n- Move one debug print to better place\n\nv3(Matthew Auld)\n- Should be drm/xe/uapi\n- More Cc\n\nv4(Shuicheng Lin)\n- Fix kmem leak issues by the way\n\nv5\n- Remove kmem leak because it has been merged by another patch\n\nv6\n- Remove the fix which is not related to current fix\n\nv7\n- No change\n\nv8\n- Rebase\n\nv9\n- Limit the restrictions to iGPU\n\nv10\n- No change\n\n(cherry picked from commit 016ccdb674b8c899940b3944952c96a6a490d10a)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
                     }
                 ]
             },
