@@ -29623,11 +29623,28 @@
                     }
                 ]
             },
+            "CVE-2026-46151": {
+                "cve_id": "CVE-2026-46151",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: usblp: fix heap leak in IEEE 1284 device ID via short response\n\nusblp_ctrl_msg() collapses the usb_control_msg() return value to\n0/-errno, discarding the actual number of bytes transferred.  A broken\nprinter can complete the GET_DEVICE_ID control transfer short and the\ndriver has no way to know.\n\nusblp_cache_device_id_string() reads the 2-byte big-endian length prefix\nfrom the response and trusts it (clamped only to the buffer bounds).\nThe buffer is kmalloc(1024) at probe time. A device that sends exactly\ntwo bytes (e.g. 0x03 0xFF, claiming a 1023-byte ID) leaves\ndevice_id_string[2..1022] holding stale kmalloc heap.\n\nThat stale data is then exposed:\n  - via the ieee1284_id sysfs attribute (sprintf(\"%s\", buf+2), truncated\n    at the first NUL in the stale heap), and\n  - via the IOCNR_GET_DEVICE_ID ioctl, which copy_to_user()s the full\n    claimed length regardless of NULs, up to 1021 bytes of uninitialized\n    heap, with the leak size chosen by the device.\n\nFix this up by just zapping the buffer with zeros before each request\nsent to the device.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46153": {
                 "cve_id": "CVE-2026-46153",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\n8021q: delete cleared egress QoS mappings\n\nvlan_dev_set_egress_priority() currently keeps cleared egress\npriority mappings in the hash as tombstones. Repeated set/clear cycles\nwith distinct skb priorities therefore accumulate mapping nodes until\ndevice teardown and leak memory.\n\nDelete mappings when vlan_prio is cleared instead of keeping tombstones.\nNow that the egress mapping lists are RCU protected, the node can be\nunlinked safely and freed after a grace period.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -29657,11 +29674,28 @@
                     }
                 ]
             },
+            "CVE-2026-46158": {
+                "cve_id": "CVE-2026-46158",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmptcp: pm: ADD_ADDR rtx: always decrease sk refcount\n\nWhen an ADD_ADDR is retransmitted, the sk is held in sk_reset_timer().\nIt should then be released in all cases at the end.\n\nSome (unlikely) checks were returning directly instead of calling\nsock_put() to decrease the refcount. Jump to a new 'exit' label to call\n__sock_put() (which will become sock_put() in the next commit) to fix\nthis potential leak.\n\nWhile at it, drop the '!msk' check which cannot happen because it is\nnever reset, and explicitly mark the remaining one as \"unlikely\".",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46161": {
                 "cve_id": "CVE-2026-46161",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmd/raid10: fix divide-by-zero in setup_geo() with zero far_copies\n\nsetup_geo() extracts near_copies (nc) and far_copies (fc) from the\nuser-provided layout parameter without checking for zero. When fc=0\nwith the \"improved\" far set layout selected, 'geo->far_set_size =\ndisks / fc' triggers a divide-by-zero.\n\nValidate nc and fc immediately after extraction, returning -1 if\neither is zero.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -30019,23 +30053,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nibmveth: Disable GSO for packets with small MSS\n\nSome physical adapters on Power systems do not support segmentation\noffload when the MSS is less than 224 bytes. Attempting to send such\npackets causes the adapter to freeze, stopping all traffic until\nmanually reset.\n\nImplement ndo_features_check to disable GSO for packets with small MSS\nvalues. The network stack will perform software segmentation instead.\n\nThe 224-byte minimum matches ibmvnic\ncommit <f10b09ef687f> (\"ibmvnic: Enforce stronger sanity checks\non GSO packets\")\nwhich uses the same physical adapters in SEA configurations.\n\nThe issue occurs specifically when the hardware attempts to perform\nsegmentation (gso_segs > 1) with a small MSS. Single-segment GSO packets\n(gso_segs == 1) do not trigger the problematic LSO code path and are\ntransmitted normally without segmentation.\n\nAdd an ndo_features_check callback to disable GSO when MSS < 224 bytes.\nAlso call vlan_features_check() to ensure proper handling of VLAN packets,\nparticularly QinQ (802.1ad) configurations where the hardware parser may\nnot support certain offload features.\n\nValidated using iptables to force small MSS values. Without the fix,\nthe adapter freezes. With the fix, packets are segmented in software\nand transmission succeeds. Comprehensive regression testing completedd\n(MSS tests, performance, stability).",
                 "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-46274": {
-                "cve_id": "CVE-2026-46274",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nio-wq: check that the predecessor is hashed in io_wq_remove_pending()\n\nio_wq_remove_pending() needs to fix up wq->hash_tail[] if the cancelled\nwork was the tail of its hash bucket. When doing this, it checks whether\nthe preceding entry in acct->work_list has the same hash value, but\nnever checks that the predecessor is hashed at all. io_get_work_hash()\nis simply atomic_read(&work->flags) >> IO_WQ_HASH_SHIFT, and the hash\nbits are never set for non-hashed work, so it returns 0. Thus, when a\nhashed bucket-0 work is cancelled while a non-hashed work is its list\npredecessor, the check spuriously passes and a pointer to the non-hashed\nio_kiocb is stored in wq->hash_tail[0].\n\nBecause non-hashed work is dequeued via the fast path in\nio_get_next_work(), which never touches hash_tail[], the stale pointer\nis never cleared. Therefore, after the non-hashed io_kiocb completes and\nis freed back to req_cachep, wq->hash_tail[0] is a dangling pointer. The\nio_wq is per-task (tctx->io_wq) and survives ring open/close, so the\ndangling pointer persists for the lifetime of the task; the next hashed\nbucket-0 enqueue dereferences it in io_wq_insert_work() and\nwq_list_add_after() writes through freed memory.\n\nAdd the missing io_wq_is_hashed() check so a non-hashed predecessor\nnever inherits a hash_tail[] slot.",
-                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -60083,11 +60100,28 @@
                     }
                 ]
             },
+            "CVE-2026-46151": {
+                "cve_id": "CVE-2026-46151",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: usblp: fix heap leak in IEEE 1284 device ID via short response\n\nusblp_ctrl_msg() collapses the usb_control_msg() return value to\n0/-errno, discarding the actual number of bytes transferred.  A broken\nprinter can complete the GET_DEVICE_ID control transfer short and the\ndriver has no way to know.\n\nusblp_cache_device_id_string() reads the 2-byte big-endian length prefix\nfrom the response and trusts it (clamped only to the buffer bounds).\nThe buffer is kmalloc(1024) at probe time. A device that sends exactly\ntwo bytes (e.g. 0x03 0xFF, claiming a 1023-byte ID) leaves\ndevice_id_string[2..1022] holding stale kmalloc heap.\n\nThat stale data is then exposed:\n  - via the ieee1284_id sysfs attribute (sprintf(\"%s\", buf+2), truncated\n    at the first NUL in the stale heap), and\n  - via the IOCNR_GET_DEVICE_ID ioctl, which copy_to_user()s the full\n    claimed length regardless of NULs, up to 1021 bytes of uninitialized\n    heap, with the leak size chosen by the device.\n\nFix this up by just zapping the buffer with zeros before each request\nsent to the device.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46153": {
                 "cve_id": "CVE-2026-46153",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\n8021q: delete cleared egress QoS mappings\n\nvlan_dev_set_egress_priority() currently keeps cleared egress\npriority mappings in the hash as tombstones. Repeated set/clear cycles\nwith distinct skb priorities therefore accumulate mapping nodes until\ndevice teardown and leak memory.\n\nDelete mappings when vlan_prio is cleared instead of keeping tombstones.\nNow that the egress mapping lists are RCU protected, the node can be\nunlinked safely and freed after a grace period.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -60117,11 +60151,28 @@
                     }
                 ]
             },
+            "CVE-2026-46158": {
+                "cve_id": "CVE-2026-46158",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmptcp: pm: ADD_ADDR rtx: always decrease sk refcount\n\nWhen an ADD_ADDR is retransmitted, the sk is held in sk_reset_timer().\nIt should then be released in all cases at the end.\n\nSome (unlikely) checks were returning directly instead of calling\nsock_put() to decrease the refcount. Jump to a new 'exit' label to call\n__sock_put() (which will become sock_put() in the next commit) to fix\nthis potential leak.\n\nWhile at it, drop the '!msk' check which cannot happen because it is\nnever reset, and explicitly mark the remaining one as \"unlikely\".",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46161": {
                 "cve_id": "CVE-2026-46161",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmd/raid10: fix divide-by-zero in setup_geo() with zero far_copies\n\nsetup_geo() extracts near_copies (nc) and far_copies (fc) from the\nuser-provided layout parameter without checking for zero. When fc=0\nwith the \"improved\" far set layout selected, 'geo->far_set_size =\ndisks / fc' triggers a divide-by-zero.\n\nValidate nc and fc immediately after extraction, returning -1 if\neither is zero.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -60479,23 +60530,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nibmveth: Disable GSO for packets with small MSS\n\nSome physical adapters on Power systems do not support segmentation\noffload when the MSS is less than 224 bytes. Attempting to send such\npackets causes the adapter to freeze, stopping all traffic until\nmanually reset.\n\nImplement ndo_features_check to disable GSO for packets with small MSS\nvalues. The network stack will perform software segmentation instead.\n\nThe 224-byte minimum matches ibmvnic\ncommit <f10b09ef687f> (\"ibmvnic: Enforce stronger sanity checks\non GSO packets\")\nwhich uses the same physical adapters in SEA configurations.\n\nThe issue occurs specifically when the hardware attempts to perform\nsegmentation (gso_segs > 1) with a small MSS. Single-segment GSO packets\n(gso_segs == 1) do not trigger the problematic LSO code path and are\ntransmitted normally without segmentation.\n\nAdd an ndo_features_check callback to disable GSO when MSS < 224 bytes.\nAlso call vlan_features_check() to ensure proper handling of VLAN packets,\nparticularly QinQ (802.1ad) configurations where the hardware parser may\nnot support certain offload features.\n\nValidated using iptables to force small MSS values. Without the fix,\nthe adapter freezes. With the fix, packets are segmented in software\nand transmission succeeds. Comprehensive regression testing completedd\n(MSS tests, performance, stability).",
                 "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-46274": {
-                "cve_id": "CVE-2026-46274",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nio-wq: check that the predecessor is hashed in io_wq_remove_pending()\n\nio_wq_remove_pending() needs to fix up wq->hash_tail[] if the cancelled\nwork was the tail of its hash bucket. When doing this, it checks whether\nthe preceding entry in acct->work_list has the same hash value, but\nnever checks that the predecessor is hashed at all. io_get_work_hash()\nis simply atomic_read(&work->flags) >> IO_WQ_HASH_SHIFT, and the hash\nbits are never set for non-hashed work, so it returns 0. Thus, when a\nhashed bucket-0 work is cancelled while a non-hashed work is its list\npredecessor, the check spuriously passes and a pointer to the non-hashed\nio_kiocb is stored in wq->hash_tail[0].\n\nBecause non-hashed work is dequeued via the fast path in\nio_get_next_work(), which never touches hash_tail[], the stale pointer\nis never cleared. Therefore, after the non-hashed io_kiocb completes and\nis freed back to req_cachep, wq->hash_tail[0] is a dangling pointer. The\nio_wq is per-task (tctx->io_wq) and survives ring open/close, so the\ndangling pointer persists for the lifetime of the task; the next hashed\nbucket-0 enqueue dereferences it in io_wq_insert_work() and\nwq_list_add_after() writes through freed memory.\n\nAdd the missing io_wq_is_hashed() check so a non-hashed predecessor\nnever inherits a hash_tail[] slot.",
-                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
