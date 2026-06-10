@@ -1,0 +1,74 @@
+{
+    "package_name": "node-shell-quote",
+    "advisory": {
+        "20.04": {
+            "CVE-2026-9277": {
+                "cve_id": "CVE-2026-9277",
+                "title": "shell-quote quote() does not escape newlines in object .op values",
+                "description": "### Summary\n\n`shell-quote`'s `quote()` function did not validate object-token inputs against the operator model used by `parse()`. The `.op` field was backslash-escaped character by character using `/(.)/g`, which in JavaScript does not match line terminators (`\\n`, `\\r`, U+2028, U+2029). A line terminator in `.op` therefore passed through unescaped into the output; POSIX shells treat a literal `\\n` as a command separator, so any content after it would execute as a second command.\n\nThe vulnerable code path is reachable in two ways. Neither requires the parser to misbehave \u2014 `parse()` only emits ops from a fixed control set \u2014 but both are documented API surface:\n\n1. **Direct construction.** A caller builds `{ op: '...\\n...' }` from external input (e.g. a deserialized argument array) and passes it to `quote()`.\n2. **`envFn` return.** `parse(cmd, envFn)` is documented to splice the return value of `envFn` into the result array when it is an object. An attacker-influenced data source consulted by `envFn` can introduce an object token whose `.op` reaches `quote()`.\n\n### Impact\n\nShell command injection in callers that pass object tokens with attacker-influenced `.op` values to `quote()` and then hand the result to a shell. The preconditions are narrower than ordinary string injection \u2014 they require the caller to feed object tokens into `quote()` \u2014 but object tokens are a public, documented part of the API surface, and `quote()` is intended to be a shell-safety boundary.\n\n### PoC\n\n```js\nconst { parse, quote } = require('shell-quote');\n\n// Direct construction\nquote([{ op: ';\\nid' }]);\n// \u2192 \"\\;\\n\\\\i\\\\d\"  \u2190 literal newline; second line executes as a command\n\n// Via parse() with an envFn returning attacker-shaped objects\nconst tokens = parse('echo $X', () => ({ op: ';\\nid' }));\nrequire('child_process').execSync(quote(tokens), { shell: true });\n// Executes `id` after `echo \\;`.\n```\n\nConfirmed under `sh`, `bash`, `dash`, and `zsh`.\n\n### Patch\n\nFixed by replacing the per-character escape with strict shape validation in `quote()`. The object-token branch now:\n\n- **`{ op }`** \u2014 `.op` must be a string from the same allowlist the parser emits (`||`, `&&`, `;;`, `|&`, `<(`, `<<<`, `>>`, `>&`, `<&`, `&`, `;`, `(`, `)`, `|`, `<`, `>`). Anything else throws `TypeError`. This is the direct fix for the reported issue and removes the entire class of `.op` injection.\n- **`{ op: 'glob', pattern }`** \u2014 `.pattern` must be a string with no line terminators. Glob metacharacters (`*`, `?`, `[`, `]`, `{`, `}`, `,`) pass through; all other shell-special characters are backslash-escaped. (Previously the pattern field was discarded entirely and the literal string `\\g\\l\\o\\b` was emitted \u2014 a latent bug, not security-relevant.)\n- **`{ comment }`** \u2014 `.comment` must be a string with no line terminators (line terminators would end the shell comment and resume command parsing \u2014 same injection shape).\n- **Any other object shape** \u2014 `TypeError`.\n\nThe fix is allowlist-based rather than a targeted regex tweak, so it closes the reported vector and forecloses adjacent ones (U+2028 / U+2029 line separators in `.op`, line terminators in comments, unknown-shape objects coerced through `.replace`).\n\n### Workarounds\n\nPrior to upgrading, callers that build object tokens from untrusted input should validate `.op` against the parser's operator set themselves, and never construct `{ op }` from attacker-controlled strings.\n\n### Credits\n\nReported by Akshat Sinha",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:1.7.3+~1.7.1-1",
+                        "fixed": "0:1.7.4+~1.7.1-1ubuntu0.24.04.1"
+                    },
+                    {
+                        "introduced": "0:1.7.4+~1.7.1-1",
+                        "fixed": "0:1.7.4+~1.7.1-1ubuntu0.24.04.1"
+                    },
+                    {
+                        "introduced": "0:1.7.4+~1.7.1-1",
+                        "fixed": "0:1.7.4+~1.7.1-1ubuntu0.25.10.1"
+                    }
+                ]
+            }
+        },
+        "22.04": {
+            "CVE-2026-9277": {
+                "cve_id": "CVE-2026-9277",
+                "title": "shell-quote quote() does not escape newlines in object .op values",
+                "description": "### Summary\n\n`shell-quote`'s `quote()` function did not validate object-token inputs against the operator model used by `parse()`. The `.op` field was backslash-escaped character by character using `/(.)/g`, which in JavaScript does not match line terminators (`\\n`, `\\r`, U+2028, U+2029). A line terminator in `.op` therefore passed through unescaped into the output; POSIX shells treat a literal `\\n` as a command separator, so any content after it would execute as a second command.\n\nThe vulnerable code path is reachable in two ways. Neither requires the parser to misbehave \u2014 `parse()` only emits ops from a fixed control set \u2014 but both are documented API surface:\n\n1. **Direct construction.** A caller builds `{ op: '...\\n...' }` from external input (e.g. a deserialized argument array) and passes it to `quote()`.\n2. **`envFn` return.** `parse(cmd, envFn)` is documented to splice the return value of `envFn` into the result array when it is an object. An attacker-influenced data source consulted by `envFn` can introduce an object token whose `.op` reaches `quote()`.\n\n### Impact\n\nShell command injection in callers that pass object tokens with attacker-influenced `.op` values to `quote()` and then hand the result to a shell. The preconditions are narrower than ordinary string injection \u2014 they require the caller to feed object tokens into `quote()` \u2014 but object tokens are a public, documented part of the API surface, and `quote()` is intended to be a shell-safety boundary.\n\n### PoC\n\n```js\nconst { parse, quote } = require('shell-quote');\n\n// Direct construction\nquote([{ op: ';\\nid' }]);\n// \u2192 \"\\;\\n\\\\i\\\\d\"  \u2190 literal newline; second line executes as a command\n\n// Via parse() with an envFn returning attacker-shaped objects\nconst tokens = parse('echo $X', () => ({ op: ';\\nid' }));\nrequire('child_process').execSync(quote(tokens), { shell: true });\n// Executes `id` after `echo \\;`.\n```\n\nConfirmed under `sh`, `bash`, `dash`, and `zsh`.\n\n### Patch\n\nFixed by replacing the per-character escape with strict shape validation in `quote()`. The object-token branch now:\n\n- **`{ op }`** \u2014 `.op` must be a string from the same allowlist the parser emits (`||`, `&&`, `;;`, `|&`, `<(`, `<<<`, `>>`, `>&`, `<&`, `&`, `;`, `(`, `)`, `|`, `<`, `>`). Anything else throws `TypeError`. This is the direct fix for the reported issue and removes the entire class of `.op` injection.\n- **`{ op: 'glob', pattern }`** \u2014 `.pattern` must be a string with no line terminators. Glob metacharacters (`*`, `?`, `[`, `]`, `{`, `}`, `,`) pass through; all other shell-special characters are backslash-escaped. (Previously the pattern field was discarded entirely and the literal string `\\g\\l\\o\\b` was emitted \u2014 a latent bug, not security-relevant.)\n- **`{ comment }`** \u2014 `.comment` must be a string with no line terminators (line terminators would end the shell comment and resume command parsing \u2014 same injection shape).\n- **Any other object shape** \u2014 `TypeError`.\n\nThe fix is allowlist-based rather than a targeted regex tweak, so it closes the reported vector and forecloses adjacent ones (U+2028 / U+2029 line separators in `.op`, line terminators in comments, unknown-shape objects coerced through `.replace`).\n\n### Workarounds\n\nPrior to upgrading, callers that build object tokens from untrusted input should validate `.op` against the parser's operator set themselves, and never construct `{ op }` from attacker-controlled strings.\n\n### Credits\n\nReported by Akshat Sinha",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:1.7.3+~1.7.1-1",
+                        "fixed": "0:1.7.4+~1.7.1-1ubuntu0.24.04.1"
+                    },
+                    {
+                        "introduced": "0:1.7.4+~1.7.1-1",
+                        "fixed": "0:1.7.4+~1.7.1-1ubuntu0.24.04.1"
+                    },
+                    {
+                        "introduced": "0:1.7.4+~1.7.1-1",
+                        "fixed": "0:1.7.4+~1.7.1-1ubuntu0.25.10.1"
+                    }
+                ]
+            }
+        },
+        "24.04": {
+            "CVE-2026-9277": {
+                "cve_id": "CVE-2026-9277",
+                "title": "shell-quote quote() does not escape newlines in object .op values",
+                "description": "### Summary\n\n`shell-quote`'s `quote()` function did not validate object-token inputs against the operator model used by `parse()`. The `.op` field was backslash-escaped character by character using `/(.)/g`, which in JavaScript does not match line terminators (`\\n`, `\\r`, U+2028, U+2029). A line terminator in `.op` therefore passed through unescaped into the output; POSIX shells treat a literal `\\n` as a command separator, so any content after it would execute as a second command.\n\nThe vulnerable code path is reachable in two ways. Neither requires the parser to misbehave \u2014 `parse()` only emits ops from a fixed control set \u2014 but both are documented API surface:\n\n1. **Direct construction.** A caller builds `{ op: '...\\n...' }` from external input (e.g. a deserialized argument array) and passes it to `quote()`.\n2. **`envFn` return.** `parse(cmd, envFn)` is documented to splice the return value of `envFn` into the result array when it is an object. An attacker-influenced data source consulted by `envFn` can introduce an object token whose `.op` reaches `quote()`.\n\n### Impact\n\nShell command injection in callers that pass object tokens with attacker-influenced `.op` values to `quote()` and then hand the result to a shell. The preconditions are narrower than ordinary string injection \u2014 they require the caller to feed object tokens into `quote()` \u2014 but object tokens are a public, documented part of the API surface, and `quote()` is intended to be a shell-safety boundary.\n\n### PoC\n\n```js\nconst { parse, quote } = require('shell-quote');\n\n// Direct construction\nquote([{ op: ';\\nid' }]);\n// \u2192 \"\\;\\n\\\\i\\\\d\"  \u2190 literal newline; second line executes as a command\n\n// Via parse() with an envFn returning attacker-shaped objects\nconst tokens = parse('echo $X', () => ({ op: ';\\nid' }));\nrequire('child_process').execSync(quote(tokens), { shell: true });\n// Executes `id` after `echo \\;`.\n```\n\nConfirmed under `sh`, `bash`, `dash`, and `zsh`.\n\n### Patch\n\nFixed by replacing the per-character escape with strict shape validation in `quote()`. The object-token branch now:\n\n- **`{ op }`** \u2014 `.op` must be a string from the same allowlist the parser emits (`||`, `&&`, `;;`, `|&`, `<(`, `<<<`, `>>`, `>&`, `<&`, `&`, `;`, `(`, `)`, `|`, `<`, `>`). Anything else throws `TypeError`. This is the direct fix for the reported issue and removes the entire class of `.op` injection.\n- **`{ op: 'glob', pattern }`** \u2014 `.pattern` must be a string with no line terminators. Glob metacharacters (`*`, `?`, `[`, `]`, `{`, `}`, `,`) pass through; all other shell-special characters are backslash-escaped. (Previously the pattern field was discarded entirely and the literal string `\\g\\l\\o\\b` was emitted \u2014 a latent bug, not security-relevant.)\n- **`{ comment }`** \u2014 `.comment` must be a string with no line terminators (line terminators would end the shell comment and resume command parsing \u2014 same injection shape).\n- **Any other object shape** \u2014 `TypeError`.\n\nThe fix is allowlist-based rather than a targeted regex tweak, so it closes the reported vector and forecloses adjacent ones (U+2028 / U+2029 line separators in `.op`, line terminators in comments, unknown-shape objects coerced through `.replace`).\n\n### Workarounds\n\nPrior to upgrading, callers that build object tokens from untrusted input should validate `.op` against the parser's operator set themselves, and never construct `{ op }` from attacker-controlled strings.\n\n### Credits\n\nReported by Akshat Sinha",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:1.7.3+~1.7.1-1",
+                        "fixed": "0:1.7.4+~1.7.1-1ubuntu0.24.04.1"
+                    },
+                    {
+                        "introduced": "0:1.7.4+~1.7.1-1",
+                        "fixed": "0:1.7.4+~1.7.1-1ubuntu0.24.04.1"
+                    },
+                    {
+                        "introduced": "0:1.7.4+~1.7.1-1",
+                        "fixed": "0:1.7.4+~1.7.1-1ubuntu0.25.10.1"
+                    }
+                ]
+            }
+        }
+    }
+}

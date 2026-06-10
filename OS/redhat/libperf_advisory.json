@@ -29916,7 +29916,7 @@
                 "cve_id": "CVE-2026-46248",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath12k: clear stale link mapping of ahvif->links_map\n\nWhen an arvif is initialized in non-AP STA mode but MLO connection\npreparation fails before the arvif is created\n(arvif->is_created remains false), the error path attempts to delete all\nlinks. However, link deletion only executes when arvif->is_created is true.\nAs a result, ahvif retains a stale entry of arvif that is initialized but\nnot created.\n\nWhen a new arvif is initialized with the same link id, this stale mapping\ntriggers the following WARN_ON.\n\nWARNING: drivers/net/wireless/ath/ath12k/mac.c:4271 at ath12k_mac_op_change_vif_links+0x140/0x180 [ath12k], CPU#3: wpa_supplicant/275\n\nCall trace:\n ath12k_mac_op_change_vif_links+0x140/0x180 [ath12k] (P)\n drv_change_vif_links+0xbc/0x1a4 [mac80211]\n ieee80211_vif_update_links+0x54c/0x6a0 [mac80211]\n ieee80211_vif_set_links+0x40/0x70 [mac80211]\n ieee80211_prep_connection+0x84/0x450 [mac80211]\n ieee80211_mgd_auth+0x200/0x480 [mac80211]\n ieee80211_auth+0x14/0x20 [mac80211]\n cfg80211_mlme_auth+0x90/0xf0 [cfg80211]\n nl80211_authenticate+0x32c/0x380 [cfg80211]\n genl_family_rcv_msg_doit+0xc8/0x134\n\nFix this issue by unassigning the link vif and clearing ahvif->links_map\nif arvif is only initialized but not created.\n\nTested-on: QCN9274 hw2.0 PCI WLAN.WBE.1.5-01651-QCAHKSWPL_SILICONZ-1",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -29933,7 +29933,7 @@
                 "cve_id": "CVE-2026-46249",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nocteontx2-af: Fix PF driver crash with kexec kernel booting\n\nDuring a kexec reboot the hardware is not power-cycled, so AF state from\nthe old kernel can persist into the new kernel. When AF and PF drivers\nare built as modules, the PF driver may probe before AF reinitializes\nthe hardware.\n\nThe PF driver treats the RVUM block revision as an indication that AF\ninitialization is complete. If this value is left uncleared at shutdown,\nPF may incorrectly assume AF is ready and access stale hardware state,\nleading to a crash.\n\nClear the RVUM block revision during AF shutdown to avoid PF\nmis-detecting AF readiness after kexec.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -30001,7 +30001,7 @@
                 "cve_id": "CVE-2026-46262",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: fsl_xcvr: Revert fix missing lock in fsl_xcvr_mode_put()\n\nThis reverts commit f51424872760 (\"ASoC: fsl_xcvr: fix missing lock in fsl_xcvr_mode_put()\").\n\nThe original patch attempted to acquire the card->controls_rwsem lock in\nfsl_xcvr_mode_put(). However, this function is called from the upper ALSA\ncore function snd_ctl_elem_write(), which already holds the write lock on\ncontrols_rwsem for the whole put operation. So there is no need to simply\nhold the lock for fsl_xcvr_activate_ctl() again.\n\nAcquiring the read lock while holding the write lock in the same thread\nresults in a deadlock and a hung task, as reported by Alexander Stein.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -30263,6 +30263,176 @@
                 "cve_id": "CVE-2026-46309",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe/uapi: Reject coh_none PAT index for CPU cached memory in madvise\n\nAdd validation in xe_vm_madvise_ioctl() to reject PAT indices with\nXE_COH_NONE coherency mode when applied to CPU cached memory.\n\nUsing coh_none with CPU cached buffers is a security issue. When the\nkernel clears pages before reallocation, the clear operation stays in\nCPU cache (dirty). GPU with coh_none can bypass CPU caches and read\nstale sensitive data directly from DRAM, potentially leaking data from\npreviously freed pages of other processes.\n\nThis aligns with the existing validation in vm_bind path\n(xe_vm_bind_ioctl_validate_bo).\n\nv2(Matthew brost)\n- Add fixes\n- Move one debug print to better place\n\nv3(Matthew Auld)\n- Should be drm/xe/uapi\n- More Cc\n\nv4(Shuicheng Lin)\n- Fix kmem leak issues by the way\n\nv5\n- Remove kmem leak because it has been merged by another patch\n\nv6\n- Remove the fix which is not related to current fix\n\nv7\n- No change\n\nv8\n- Rebase\n\nv9\n- Limit the restrictions to iGPU\n\nv10\n- No change\n\n(cherry picked from commit 016ccdb674b8c899940b3944952c96a6a490d10a)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46315": {
+                "cve_id": "CVE-2026-46315",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nio_uring/waitid: clear waitid info before copying it to userspace\n\nIORING_OP_WAITID stores its result fields in struct io_waitid::info and\nlater copies them to userspace siginfo. The prep path initializes the\nrequest arguments, but it does not initialize info itself.\n\nIf the wait operation completes without reporting a child event, the common\nwait code can return without writing wo_info. In that case io_waitid_finish()\nstill copies iw->info to userspace, exposing stale bytes from the reused\nio_kiocb command storage.\n\nClear the result storage during prep so the io_uring path matches the\nregular waitid syscall, which uses a zero-initialized struct waitid_info.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46316": {
+                "cve_id": "CVE-2026-46316",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: arm64: vgic-its: Drop the translation cache reference only for the erased entry\n\nvgic_its_invalidate_cache() walks the per-ITS translation cache with\nxa_for_each() and drops the cache's reference on each entry with\nvgic_put_irq(). It puts the iterated pointer, though, rather than the\nvalue returned by xa_erase().\n\nThe function is called from contexts that do not exclude one another: the\nITS command handlers hold its_lock, the GITS_CTLR write path holds\ncmd_lock, and the path that clears EnableLPIs in a redistributor's\nGICR_CTLR holds neither. Two or more of them can drain the same cache\nconcurrently, and if each one observes the same entry, erases it and then\nputs it, the single reference the cache holds on that entry is dropped\nmore than once. The entry can then be freed while an ITE still maps it.\n\nxa_erase() is atomic and returns the previous entry, so put only the entry\nthat this context actually removed. The cache reference is then dropped\nexactly once per entry even when the invalidations run concurrently, and\nthe behavior is unchanged when only one context runs.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46317": {
+                "cve_id": "CVE-2026-46317",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: arm64: Reassign nested_mmus array behind mmu_lock\n\nkvm->arch.nested_mmus[] is walked under kvm->mmu_lock, including from the\nMMU notifier path (kvm_unmap_gfn_range() -> kvm_nested_s2_unmap()), which\ncan run at any time. kvm_vcpu_init_nested() reallocates the array and frees\nthe old buffer while holding only kvm->arch.config_lock, so such a walker\ncan reference the freed array.\n\nAllocate the new array outside of mmu_lock, as the allocation can sleep.\nUnder the lock, copy the existing entries, fix up the back pointers and\nreassign the array. Free the old buffer after dropping the lock, as\nkvfree() can sleep as well.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46319": {
+                "cve_id": "CVE-2026-46319",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: act_ct: Only release RCU read lock after ct_ft\n\nWhen looking up a flow table in act_ct in tcf_ct_flow_table_get(),\nrhashtable_lookup_fast() internally opens and closes an RCU read critical\nsection before returning ct_ft.\nThe tcf_ct_flow_table_cleanup_work() can complete before refcount_inc_not_zero()\nis invoked on the returned ct_ft resulting in a UAF on the already freed ct_ft\nobject. This vulnerability can lead to privilege escalation.\n\nAnalysis from zdi-disclosures@trendmicro.com:\nWhen initializing act_ct, tcf_ct_init() is called, which internally triggers\ntcf_ct_flow_table_get().\n\nstatic int tcf_ct_flow_table_get(struct net *net, struct tcf_ct_params *params)\n\n{\n                struct zones_ht_key key = { .net = net, .zone = params->zone };\n                struct tcf_ct_flow_table *ct_ft;\n                int err = -ENOMEM;\n\n                mutex_lock(&zones_mutex);\n                ct_ft = rhashtable_lookup_fast(&zones_ht, &key, zones_params); // [1]\n                if (ct_ft && refcount_inc_not_zero(&ct_ft->ref)) // [2]\n                                goto out_unlock;\n                ...\n}\n\nstatic __always_inline void *rhashtable_lookup_fast(\n                struct rhashtable *ht, const void *key,\n                const struct rhashtable_params params)\n{\n                void *obj;\n\n                rcu_read_lock();\n                obj = rhashtable_lookup(ht, key, params);\n                rcu_read_unlock();\n\n                return obj;\n}\n\nAt [1], rhashtable_lookup_fast() looks up and returns the corresponding ct_ft\nfrom zones_ht . The lookup is performed within an RCU read critical section\nthrough rcu_read_lock() / rcu_read_unlock(), which prevents the object from\nbeing freed. However, at the point of function return, rcu_read_unlock() has\nalready been called, and there is nothing preventing ct_ft from being freed\nbefore reaching refcount_inc_not_zero(&ct_ft->ref) at [2]. This interval becomes\nthe race window, during which ct_ft can be freed.\n\nFree Process:\n\ntcf_ct_flow_table_put() is executed through the path tcf_ct_cleanup() call_rcu()\ntcf_ct_params_free_rcu() tcf_ct_params_free() tcf_ct_flow_table_put().\n\nstatic void tcf_ct_flow_table_put(struct tcf_ct_flow_table *ct_ft)\n{\n                if (refcount_dec_and_test(&ct_ft->ref)) {\n                                rhashtable_remove_fast(&zones_ht, &ct_ft->node, zones_params);\n                                INIT_RCU_WORK(&ct_ft->rwork, tcf_ct_flow_table_cleanup_work); // [3]\n                                queue_rcu_work(act_ct_wq, &ct_ft->rwork);\n                }\n}\n\nAt [3], tcf_ct_flow_table_cleanup_work() is scheduled as RCU work\n\nstatic void tcf_ct_flow_table_cleanup_work(struct work_struct *work)\n\n{\n                struct tcf_ct_flow_table *ct_ft;\n                struct flow_block *block;\n\n                ct_ft = container_of(to_rcu_work(work), struct tcf_ct_flow_table,\n                                                                rwork);\n                nf_flow_table_free(&ct_ft->nf_ft);\n                block = &ct_ft->nf_ft.flow_block;\n                down_write(&ct_ft->nf_ft.flow_block_lock);\n                WARN_ON(!list_empty(&block->cb_list));\n                up_write(&ct_ft->nf_ft.flow_block_lock);\n                kfree(ct_ft); // [4]\n\n                module_put(THIS_MODULE);\n}\n\ntcf_ct_flow_table_cleanup_work() frees ct_ft at [4]. When this function executes\nbetween [1] and [2], UAF occurs.\n\nThis race condition has a very short race window, making it generally\ndifficult to trigger. Therefore, to trigger the vulnerability an msleep(100) was\ninserted after[1]",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46320": {
+                "cve_id": "CVE-2026-46320",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntap: free page on error paths in tap_get_user_xdp()\n\ntap_get_user_xdp() rejects a frame shorter than ETH_HLEN with -EINVAL,\nand returns -ENOMEM when build_skb() fails. Both paths jump to the err\nlabel without freeing the page that vhost_net_build_xdp() allocated for\nthe frame. tap_sendmsg() discards the per-buffer return value and always\nreturns 0, so vhost_tx_batch() takes the success path and never frees\nthe page; each rejected frame in a batch leaks one page-frag chunk.\n\nFree the page on both error paths, before the skb is built. This is the\ntap counterpart of the same leak in tun_xdp_one().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46322": {
+                "cve_id": "CVE-2026-46322",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntun: free page on build_skb failure in tun_xdp_one()\n\nWhen build_skb() fails in tun_xdp_one(), the function sets ret to\n-ENOMEM and jumps to the out label, which returns without freeing the\npage that vhost_net_build_xdp() allocated for the frame. As with the\nshort-frame rejection path, tun_sendmsg() discards the per-buffer error\nand still returns total_len, so vhost_tx_batch() takes the success path\nand never frees the page. Each build_skb() failure in a batch leaks one\npage-frag chunk.\n\nFree the page before taking the error path, matching the put_page() the\nother error exits of tun_xdp_one() already perform.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46323": {
+                "cve_id": "CVE-2026-46323",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: gro: don't merge zcopy skbs\n\nskb_gro_receive() can currently copy frags between the source and GRO\nskb, without checking the zerocopy status, and in particular the\nSKBFL_MANAGED_FRAG_REFS flag.\n\nWhen SKBFL_MANAGED_FRAG_REFS is set, the skb doesn't hold a reference\non the pages in shinfo->frags. Appending those frags to another skb's\nfrags without fixing up the page refcount can lead to UAF.\n\nWhen either the last skb in the GRO chain (the one we would append\nfrags to) or the source skb is zerocopy, don't merge the skbs.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46324": {
+                "cve_id": "CVE-2026-46324",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_tables: use list_del_rcu for netlink hooks\n\nnft_netdev_unregister_hooks and __nft_unregister_flowtable_net_hooks need\nto use list_del_rcu(), this list can be walked by concurrent dumpers.\n\nAdd a new helper and use it consistently.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46327": {
+                "cve_id": "CVE-2026-46327",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndm: fix unlocked test for dm_suspended_md\n\nThe function dm_blk_report_zones tests if the device is suspended with\nthe \"dm_suspended_md\" call. However, this function is called without\nholding any locks, so the device may be suspended just after it.\n\nMove the call to dm_suspended_md after dm_get_live_table, so that the\ndevice can't be suspended after the suspended state was tested.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46330": {
+                "cve_id": "CVE-2026-46330",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nRevert \"net/smc: Introduce TCP ULP support\"\n\nThis reverts commit d7cd421da9da2cc7b4d25b8537f66db5c8331c40.\n\nAs reported by Al Viro, the TCP ULP support for SMC is fundamentally\nbroken. The implementation attempts to convert an active TCP socket\ninto an SMC socket by modifying the underlying `struct file`, dentry,\nand inode in-place, which violates core VFS invariants that assume\nthese structures are immutable for an open file, creating a risk of\nuse after free errors and general system instability.\n\nGiven the severity of this design flaw and the fact that cleaner\nalternatives (e.g., LD_PRELOAD, BPF) exist for legacy application\ntransparency, the correct course of action is to remove this feature\nentirely.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -60240,7 +60410,7 @@
                 "cve_id": "CVE-2026-46248",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath12k: clear stale link mapping of ahvif->links_map\n\nWhen an arvif is initialized in non-AP STA mode but MLO connection\npreparation fails before the arvif is created\n(arvif->is_created remains false), the error path attempts to delete all\nlinks. However, link deletion only executes when arvif->is_created is true.\nAs a result, ahvif retains a stale entry of arvif that is initialized but\nnot created.\n\nWhen a new arvif is initialized with the same link id, this stale mapping\ntriggers the following WARN_ON.\n\nWARNING: drivers/net/wireless/ath/ath12k/mac.c:4271 at ath12k_mac_op_change_vif_links+0x140/0x180 [ath12k], CPU#3: wpa_supplicant/275\n\nCall trace:\n ath12k_mac_op_change_vif_links+0x140/0x180 [ath12k] (P)\n drv_change_vif_links+0xbc/0x1a4 [mac80211]\n ieee80211_vif_update_links+0x54c/0x6a0 [mac80211]\n ieee80211_vif_set_links+0x40/0x70 [mac80211]\n ieee80211_prep_connection+0x84/0x450 [mac80211]\n ieee80211_mgd_auth+0x200/0x480 [mac80211]\n ieee80211_auth+0x14/0x20 [mac80211]\n cfg80211_mlme_auth+0x90/0xf0 [cfg80211]\n nl80211_authenticate+0x32c/0x380 [cfg80211]\n genl_family_rcv_msg_doit+0xc8/0x134\n\nFix this issue by unassigning the link vif and clearing ahvif->links_map\nif arvif is only initialized but not created.\n\nTested-on: QCN9274 hw2.0 PCI WLAN.WBE.1.5-01651-QCAHKSWPL_SILICONZ-1",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -60257,7 +60427,7 @@
                 "cve_id": "CVE-2026-46249",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nocteontx2-af: Fix PF driver crash with kexec kernel booting\n\nDuring a kexec reboot the hardware is not power-cycled, so AF state from\nthe old kernel can persist into the new kernel. When AF and PF drivers\nare built as modules, the PF driver may probe before AF reinitializes\nthe hardware.\n\nThe PF driver treats the RVUM block revision as an indication that AF\ninitialization is complete. If this value is left uncleared at shutdown,\nPF may incorrectly assume AF is ready and access stale hardware state,\nleading to a crash.\n\nClear the RVUM block revision during AF shutdown to avoid PF\nmis-detecting AF readiness after kexec.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -60325,7 +60495,7 @@
                 "cve_id": "CVE-2026-46262",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: fsl_xcvr: Revert fix missing lock in fsl_xcvr_mode_put()\n\nThis reverts commit f51424872760 (\"ASoC: fsl_xcvr: fix missing lock in fsl_xcvr_mode_put()\").\n\nThe original patch attempted to acquire the card->controls_rwsem lock in\nfsl_xcvr_mode_put(). However, this function is called from the upper ALSA\ncore function snd_ctl_elem_write(), which already holds the write lock on\ncontrols_rwsem for the whole put operation. So there is no need to simply\nhold the lock for fsl_xcvr_activate_ctl() again.\n\nAcquiring the read lock while holding the write lock in the same thread\nresults in a deadlock and a hung task, as reported by Alexander Stein.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -60587,6 +60757,176 @@
                 "cve_id": "CVE-2026-46309",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe/uapi: Reject coh_none PAT index for CPU cached memory in madvise\n\nAdd validation in xe_vm_madvise_ioctl() to reject PAT indices with\nXE_COH_NONE coherency mode when applied to CPU cached memory.\n\nUsing coh_none with CPU cached buffers is a security issue. When the\nkernel clears pages before reallocation, the clear operation stays in\nCPU cache (dirty). GPU with coh_none can bypass CPU caches and read\nstale sensitive data directly from DRAM, potentially leaking data from\npreviously freed pages of other processes.\n\nThis aligns with the existing validation in vm_bind path\n(xe_vm_bind_ioctl_validate_bo).\n\nv2(Matthew brost)\n- Add fixes\n- Move one debug print to better place\n\nv3(Matthew Auld)\n- Should be drm/xe/uapi\n- More Cc\n\nv4(Shuicheng Lin)\n- Fix kmem leak issues by the way\n\nv5\n- Remove kmem leak because it has been merged by another patch\n\nv6\n- Remove the fix which is not related to current fix\n\nv7\n- No change\n\nv8\n- Rebase\n\nv9\n- Limit the restrictions to iGPU\n\nv10\n- No change\n\n(cherry picked from commit 016ccdb674b8c899940b3944952c96a6a490d10a)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46315": {
+                "cve_id": "CVE-2026-46315",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nio_uring/waitid: clear waitid info before copying it to userspace\n\nIORING_OP_WAITID stores its result fields in struct io_waitid::info and\nlater copies them to userspace siginfo. The prep path initializes the\nrequest arguments, but it does not initialize info itself.\n\nIf the wait operation completes without reporting a child event, the common\nwait code can return without writing wo_info. In that case io_waitid_finish()\nstill copies iw->info to userspace, exposing stale bytes from the reused\nio_kiocb command storage.\n\nClear the result storage during prep so the io_uring path matches the\nregular waitid syscall, which uses a zero-initialized struct waitid_info.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46316": {
+                "cve_id": "CVE-2026-46316",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: arm64: vgic-its: Drop the translation cache reference only for the erased entry\n\nvgic_its_invalidate_cache() walks the per-ITS translation cache with\nxa_for_each() and drops the cache's reference on each entry with\nvgic_put_irq(). It puts the iterated pointer, though, rather than the\nvalue returned by xa_erase().\n\nThe function is called from contexts that do not exclude one another: the\nITS command handlers hold its_lock, the GITS_CTLR write path holds\ncmd_lock, and the path that clears EnableLPIs in a redistributor's\nGICR_CTLR holds neither. Two or more of them can drain the same cache\nconcurrently, and if each one observes the same entry, erases it and then\nputs it, the single reference the cache holds on that entry is dropped\nmore than once. The entry can then be freed while an ITE still maps it.\n\nxa_erase() is atomic and returns the previous entry, so put only the entry\nthat this context actually removed. The cache reference is then dropped\nexactly once per entry even when the invalidations run concurrently, and\nthe behavior is unchanged when only one context runs.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46317": {
+                "cve_id": "CVE-2026-46317",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: arm64: Reassign nested_mmus array behind mmu_lock\n\nkvm->arch.nested_mmus[] is walked under kvm->mmu_lock, including from the\nMMU notifier path (kvm_unmap_gfn_range() -> kvm_nested_s2_unmap()), which\ncan run at any time. kvm_vcpu_init_nested() reallocates the array and frees\nthe old buffer while holding only kvm->arch.config_lock, so such a walker\ncan reference the freed array.\n\nAllocate the new array outside of mmu_lock, as the allocation can sleep.\nUnder the lock, copy the existing entries, fix up the back pointers and\nreassign the array. Free the old buffer after dropping the lock, as\nkvfree() can sleep as well.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46319": {
+                "cve_id": "CVE-2026-46319",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: act_ct: Only release RCU read lock after ct_ft\n\nWhen looking up a flow table in act_ct in tcf_ct_flow_table_get(),\nrhashtable_lookup_fast() internally opens and closes an RCU read critical\nsection before returning ct_ft.\nThe tcf_ct_flow_table_cleanup_work() can complete before refcount_inc_not_zero()\nis invoked on the returned ct_ft resulting in a UAF on the already freed ct_ft\nobject. This vulnerability can lead to privilege escalation.\n\nAnalysis from zdi-disclosures@trendmicro.com:\nWhen initializing act_ct, tcf_ct_init() is called, which internally triggers\ntcf_ct_flow_table_get().\n\nstatic int tcf_ct_flow_table_get(struct net *net, struct tcf_ct_params *params)\n\n{\n                struct zones_ht_key key = { .net = net, .zone = params->zone };\n                struct tcf_ct_flow_table *ct_ft;\n                int err = -ENOMEM;\n\n                mutex_lock(&zones_mutex);\n                ct_ft = rhashtable_lookup_fast(&zones_ht, &key, zones_params); // [1]\n                if (ct_ft && refcount_inc_not_zero(&ct_ft->ref)) // [2]\n                                goto out_unlock;\n                ...\n}\n\nstatic __always_inline void *rhashtable_lookup_fast(\n                struct rhashtable *ht, const void *key,\n                const struct rhashtable_params params)\n{\n                void *obj;\n\n                rcu_read_lock();\n                obj = rhashtable_lookup(ht, key, params);\n                rcu_read_unlock();\n\n                return obj;\n}\n\nAt [1], rhashtable_lookup_fast() looks up and returns the corresponding ct_ft\nfrom zones_ht . The lookup is performed within an RCU read critical section\nthrough rcu_read_lock() / rcu_read_unlock(), which prevents the object from\nbeing freed. However, at the point of function return, rcu_read_unlock() has\nalready been called, and there is nothing preventing ct_ft from being freed\nbefore reaching refcount_inc_not_zero(&ct_ft->ref) at [2]. This interval becomes\nthe race window, during which ct_ft can be freed.\n\nFree Process:\n\ntcf_ct_flow_table_put() is executed through the path tcf_ct_cleanup() call_rcu()\ntcf_ct_params_free_rcu() tcf_ct_params_free() tcf_ct_flow_table_put().\n\nstatic void tcf_ct_flow_table_put(struct tcf_ct_flow_table *ct_ft)\n{\n                if (refcount_dec_and_test(&ct_ft->ref)) {\n                                rhashtable_remove_fast(&zones_ht, &ct_ft->node, zones_params);\n                                INIT_RCU_WORK(&ct_ft->rwork, tcf_ct_flow_table_cleanup_work); // [3]\n                                queue_rcu_work(act_ct_wq, &ct_ft->rwork);\n                }\n}\n\nAt [3], tcf_ct_flow_table_cleanup_work() is scheduled as RCU work\n\nstatic void tcf_ct_flow_table_cleanup_work(struct work_struct *work)\n\n{\n                struct tcf_ct_flow_table *ct_ft;\n                struct flow_block *block;\n\n                ct_ft = container_of(to_rcu_work(work), struct tcf_ct_flow_table,\n                                                                rwork);\n                nf_flow_table_free(&ct_ft->nf_ft);\n                block = &ct_ft->nf_ft.flow_block;\n                down_write(&ct_ft->nf_ft.flow_block_lock);\n                WARN_ON(!list_empty(&block->cb_list));\n                up_write(&ct_ft->nf_ft.flow_block_lock);\n                kfree(ct_ft); // [4]\n\n                module_put(THIS_MODULE);\n}\n\ntcf_ct_flow_table_cleanup_work() frees ct_ft at [4]. When this function executes\nbetween [1] and [2], UAF occurs.\n\nThis race condition has a very short race window, making it generally\ndifficult to trigger. Therefore, to trigger the vulnerability an msleep(100) was\ninserted after[1]",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46320": {
+                "cve_id": "CVE-2026-46320",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntap: free page on error paths in tap_get_user_xdp()\n\ntap_get_user_xdp() rejects a frame shorter than ETH_HLEN with -EINVAL,\nand returns -ENOMEM when build_skb() fails. Both paths jump to the err\nlabel without freeing the page that vhost_net_build_xdp() allocated for\nthe frame. tap_sendmsg() discards the per-buffer return value and always\nreturns 0, so vhost_tx_batch() takes the success path and never frees\nthe page; each rejected frame in a batch leaks one page-frag chunk.\n\nFree the page on both error paths, before the skb is built. This is the\ntap counterpart of the same leak in tun_xdp_one().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46322": {
+                "cve_id": "CVE-2026-46322",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntun: free page on build_skb failure in tun_xdp_one()\n\nWhen build_skb() fails in tun_xdp_one(), the function sets ret to\n-ENOMEM and jumps to the out label, which returns without freeing the\npage that vhost_net_build_xdp() allocated for the frame. As with the\nshort-frame rejection path, tun_sendmsg() discards the per-buffer error\nand still returns total_len, so vhost_tx_batch() takes the success path\nand never frees the page. Each build_skb() failure in a batch leaks one\npage-frag chunk.\n\nFree the page before taking the error path, matching the put_page() the\nother error exits of tun_xdp_one() already perform.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46323": {
+                "cve_id": "CVE-2026-46323",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: gro: don't merge zcopy skbs\n\nskb_gro_receive() can currently copy frags between the source and GRO\nskb, without checking the zerocopy status, and in particular the\nSKBFL_MANAGED_FRAG_REFS flag.\n\nWhen SKBFL_MANAGED_FRAG_REFS is set, the skb doesn't hold a reference\non the pages in shinfo->frags. Appending those frags to another skb's\nfrags without fixing up the page refcount can lead to UAF.\n\nWhen either the last skb in the GRO chain (the one we would append\nfrags to) or the source skb is zerocopy, don't merge the skbs.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46324": {
+                "cve_id": "CVE-2026-46324",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_tables: use list_del_rcu for netlink hooks\n\nnft_netdev_unregister_hooks and __nft_unregister_flowtable_net_hooks need\nto use list_del_rcu(), this list can be walked by concurrent dumpers.\n\nAdd a new helper and use it consistently.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46327": {
+                "cve_id": "CVE-2026-46327",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndm: fix unlocked test for dm_suspended_md\n\nThe function dm_blk_report_zones tests if the device is suspended with\nthe \"dm_suspended_md\" call. However, this function is called without\nholding any locks, so the device may be suspended just after it.\n\nMove the call to dm_suspended_md after dm_get_live_table, so that the\ndevice can't be suspended after the suspended state was tested.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46330": {
+                "cve_id": "CVE-2026-46330",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nRevert \"net/smc: Introduce TCP ULP support\"\n\nThis reverts commit d7cd421da9da2cc7b4d25b8537f66db5c8331c40.\n\nAs reported by Al Viro, the TCP ULP support for SMC is fundamentally\nbroken. The implementation attempts to convert an active TCP socket\ninto an SMC socket by modifying the underlying `struct file`, dentry,\nand inode in-place, which violates core VFS invariants that assume\nthese structures are immutable for an open file, creating a risk of\nuse after free errors and general system instability.\n\nGiven the severity of this design flaw and the fact that cleaner\nalternatives (e.g., LD_PRELOAD, BPF) exist for legacy application\ntransparency, the correct course of action is to remove this feature\nentirely.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
