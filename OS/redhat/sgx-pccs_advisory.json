@@ -1,115 +1,6 @@
 {
     "package_name": "sgx-pccs",
     "advisory": {
-        "9": {
-            "CVE-2025-13465": {
-                "cve_id": "CVE-2025-13465",
-                "title": "Lodash versions 4.0.0 through 4.17.22 are vulnerable to prototype ...",
-                "description": "Lodash versions 4.0.0 through 4.17.22 are vulnerable to prototype pollution in the _.unset\u00a0and _.omit\u00a0functions. An attacker can pass crafted paths which cause Lodash to delete methods from global prototypes.\n\nThe issue permits deletion of properties but does not allow overwriting their original behavior.\n\nThis issue is patched on 4.17.23",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "2.26-4.fc43",
-                        "fixed": "2.26-34.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2025-15284": {
-                "cve_id": "CVE-2025-15284",
-                "title": "Improper Input Validation vulnerability in qs (parse modules) all ...",
-                "description": "Improper Input Validation vulnerability in qs (parse modules) allows HTTP DoS.This issue affects qs: < 6.14.1.\n\n\nSummary\n\nThe arrayLimit\u00a0option in qs did not enforce limits for bracket notation (a[]=1&a[]=2), only for indexed notation (a[0]=1). This is a consistency bug; arrayLimit\u00a0should apply uniformly across all array notations.\n\nNote:\u00a0The default parameterLimit\u00a0of 1000 effectively mitigates the DoS scenario originally described. With default options, bracket notation cannot produce arrays larger than parameterLimit\u00a0regardless of arrayLimit, because each a[]=valueconsumes one parameter slot. The severity has been reduced accordingly.\n\nDetails\n\nThe arrayLimit\u00a0option only checked limits for indexed notation (a[0]=1&a[1]=2) but did not enforce it for bracket notation (a[]=1&a[]=2).\n\nVulnerable code\u00a0(lib/parse.js:159-162):\n\nif (root === '[]' && options.parseArrays) {\n    obj = utils.combine([], leaf);  // No arrayLimit check\n}\n\n\n\n\n\nWorking code\u00a0(lib/parse.js:175):\n\nelse if (index <= options.arrayLimit) {  // Limit checked here\n    obj = [];\n    obj[index] = leaf;\n}\n\n\n\n\n\nThe bracket notation handler at line 159 uses utils.combine([], leaf)\u00a0without validating against options.arrayLimit, while indexed notation at line 175 checks index <= options.arrayLimit\u00a0before creating arrays.\n\n\n\nPoC\n\nconst qs = require('qs');\nconst result = qs.parse('a[]=1&a[]=2&a[]=3&a[]=4&a[]=5&a[]=6', { arrayLimit: 5 });\nconsole.log(result.a.length);  // Output: 6 (should be max 5)\n\n\n\n\n\nNote on parameterLimit interaction:\u00a0The original advisory's \"DoS demonstration\" claimed a length of 10,000, but parameterLimit\u00a0(default: 1000) caps parsing to 1,000 parameters. With default options, the actual output is 1,000, not 10,000.\n\nImpact\n\nConsistency bug in arrayLimit\u00a0enforcement. With default parameterLimit, the practical DoS risk is negligible since parameterLimit\u00a0already caps the total number of parsed parameters (and thus array elements from bracket notation). The risk increases only when parameterLimit\u00a0is explicitly set to a very high value.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "2.26-4.fc43",
-                        "fixed": "2.26-34.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-23745": {
-                "cve_id": "CVE-2026-23745",
-                "title": "node-tar is a Tar for Node.js. The node-tar library (<= 7.5.2) fa ...",
-                "description": "node-tar is a Tar for Node.js. The node-tar library (<= 7.5.2) fails to sanitize the linkpath of Link (hardlink) and SymbolicLink entries when preservePaths is false (the default secure behavior). This allows malicious archives to bypass the extraction root restriction, leading to Arbitrary File Overwrite via hardlinks and Symlink Poisoning via absolute symlink targets. This vulnerability is fixed in 7.5.3.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "2.26-4.fc43",
-                        "fixed": "2.26-34.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-23950": {
-                "cve_id": "CVE-2026-23950",
-                "title": "node-tar,a Tar for Node.js, has a race condition vulnerability in ...",
-                "description": "node-tar,a Tar for Node.js, has a race condition vulnerability in versions up to and including 7.5.3. This is due to an incomplete handling of Unicode path collisions in the `path-reservations` system. On case-insensitive or normalization-insensitive filesystems (such as macOS APFS, In which it has been tested), the library fails to lock colliding paths (e.g., `\u00df` and `ss`), allowing them to be processed in parallel. This bypasses the library's internal concurrency safeguards and permits Symlink Poisoning attacks via race conditions. The library uses a `PathReservations` system to ensure that metadata checks and file operations for the same path are serialized. This prevents race conditions where one entry might clobber another concurrently. This is a Race Condition which enables Arbitrary File Overwrite. This vulnerability affects users and systems using node-tar on macOS (APFS/HFS+). Because of using `NFD` Unicode normalization (in which `\u00df` and `ss` are different), conflicting paths do not have their order properly preserved under filesystems that ignore Unicode normalization (e.g., APFS (in which `\u00df` causes an inode collision with `ss`)). This enables an attacker to circumvent internal parallelization locks (`PathReservations`) using conflicting filenames within a malicious tar archive. The patch in version 7.5.4 updates `path-reservations.js` to use a normalization form that matches the target filesystem's behavior (e.g., `NFKD`), followed by first `toLocaleLowerCase('en')` and then `toLocaleUpperCase('en')`. As a workaround, users who cannot upgrade promptly, and who are programmatically using `node-tar` to extract arbitrary tarball data should filter out all `SymbolicLink` entries (as npm does) to defend against arbitrary file writes via this file system entry name collision issue.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "2.26-4.fc43",
-                        "fixed": "2.26-34.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-2950": {
-                "cve_id": "CVE-2026-2950",
-                "title": "Impact:\n\nLodash versions 4.17.23 and earlier are vulnerable to pr ...",
-                "description": "Impact:\n\nLodash versions 4.17.23 and earlier are vulnerable to prototype pollution in the _.unset and _.omit functions. The fix for (CVE-2025-13465: https://github.com/lodash/lodash/security/advisories/GHSA-xxjr-mmjv-4gpg) only guards against string key members, so an attacker can bypass the check by passing array-wrapped path segments. This allows deletion of properties from built-in prototypes such as Object.prototype, Number.prototype, and String.prototype.\n\nThe issue permits deletion of prototype properties but does not allow overwriting their original behavior.\n\nPatches:\n\nThis issue is patched in 4.18.0.\n\nWorkarounds:\n\nNone. Upgrade to the patched version.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "2.26-4.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-4923": {
-                "cve_id": "CVE-2026-4923",
-                "title": "Impact:\n\nWhen using multiple wildcards, combined with at least on ...",
-                "description": "Impact:\n\nWhen using multiple wildcards, combined with at least one parameter, a regular expression can be generated that is vulnerable to ReDoS. This backtracking vulnerability requires the second wildcard to be somewhere other than the end of the path.\n\nUnsafe examples:\n\n/*foo-*bar-:baz\n/*a-:b-*c-:d\n/x/*a-:b/*c/y\n\nSafe examples:\n\n/*foo-:bar\n/*foo-:bar-*baz\n\nPatches:\n\nUpgrade to version 8.4.0.\n\nWorkarounds:\n\nIf you are using multiple wildcard parameters, you can check the regex output with a tool such as https://makenowjust-labs.github.io/recheck/playground/ to confirm whether a path is vulnerable.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "2.26-4.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-6322": {
-                "cve_id": "CVE-2026-6322",
-                "title": "fast-uri normalize() decoded percent-encoded authority delimiters ...",
-                "description": "fast-uri normalize() decoded percent-encoded authority delimiters inside the host component and then re-emitted them as raw delimiters during serialization. A host that combined an allowed domain, an encoded at-sign, and a different domain was re-emitted with the at-sign as a raw userinfo separator, changing the URI's authority to the second domain. Applications that normalize untrusted URLs before host allowlist checks, redirect validation, or outbound request routing can be steered to a different authority than the input appeared to specify. Versions <= 3.1.1 are affected. Update to 3.1.2 or later.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "2.26-4.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            }
-        },
         "10": {
             "CVE-2025-13465": {
                 "cve_id": "CVE-2025-13465",
@@ -201,6 +92,23 @@
                     }
                 ]
             },
+            "CVE-2026-5078": {
+                "cve_id": "CVE-2026-5078",
+                "title": "Impact: The morgan logging middleware's :remote-user token extrac ...",
+                "description": "Impact: The morgan logging middleware's :remote-user token extracts the Basic auth username from the Authorization request header and writes it to the log stream without neutralizing control characters. An unauthenticated attacker can send a crafted Authorization Basic header containing CR or LF bytes to inject forged log lines, breaking the one-request-per-line structure of access logs and enabling log forgery against downstream log consumers. The built-in combined, common, default, and short formats are affected, as well as any custom format that references :remote-user. Affected versions: morgan 1.2.0 through 1.10.1. Patches: upgrade to morgan 1.11.0, which neutralizes control characters in the :remote-user token output. Workarounds: use a custom format string that does not include :remote-user.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "2.26-4.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-6322": {
                 "cve_id": "CVE-2026-6322",
                 "title": "fast-uri normalize() decoded percent-encoded authority delimiters ...",
@@ -211,6 +119,132 @@
                     {
                         "introduced": "0",
                         "identifier": "el10"
+                    },
+                    {
+                        "introduced": "2.26-4.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            }
+        },
+        "9": {
+            "CVE-2025-13465": {
+                "cve_id": "CVE-2025-13465",
+                "title": "Lodash versions 4.0.0 through 4.17.22 are vulnerable to prototype ...",
+                "description": "Lodash versions 4.0.0 through 4.17.22 are vulnerable to prototype pollution in the _.unset\u00a0and _.omit\u00a0functions. An attacker can pass crafted paths which cause Lodash to delete methods from global prototypes.\n\nThe issue permits deletion of properties but does not allow overwriting their original behavior.\n\nThis issue is patched on 4.17.23",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "2.26-4.fc43",
+                        "fixed": "2.26-34.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2025-15284": {
+                "cve_id": "CVE-2025-15284",
+                "title": "Improper Input Validation vulnerability in qs (parse modules) all ...",
+                "description": "Improper Input Validation vulnerability in qs (parse modules) allows HTTP DoS.This issue affects qs: < 6.14.1.\n\n\nSummary\n\nThe arrayLimit\u00a0option in qs did not enforce limits for bracket notation (a[]=1&a[]=2), only for indexed notation (a[0]=1). This is a consistency bug; arrayLimit\u00a0should apply uniformly across all array notations.\n\nNote:\u00a0The default parameterLimit\u00a0of 1000 effectively mitigates the DoS scenario originally described. With default options, bracket notation cannot produce arrays larger than parameterLimit\u00a0regardless of arrayLimit, because each a[]=valueconsumes one parameter slot. The severity has been reduced accordingly.\n\nDetails\n\nThe arrayLimit\u00a0option only checked limits for indexed notation (a[0]=1&a[1]=2) but did not enforce it for bracket notation (a[]=1&a[]=2).\n\nVulnerable code\u00a0(lib/parse.js:159-162):\n\nif (root === '[]' && options.parseArrays) {\n    obj = utils.combine([], leaf);  // No arrayLimit check\n}\n\n\n\n\n\nWorking code\u00a0(lib/parse.js:175):\n\nelse if (index <= options.arrayLimit) {  // Limit checked here\n    obj = [];\n    obj[index] = leaf;\n}\n\n\n\n\n\nThe bracket notation handler at line 159 uses utils.combine([], leaf)\u00a0without validating against options.arrayLimit, while indexed notation at line 175 checks index <= options.arrayLimit\u00a0before creating arrays.\n\n\n\nPoC\n\nconst qs = require('qs');\nconst result = qs.parse('a[]=1&a[]=2&a[]=3&a[]=4&a[]=5&a[]=6', { arrayLimit: 5 });\nconsole.log(result.a.length);  // Output: 6 (should be max 5)\n\n\n\n\n\nNote on parameterLimit interaction:\u00a0The original advisory's \"DoS demonstration\" claimed a length of 10,000, but parameterLimit\u00a0(default: 1000) caps parsing to 1,000 parameters. With default options, the actual output is 1,000, not 10,000.\n\nImpact\n\nConsistency bug in arrayLimit\u00a0enforcement. With default parameterLimit, the practical DoS risk is negligible since parameterLimit\u00a0already caps the total number of parsed parameters (and thus array elements from bracket notation). The risk increases only when parameterLimit\u00a0is explicitly set to a very high value.",
+                "severity": "LOW",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "2.26-4.fc43",
+                        "fixed": "2.26-34.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-23745": {
+                "cve_id": "CVE-2026-23745",
+                "title": "node-tar is a Tar for Node.js. The node-tar library (<= 7.5.2) fa ...",
+                "description": "node-tar is a Tar for Node.js. The node-tar library (<= 7.5.2) fails to sanitize the linkpath of Link (hardlink) and SymbolicLink entries when preservePaths is false (the default secure behavior). This allows malicious archives to bypass the extraction root restriction, leading to Arbitrary File Overwrite via hardlinks and Symlink Poisoning via absolute symlink targets. This vulnerability is fixed in 7.5.3.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "2.26-4.fc43",
+                        "fixed": "2.26-34.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-23950": {
+                "cve_id": "CVE-2026-23950",
+                "title": "node-tar,a Tar for Node.js, has a race condition vulnerability in ...",
+                "description": "node-tar,a Tar for Node.js, has a race condition vulnerability in versions up to and including 7.5.3. This is due to an incomplete handling of Unicode path collisions in the `path-reservations` system. On case-insensitive or normalization-insensitive filesystems (such as macOS APFS, In which it has been tested), the library fails to lock colliding paths (e.g., `\u00df` and `ss`), allowing them to be processed in parallel. This bypasses the library's internal concurrency safeguards and permits Symlink Poisoning attacks via race conditions. The library uses a `PathReservations` system to ensure that metadata checks and file operations for the same path are serialized. This prevents race conditions where one entry might clobber another concurrently. This is a Race Condition which enables Arbitrary File Overwrite. This vulnerability affects users and systems using node-tar on macOS (APFS/HFS+). Because of using `NFD` Unicode normalization (in which `\u00df` and `ss` are different), conflicting paths do not have their order properly preserved under filesystems that ignore Unicode normalization (e.g., APFS (in which `\u00df` causes an inode collision with `ss`)). This enables an attacker to circumvent internal parallelization locks (`PathReservations`) using conflicting filenames within a malicious tar archive. The patch in version 7.5.4 updates `path-reservations.js` to use a normalization form that matches the target filesystem's behavior (e.g., `NFKD`), followed by first `toLocaleLowerCase('en')` and then `toLocaleUpperCase('en')`. As a workaround, users who cannot upgrade promptly, and who are programmatically using `node-tar` to extract arbitrary tarball data should filter out all `SymbolicLink` entries (as npm does) to defend against arbitrary file writes via this file system entry name collision issue.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "2.26-4.fc43",
+                        "fixed": "2.26-34.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-2950": {
+                "cve_id": "CVE-2026-2950",
+                "title": "Impact:\n\nLodash versions 4.17.23 and earlier are vulnerable to pr ...",
+                "description": "Impact:\n\nLodash versions 4.17.23 and earlier are vulnerable to prototype pollution in the _.unset and _.omit functions. The fix for (CVE-2025-13465: https://github.com/lodash/lodash/security/advisories/GHSA-xxjr-mmjv-4gpg) only guards against string key members, so an attacker can bypass the check by passing array-wrapped path segments. This allows deletion of properties from built-in prototypes such as Object.prototype, Number.prototype, and String.prototype.\n\nThe issue permits deletion of prototype properties but does not allow overwriting their original behavior.\n\nPatches:\n\nThis issue is patched in 4.18.0.\n\nWorkarounds:\n\nNone. Upgrade to the patched version.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "2.26-4.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-4923": {
+                "cve_id": "CVE-2026-4923",
+                "title": "Impact:\n\nWhen using multiple wildcards, combined with at least on ...",
+                "description": "Impact:\n\nWhen using multiple wildcards, combined with at least one parameter, a regular expression can be generated that is vulnerable to ReDoS. This backtracking vulnerability requires the second wildcard to be somewhere other than the end of the path.\n\nUnsafe examples:\n\n/*foo-*bar-:baz\n/*a-:b-*c-:d\n/x/*a-:b/*c/y\n\nSafe examples:\n\n/*foo-:bar\n/*foo-:bar-*baz\n\nPatches:\n\nUpgrade to version 8.4.0.\n\nWorkarounds:\n\nIf you are using multiple wildcard parameters, you can check the regex output with a tool such as https://makenowjust-labs.github.io/recheck/playground/ to confirm whether a path is vulnerable.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "2.26-4.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-5078": {
+                "cve_id": "CVE-2026-5078",
+                "title": "Impact: The morgan logging middleware's :remote-user token extrac ...",
+                "description": "Impact: The morgan logging middleware's :remote-user token extracts the Basic auth username from the Authorization request header and writes it to the log stream without neutralizing control characters. An unauthenticated attacker can send a crafted Authorization Basic header containing CR or LF bytes to inject forged log lines, breaking the one-request-per-line structure of access logs and enabling log forgery against downstream log consumers. The built-in combined, common, default, and short formats are affected, as well as any custom format that references :remote-user. Affected versions: morgan 1.2.0 through 1.10.1. Patches: upgrade to morgan 1.11.0, which neutralizes control characters in the :remote-user token output. Workarounds: use a custom format string that does not include :remote-user.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "2.26-4.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-6322": {
+                "cve_id": "CVE-2026-6322",
+                "title": "fast-uri normalize() decoded percent-encoded authority delimiters ...",
+                "description": "fast-uri normalize() decoded percent-encoded authority delimiters inside the host component and then re-emitted them as raw delimiters during serialization. A host that combined an allowed domain, an encoded at-sign, and a different domain was re-emitted with the at-sign as a raw userinfo separator, changing the URI's authority to the second domain. Applications that normalize untrusted URLs before host allowlist checks, redirect validation, or outbound request routing can be steered to a different authority than the input appeared to specify. Versions <= 3.1.1 are affected. Update to 3.1.2 or later.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
                     },
                     {
                         "introduced": "2.26-4.fc43",

@@ -2,11 +2,23 @@
     "package_name": "openresty-openssl3",
     "advisory": {
         "20.04": {
+            "CVE-2026-34180": {
+                "cve_id": "CVE-2026-34180",
+                "title": "Heap Buffer Over-read in ASN.1 Content Parsing",
+                "description": "Issue summary: Parsing a crafted DER-encoded ASN.1 structure with a primitive\nelement whose content exceeds 2 gigabytes in length may cause a heap buffer\nover-read on 64-bit Unix and Unix-like platforms.\n\nImpact summary: The heap buffer over-read may crash the application (Denial of\nService) or to load into the decoded ASN.1 object contents of memory beyond the\nend of the input buffer.  More typically such ASN.1 elements would instead be\ntruncated.\n\nAn integer truncation in OpenSSL\u2019s ASN.1 decoder causes the content length of\nan ASN.1 primitive element to be mishandled when it exceeds 2 gigabytes. In the\nworst case the truncated length is treated as a request to scan the binary\ncontent for a terminating zero byte, possibly causing OpenSSL to read either\nless than or beyond the end of the allocated buffer.\n\nApplications that pass attacker-supplied data to d2i_X509(), d2i_PKCS7(), or\nany other d2i_* decoding function are affected. OpenSSL\u2019s own command-line\ntools are not vulnerable, as data read through the BIO layer is checked before\nit reaches the affected code. The issue only affects 64-bit Unix and Unix-like\nplatforms; 32-bit platforms and 64-bit Windows are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0"
+                    }
+                ]
+            },
             "CVE-2026-34181": {
                 "cve_id": "CVE-2026-34181",
                 "title": "PKCS#12 Files with PBMAC1 Are Accepted with Short HMAC Keys",
                 "description": "Issue Summary: The PKCS#12 file processing fails to perform sufficient input\nvalidation for files that use Password-Based Message Authentication Code 1\n(PBMAC1) integrity mechanism allowing a certificate and private key forgery.\n\nImpact Summary: An attacker impersonating a user can cause a service reading\nPKCS#12 files to accept forged certificates and private keys with a 1 in 256\nprobability.\n\nIf a service accepting PKCS#12 files is using passwords for authenticating\nthe received files, the attacker can create unencrypted PKCS#12 files that\nuse PBMAC1 authentication that specifies an HMAC key of only one byte, allowing\nthem to craft a file that will be accepted with a 1 in 256 probability.\nThat would then cause the service to accept a certificate and private key\ncontrolled by the attacker.\n\nThe FIPS modules are not affected by this issue, as the affected code is\noutside the OpenSSL FIPS module boundary.",
-                "severity": "",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -18,7 +30,7 @@
                 "cve_id": "CVE-2026-34182",
                 "title": "CMS AuthEnvelopedData Processing May Accept Forged Messages",
                 "description": "Issue Summary: Cryptographic Message Services (CMS) processing fails to perform\nsufficient input validation on the cipher and tag length fields of\nAuthEnvelopedData containers, leading to various potential compromises.\n\nImpact Summary: Attackers making use of these vulnerabilities may achieve\nkey-equivalent functionality for a given CMS recipient and/or bypass integrity\nvalidation for a given message.\n\nIn one use case, an attacker may send a CMS message containing\nAuthEnvelopedData with the cipher specified as a non-AEAD cipher.  OpenSSL\nerroneously allows this selection, and attempts to decrypt and validate the\nmessage.\n\nAn on-path attacker who captures one legitimate AES-GCM AuthEnvelopedData\naddressed to the victim can re-emit it with the recipientInfos set left\nbyte-for-byte intact, so the victim\u2019s private key still unwraps the genuine CEK\n(the content-encryption key), but with the inner OID rewritten to AES-256-OFB\n(Output Feedback Mode, an unauthenticated keystream mode) and with an\nattacker-chosen IV and ciphertext. The victim initializes AES-256-OFB under the\nreal CEK, never consults the MAC field, and CMS_decrypt() returns success.\n\nIf the application under attack responds to the attacker with any indicator\nshowing success or failure of the decryption effort, it is possible for the\nattacker to use this as an oracle to obtain key equivalent functionality for the\nCEK used for the chosen recipient of the message.\n\nIn another use case, an attacker can reduce the tag length of the chosen AEAD\ncipher for a given AuthEnvelopedData container to be a single byte long,\nallowing an attacker to brute force CMS decryption, producing an integrity\nbypass for applications that trust CMS_decrypt() to reject modified content.\n\nThe FIPS modules are not affected by this issue.",
-                "severity": "",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -30,18 +42,6 @@
                 "cve_id": "CVE-2026-34183",
                 "title": "Unbounded Memory Growth in the QUIC PATH_CHALLENGE Handler",
                 "description": "Issue summary: Remote peer may exhaust heap memory of the QUIC\nserver or client by flooding it with packets containing PATH_CHALLENGE\nframes.\n\nImpact summary: A malicious remote peer can cause an unbounded\nmemory allocation which can lead to an abnormal termination of the\napplication acting as a QUIC client or server and a Denial of Service.\n\nA remote peer may exhaust heap memory by flooding the local\nQUIC stack with PATH_CHALLENGE frames. The local QUIC stack\nallocates a PATH_RESPONSE frame for every PATH_CHALLENGE it receives.\nThe allocated PATH_RESPONSE frame gets freed only when the remote\npeer acknowledges reception of the PATH_RESPONSE frame which will\nnot be done by a malicious peer.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by\nthis issue. The QUIC stack is outside of OpenSSL FIPS module\nboundary.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0"
-                    }
-                ]
-            },
-            "CVE-2026-34180": {
-                "cve_id": "CVE-2026-34180",
-                "title": "Heap Buffer Over-read in ASN.1 Content Parsing",
-                "description": "Issue summary: Parsing a crafted DER-encoded ASN.1 structure with a primitive\nelement whose content exceeds 2 gigabytes in length may cause a heap buffer\nover-read on 64-bit Unix and Unix-like platforms.\n\nImpact summary: The heap buffer over-read may crash the application (Denial of\nService) or to load into the decoded ASN.1 object contents of memory beyond the\nend of the input buffer.  More typically such ASN.1 elements would instead be\ntruncated.\n\nAn integer truncation in OpenSSL\u2019s ASN.1 decoder causes the content length of\nan ASN.1 primitive element to be mishandled when it exceeds 2 gigabytes. In the\nworst case the truncated length is treated as a request to scan the binary\ncontent for a terminating zero byte, possibly causing OpenSSL to read either\nless than or beyond the end of the allocated buffer.\n\nApplications that pass attacker-supplied data to d2i_X509(), d2i_PKCS7(), or\nany other d2i_* decoding function are affected. OpenSSL\u2019s own command-line\ntools are not vulnerable, as data read through the BIO layer is checked before\nit reaches the affected code. The issue only affects 64-bit Unix and Unix-like\nplatforms; 32-bit platforms and 64-bit Windows are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -150,7 +150,7 @@
                 "cve_id": "CVE-2026-45447",
                 "title": "Heap Use-After-Free in the PKCS7_verify() Function",
                 "description": "Issue summary: A specially crafted PKCS#7 or S/MIME signed message could\ntrigger a use-after-free during PKCS#7 signature verification.\n\nImpact summary: A use-after-free may result in process crashes, heap\ncorruption, or potentially remote code execution.\n\nWhen processing a PKCS#7 or S/MIME signed message, if the SignedData\ndigestAlgorithms field is present as an empty ASN.1 SET, OpenSSL may\nincorrectly free a caller-owned BIO during PKCS7_verify(). A subsequent\nuse of the BIO by the calling application results in a use-after-free\ncondition.\n\nIn the common case this occurs when the application later calls\nBIO_free() on the BIO originally passed to PKCS7_verify(). Depending\non allocator behavior and application-specific BIO usage patterns, this\nmay result in a crash or other memory corruption. In some application\ncontexts this may potentially be exploitable for remote code execution.\n\nApplications that process PKCS#7 or S/MIME signed messages using OpenSSL\nPKCS#7 APIs may be affected. Applications using the CMS APIs for this\nprocessing are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
-                "severity": "CRITICAL",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -412,11 +412,23 @@
             }
         },
         "22.04": {
+            "CVE-2026-34180": {
+                "cve_id": "CVE-2026-34180",
+                "title": "Heap Buffer Over-read in ASN.1 Content Parsing",
+                "description": "Issue summary: Parsing a crafted DER-encoded ASN.1 structure with a primitive\nelement whose content exceeds 2 gigabytes in length may cause a heap buffer\nover-read on 64-bit Unix and Unix-like platforms.\n\nImpact summary: The heap buffer over-read may crash the application (Denial of\nService) or to load into the decoded ASN.1 object contents of memory beyond the\nend of the input buffer.  More typically such ASN.1 elements would instead be\ntruncated.\n\nAn integer truncation in OpenSSL\u2019s ASN.1 decoder causes the content length of\nan ASN.1 primitive element to be mishandled when it exceeds 2 gigabytes. In the\nworst case the truncated length is treated as a request to scan the binary\ncontent for a terminating zero byte, possibly causing OpenSSL to read either\nless than or beyond the end of the allocated buffer.\n\nApplications that pass attacker-supplied data to d2i_X509(), d2i_PKCS7(), or\nany other d2i_* decoding function are affected. OpenSSL\u2019s own command-line\ntools are not vulnerable, as data read through the BIO layer is checked before\nit reaches the affected code. The issue only affects 64-bit Unix and Unix-like\nplatforms; 32-bit platforms and 64-bit Windows are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0"
+                    }
+                ]
+            },
             "CVE-2026-34181": {
                 "cve_id": "CVE-2026-34181",
                 "title": "PKCS#12 Files with PBMAC1 Are Accepted with Short HMAC Keys",
                 "description": "Issue Summary: The PKCS#12 file processing fails to perform sufficient input\nvalidation for files that use Password-Based Message Authentication Code 1\n(PBMAC1) integrity mechanism allowing a certificate and private key forgery.\n\nImpact Summary: An attacker impersonating a user can cause a service reading\nPKCS#12 files to accept forged certificates and private keys with a 1 in 256\nprobability.\n\nIf a service accepting PKCS#12 files is using passwords for authenticating\nthe received files, the attacker can create unencrypted PKCS#12 files that\nuse PBMAC1 authentication that specifies an HMAC key of only one byte, allowing\nthem to craft a file that will be accepted with a 1 in 256 probability.\nThat would then cause the service to accept a certificate and private key\ncontrolled by the attacker.\n\nThe FIPS modules are not affected by this issue, as the affected code is\noutside the OpenSSL FIPS module boundary.",
-                "severity": "",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -428,7 +440,7 @@
                 "cve_id": "CVE-2026-34182",
                 "title": "CMS AuthEnvelopedData Processing May Accept Forged Messages",
                 "description": "Issue Summary: Cryptographic Message Services (CMS) processing fails to perform\nsufficient input validation on the cipher and tag length fields of\nAuthEnvelopedData containers, leading to various potential compromises.\n\nImpact Summary: Attackers making use of these vulnerabilities may achieve\nkey-equivalent functionality for a given CMS recipient and/or bypass integrity\nvalidation for a given message.\n\nIn one use case, an attacker may send a CMS message containing\nAuthEnvelopedData with the cipher specified as a non-AEAD cipher.  OpenSSL\nerroneously allows this selection, and attempts to decrypt and validate the\nmessage.\n\nAn on-path attacker who captures one legitimate AES-GCM AuthEnvelopedData\naddressed to the victim can re-emit it with the recipientInfos set left\nbyte-for-byte intact, so the victim\u2019s private key still unwraps the genuine CEK\n(the content-encryption key), but with the inner OID rewritten to AES-256-OFB\n(Output Feedback Mode, an unauthenticated keystream mode) and with an\nattacker-chosen IV and ciphertext. The victim initializes AES-256-OFB under the\nreal CEK, never consults the MAC field, and CMS_decrypt() returns success.\n\nIf the application under attack responds to the attacker with any indicator\nshowing success or failure of the decryption effort, it is possible for the\nattacker to use this as an oracle to obtain key equivalent functionality for the\nCEK used for the chosen recipient of the message.\n\nIn another use case, an attacker can reduce the tag length of the chosen AEAD\ncipher for a given AuthEnvelopedData container to be a single byte long,\nallowing an attacker to brute force CMS decryption, producing an integrity\nbypass for applications that trust CMS_decrypt() to reject modified content.\n\nThe FIPS modules are not affected by this issue.",
-                "severity": "",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -440,18 +452,6 @@
                 "cve_id": "CVE-2026-34183",
                 "title": "Unbounded Memory Growth in the QUIC PATH_CHALLENGE Handler",
                 "description": "Issue summary: Remote peer may exhaust heap memory of the QUIC\nserver or client by flooding it with packets containing PATH_CHALLENGE\nframes.\n\nImpact summary: A malicious remote peer can cause an unbounded\nmemory allocation which can lead to an abnormal termination of the\napplication acting as a QUIC client or server and a Denial of Service.\n\nA remote peer may exhaust heap memory by flooding the local\nQUIC stack with PATH_CHALLENGE frames. The local QUIC stack\nallocates a PATH_RESPONSE frame for every PATH_CHALLENGE it receives.\nThe allocated PATH_RESPONSE frame gets freed only when the remote\npeer acknowledges reception of the PATH_RESPONSE frame which will\nnot be done by a malicious peer.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by\nthis issue. The QUIC stack is outside of OpenSSL FIPS module\nboundary.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0"
-                    }
-                ]
-            },
-            "CVE-2026-34180": {
-                "cve_id": "CVE-2026-34180",
-                "title": "Heap Buffer Over-read in ASN.1 Content Parsing",
-                "description": "Issue summary: Parsing a crafted DER-encoded ASN.1 structure with a primitive\nelement whose content exceeds 2 gigabytes in length may cause a heap buffer\nover-read on 64-bit Unix and Unix-like platforms.\n\nImpact summary: The heap buffer over-read may crash the application (Denial of\nService) or to load into the decoded ASN.1 object contents of memory beyond the\nend of the input buffer.  More typically such ASN.1 elements would instead be\ntruncated.\n\nAn integer truncation in OpenSSL\u2019s ASN.1 decoder causes the content length of\nan ASN.1 primitive element to be mishandled when it exceeds 2 gigabytes. In the\nworst case the truncated length is treated as a request to scan the binary\ncontent for a terminating zero byte, possibly causing OpenSSL to read either\nless than or beyond the end of the allocated buffer.\n\nApplications that pass attacker-supplied data to d2i_X509(), d2i_PKCS7(), or\nany other d2i_* decoding function are affected. OpenSSL\u2019s own command-line\ntools are not vulnerable, as data read through the BIO layer is checked before\nit reaches the affected code. The issue only affects 64-bit Unix and Unix-like\nplatforms; 32-bit platforms and 64-bit Windows are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -560,7 +560,7 @@
                 "cve_id": "CVE-2026-45447",
                 "title": "Heap Use-After-Free in the PKCS7_verify() Function",
                 "description": "Issue summary: A specially crafted PKCS#7 or S/MIME signed message could\ntrigger a use-after-free during PKCS#7 signature verification.\n\nImpact summary: A use-after-free may result in process crashes, heap\ncorruption, or potentially remote code execution.\n\nWhen processing a PKCS#7 or S/MIME signed message, if the SignedData\ndigestAlgorithms field is present as an empty ASN.1 SET, OpenSSL may\nincorrectly free a caller-owned BIO during PKCS7_verify(). A subsequent\nuse of the BIO by the calling application results in a use-after-free\ncondition.\n\nIn the common case this occurs when the application later calls\nBIO_free() on the BIO originally passed to PKCS7_verify(). Depending\non allocator behavior and application-specific BIO usage patterns, this\nmay result in a crash or other memory corruption. In some application\ncontexts this may potentially be exploitable for remote code execution.\n\nApplications that process PKCS#7 or S/MIME signed messages using OpenSSL\nPKCS#7 APIs may be affected. Applications using the CMS APIs for this\nprocessing are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
-                "severity": "CRITICAL",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -822,11 +822,23 @@
             }
         },
         "24.04": {
+            "CVE-2026-34180": {
+                "cve_id": "CVE-2026-34180",
+                "title": "Heap Buffer Over-read in ASN.1 Content Parsing",
+                "description": "Issue summary: Parsing a crafted DER-encoded ASN.1 structure with a primitive\nelement whose content exceeds 2 gigabytes in length may cause a heap buffer\nover-read on 64-bit Unix and Unix-like platforms.\n\nImpact summary: The heap buffer over-read may crash the application (Denial of\nService) or to load into the decoded ASN.1 object contents of memory beyond the\nend of the input buffer.  More typically such ASN.1 elements would instead be\ntruncated.\n\nAn integer truncation in OpenSSL\u2019s ASN.1 decoder causes the content length of\nan ASN.1 primitive element to be mishandled when it exceeds 2 gigabytes. In the\nworst case the truncated length is treated as a request to scan the binary\ncontent for a terminating zero byte, possibly causing OpenSSL to read either\nless than or beyond the end of the allocated buffer.\n\nApplications that pass attacker-supplied data to d2i_X509(), d2i_PKCS7(), or\nany other d2i_* decoding function are affected. OpenSSL\u2019s own command-line\ntools are not vulnerable, as data read through the BIO layer is checked before\nit reaches the affected code. The issue only affects 64-bit Unix and Unix-like\nplatforms; 32-bit platforms and 64-bit Windows are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0"
+                    }
+                ]
+            },
             "CVE-2026-34181": {
                 "cve_id": "CVE-2026-34181",
                 "title": "PKCS#12 Files with PBMAC1 Are Accepted with Short HMAC Keys",
                 "description": "Issue Summary: The PKCS#12 file processing fails to perform sufficient input\nvalidation for files that use Password-Based Message Authentication Code 1\n(PBMAC1) integrity mechanism allowing a certificate and private key forgery.\n\nImpact Summary: An attacker impersonating a user can cause a service reading\nPKCS#12 files to accept forged certificates and private keys with a 1 in 256\nprobability.\n\nIf a service accepting PKCS#12 files is using passwords for authenticating\nthe received files, the attacker can create unencrypted PKCS#12 files that\nuse PBMAC1 authentication that specifies an HMAC key of only one byte, allowing\nthem to craft a file that will be accepted with a 1 in 256 probability.\nThat would then cause the service to accept a certificate and private key\ncontrolled by the attacker.\n\nThe FIPS modules are not affected by this issue, as the affected code is\noutside the OpenSSL FIPS module boundary.",
-                "severity": "",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -838,7 +850,7 @@
                 "cve_id": "CVE-2026-34182",
                 "title": "CMS AuthEnvelopedData Processing May Accept Forged Messages",
                 "description": "Issue Summary: Cryptographic Message Services (CMS) processing fails to perform\nsufficient input validation on the cipher and tag length fields of\nAuthEnvelopedData containers, leading to various potential compromises.\n\nImpact Summary: Attackers making use of these vulnerabilities may achieve\nkey-equivalent functionality for a given CMS recipient and/or bypass integrity\nvalidation for a given message.\n\nIn one use case, an attacker may send a CMS message containing\nAuthEnvelopedData with the cipher specified as a non-AEAD cipher.  OpenSSL\nerroneously allows this selection, and attempts to decrypt and validate the\nmessage.\n\nAn on-path attacker who captures one legitimate AES-GCM AuthEnvelopedData\naddressed to the victim can re-emit it with the recipientInfos set left\nbyte-for-byte intact, so the victim\u2019s private key still unwraps the genuine CEK\n(the content-encryption key), but with the inner OID rewritten to AES-256-OFB\n(Output Feedback Mode, an unauthenticated keystream mode) and with an\nattacker-chosen IV and ciphertext. The victim initializes AES-256-OFB under the\nreal CEK, never consults the MAC field, and CMS_decrypt() returns success.\n\nIf the application under attack responds to the attacker with any indicator\nshowing success or failure of the decryption effort, it is possible for the\nattacker to use this as an oracle to obtain key equivalent functionality for the\nCEK used for the chosen recipient of the message.\n\nIn another use case, an attacker can reduce the tag length of the chosen AEAD\ncipher for a given AuthEnvelopedData container to be a single byte long,\nallowing an attacker to brute force CMS decryption, producing an integrity\nbypass for applications that trust CMS_decrypt() to reject modified content.\n\nThe FIPS modules are not affected by this issue.",
-                "severity": "",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -850,18 +862,6 @@
                 "cve_id": "CVE-2026-34183",
                 "title": "Unbounded Memory Growth in the QUIC PATH_CHALLENGE Handler",
                 "description": "Issue summary: Remote peer may exhaust heap memory of the QUIC\nserver or client by flooding it with packets containing PATH_CHALLENGE\nframes.\n\nImpact summary: A malicious remote peer can cause an unbounded\nmemory allocation which can lead to an abnormal termination of the\napplication acting as a QUIC client or server and a Denial of Service.\n\nA remote peer may exhaust heap memory by flooding the local\nQUIC stack with PATH_CHALLENGE frames. The local QUIC stack\nallocates a PATH_RESPONSE frame for every PATH_CHALLENGE it receives.\nThe allocated PATH_RESPONSE frame gets freed only when the remote\npeer acknowledges reception of the PATH_RESPONSE frame which will\nnot be done by a malicious peer.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by\nthis issue. The QUIC stack is outside of OpenSSL FIPS module\nboundary.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0"
-                    }
-                ]
-            },
-            "CVE-2026-34180": {
-                "cve_id": "CVE-2026-34180",
-                "title": "Heap Buffer Over-read in ASN.1 Content Parsing",
-                "description": "Issue summary: Parsing a crafted DER-encoded ASN.1 structure with a primitive\nelement whose content exceeds 2 gigabytes in length may cause a heap buffer\nover-read on 64-bit Unix and Unix-like platforms.\n\nImpact summary: The heap buffer over-read may crash the application (Denial of\nService) or to load into the decoded ASN.1 object contents of memory beyond the\nend of the input buffer.  More typically such ASN.1 elements would instead be\ntruncated.\n\nAn integer truncation in OpenSSL\u2019s ASN.1 decoder causes the content length of\nan ASN.1 primitive element to be mishandled when it exceeds 2 gigabytes. In the\nworst case the truncated length is treated as a request to scan the binary\ncontent for a terminating zero byte, possibly causing OpenSSL to read either\nless than or beyond the end of the allocated buffer.\n\nApplications that pass attacker-supplied data to d2i_X509(), d2i_PKCS7(), or\nany other d2i_* decoding function are affected. OpenSSL\u2019s own command-line\ntools are not vulnerable, as data read through the BIO layer is checked before\nit reaches the affected code. The issue only affects 64-bit Unix and Unix-like\nplatforms; 32-bit platforms and 64-bit Windows are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -970,7 +970,7 @@
                 "cve_id": "CVE-2026-45447",
                 "title": "Heap Use-After-Free in the PKCS7_verify() Function",
                 "description": "Issue summary: A specially crafted PKCS#7 or S/MIME signed message could\ntrigger a use-after-free during PKCS#7 signature verification.\n\nImpact summary: A use-after-free may result in process crashes, heap\ncorruption, or potentially remote code execution.\n\nWhen processing a PKCS#7 or S/MIME signed message, if the SignedData\ndigestAlgorithms field is present as an empty ASN.1 SET, OpenSSL may\nincorrectly free a caller-owned BIO during PKCS7_verify(). A subsequent\nuse of the BIO by the calling application results in a use-after-free\ncondition.\n\nIn the common case this occurs when the application later calls\nBIO_free() on the BIO originally passed to PKCS7_verify(). Depending\non allocator behavior and application-specific BIO usage patterns, this\nmay result in a crash or other memory corruption. In some application\ncontexts this may potentially be exploitable for remote code execution.\n\nApplications that process PKCS#7 or S/MIME signed messages using OpenSSL\nPKCS#7 APIs may be affected. Applications using the CMS APIs for this\nprocessing are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
-                "severity": "CRITICAL",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
