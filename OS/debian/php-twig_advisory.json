@@ -60,9 +60,9 @@
             },
             "CVE-2026-46627": {
                 "cve_id": "CVE-2026-46627",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
-                "severity": "MEDIUM",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
+                "severity": "LOW",
                 "status": "fixed",
                 "events": [
                     {
@@ -77,8 +77,8 @@
             },
             "CVE-2026-46628": {
                 "cve_id": "CVE-2026-46628",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -94,8 +94,8 @@
             },
             "CVE-2026-46629": {
                 "cve_id": "CVE-2026-46629",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "twig/intl-extra: Unbounded formatter memoisation in keyed on template-controlled arguments",
+                "description": "### Description\n\n`IntlExtension` memoises every `\\IntlDateFormatter` and `\\NumberFormatter` it creates in instance-level arrays keyed on a hash that includes `locale`, `pattern`, `attrs` and other values that are ordinary named arguments of the `format_datetime` / `format_date` / `format_time` / `format_number` / `format_currency` filters. There is no size limit and no eviction.\n\nA template that iterates over many distinct `pattern` (or `locale`, or `grouping_used`, ...) values therefore allocates one ICU formatter object per distinct value and pins it for the entire lifetime of the `Twig\\Environment`. Because ICU allocates its backing buffers outside the Zend memory manager, this growth is not bounded by `memory_limit`. On long-running runtimes (RoadRunner, Swoole, FrankenPHP worker mode, ReactPHP) where the `Environment` outlives a single request, the cache also accumulates across requests.\n\n### Resolution\n\nThe formatter caches are now bounded in size (100 entries each) and evict on a FIFO basis.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -111,8 +111,8 @@
             },
             "CVE-2026-46633": {
                 "cve_id": "CVE-2026-46633",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -141,8 +141,8 @@
             },
             "CVE-2026-46635": {
                 "cve_id": "CVE-2026-46635",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -158,8 +158,8 @@
             },
             "CVE-2026-46636": {
                 "cve_id": "CVE-2026-46636",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -175,8 +175,8 @@
             },
             "CVE-2026-46637": {
                 "cve_id": "CVE-2026-46637",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: HTML-output filters in twig/* extras incorrectly declared `is_safe => ['all']`",
+                "description": "### Description\n\nSeveral filters in the `twig/*` extras packages are registered with `is_safe => ['all']`, which tells Twig's autoescaper to treat their output as safe in every context (`html`, `js`, `css`, `url`, ...). The output of these filters is plain text or HTML markup, neither of which is safe in every escaping context.\n\nAffected filters:\n\n- `html_to_markdown` (`twig/markdown-extra`) emits plain Markdown text. `league/html-to-markdown` decodes HTML entities when producing code spans and fenced blocks, so an attacker-controlled `<code>&lt;img src=x onerror=alert(1)&gt;</code>` becomes `` `<img src=x onerror=alert(1)>` ``, which renders live when interpolated into an HTML page.\n- `markdown_to_html` (`twig/markdown-extra`) emits HTML. Safe in an HTML context but not in JS, CSS or URL contexts (e.g. when interpolated into an inline `<script>` block).\n- `inline_css` (`twig/cssinliner-extra`) emits HTML with inlined styles. Same constraint as `markdown_to_html`.\n\nIn all three cases, `is_safe => ['all']` causes the autoescaper to emit the output verbatim in any context, even when the developer never wrote `|raw`. In a context such as a JS string or a URL parameter, this produces unescaped HTML and is exploitable as XSS.\n\n### Resolution\n\n- `html_to_markdown` no longer claims to be safe in any escaping context; its plain-text output is now autoescaped for the surrounding context.\n- `markdown_to_html` and `inline_css` are now declared `is_safe => ['html']`, asserting only what they actually guarantee.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix for `html_to_markdown` and `markdown_to_html` in `twig/markdown-extra`, and Christophe Coevoet for extending the audit to `inline_css` in `twig/cssinliner-extra`.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -192,8 +192,8 @@
             },
             "CVE-2026-46638": {
                 "cve_id": "CVE-2026-46638",
-                "title": "Twig: `{% sandbox %}{% include %}` skips checkSecurity() on cached templates (incomplete fix for CVE-2024-45411)",
-                "description": "### Description\n\nThe fix for CVE-2024-45411 / GHSA-6j75-5wfj-gh66 added an explicit `$loaded->unwrap()->checkSecurity()` call in `CoreExtension::include()` so that a template already cached in `Environment::$loadedTemplates` is re-checked when included with `sandboxed = true`.\n\nThe deprecated but still functional `{% sandbox %}{% include ... %}{% endsandbox %}` tag path was not updated: it compiles to `enableSandbox(); yield from $this->load(...)->unwrap()->yield(...); disableSandbox();` with no `checkSecurity()` re-invocation. If the included template was loaded once outside the sandbox in the same `Environment` instance, its constructor (and therefore its compiled `checkSecurity()` call) already ran while `isSandboxed()` was `false`, so the tags/filters/functions allowlist enforced by `SecurityPolicy::checkSecurity()` is never applied.\n\nAn attacker who can author the included template gains access to every filter, function and tag registered in the environment, regardless of the sandbox policy.\n\n### Resolution\n\nThe compiled output of `{% sandbox %}{% include %}` now calls `checkSecurity()` on the loaded template, matching the behaviour of `CoreExtension::include()` with `sandboxed = true`.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -222,8 +222,8 @@
             },
             "CVE-2026-46640": {
                 "cve_id": "CVE-2026-46640",
-                "title": "Twig: Arbitrary PHP code execution via `_self.(<string>)` macro-reference compilation",
-                "description": "### Description\n\nThe `obj.(expr)` dynamic-attribute syntax (added in 3.15.0 as the replacement for the deprecated `attribute()` function) lets the attribute be an arbitrary expression. When the receiver is `_self` (or any `{% import %}` alias) and the parenthesised expression is a string literal, `DotExpressionParser` short-circuits to the macro-call path and concatenates the attacker-controlled string into a `MacroReferenceExpression` name with no identifier validation. `MacroReferenceExpression::compile()` then emits that name raw into the generated PHP source.\n\nAn attacker who can supply template source can inject arbitrary PHP into the compiled template and execute it at template-load time, before `checkSecurity()` is ever called. This is a complete bypass of `SandboxExtension`, including a globally-enabled sandbox with an empty `SecurityPolicy` allowlist.\n\n### Resolution\n\nThe parser now validates that the dynamic attribute resolves to a valid macro identifier before routing through `MacroReferenceExpression`, and the macro-reference compiler emits the name through a properly escaped path.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -235,8 +235,8 @@
             },
             "CVE-2026-47730": {
                 "cve_id": "CVE-2026-47730",
-                "title": "Twig: XSS in profiler HtmlDumper via unescaped template and profile names",
-                "description": "### Description\n\n`Twig\\Profiler\\Dumper\\HtmlDumper` writes `Profile::getTemplate()` and `Profile::getName()` straight into its HTML output without escaping:\n\n```php\nprotected function formatTemplate(Profile $profile, $prefix): string\n{\n    return \\sprintf('%s\u2514 <span style=\"background-color: %s\">%s</span>', $prefix, self::$colors['template'], $profile->getTemplate());\n}\n```\n\nThe template name comes from the loader (the array key for `ArrayLoader`, a row id for a database-backed loader, etc.). When that name is attacker-controlled, the profiler dump emits arbitrary HTML, and any browser that renders it executes the injected markup. This is an output-encoding bug in profiler/debug tooling, not a sandbox escape.\n\n### Resolution\n\n`HtmlDumper` now runs both `Profile::getTemplate()` and `Profile::getName()` through `htmlspecialchars()` before inserting them into the HTML output.\n\n### Credits\n\nTwig would like to thank El Kharoubi Iosif for reporting the issue and Nicolas Grekas for fixing it.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -252,8 +252,8 @@
             },
             "CVE-2026-47732": {
                 "cve_id": "CVE-2026-47732",
-                "title": "Twig: Sandbox: multiple `__toString()` policy bypasses via unguarded string coercion points",
-                "description": "### Description\n\n`SandboxNodeVisitor` enforces `SecurityPolicy::checkMethodAllowed()` for implicit `__toString()` calls by wrapping selected AST nodes in `CheckToStringNode`. The set of wrapped nodes is incomplete, and several Twig language constructs still trigger PHP string coercion on a `Stringable` operand without first consulting the policy. A sandboxed template author can therefore invoke `__toString()` on any object reachable in the render context, even when `__toString` on its class is not allowlisted.\n\nConfirmed bypass vectors:\n\n- Conditional expressions (`a ? b : c`, `a ?: b`, `a ?? b`) used as the input of a string-coercing filter or as a filter/function argument.\n- The `matches` operator and the loose comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`, `<=>`), which coerce a `Stringable` operand to string and can be used as an oracle to recover the value byte by byte (no tag, filter or function needs to be allowlisted).\n- Twig tests in general (which were never policy-gated), in particular `is empty` which casts a `Stringable` value via `(string) $value` in `CoreExtension::testEmpty()`.\n- Null-coalesce expressions nested in concatenation, and the direct output of allowed functions or filters that return a `Stringable` object.\n- Arguments passed to allowed object methods, template-name expressions of template-loading tags (`include`, `extends`, `use`, ...), dynamic attribute/property names, and spread arguments from `Traversable` objects.\n- The `do` tag and the `..` range operator.\n\n### Resolution\n\nThe sandbox now wraps every child node that the parent will string-coerce at runtime, instead of relying on a hardcoded list of node types in `SandboxNodeVisitor`. A new `Twig\\Node\\CoercesChildrenToStringInterface` lets nodes declare which of their children must be guarded; core nodes (concatenation, comparison and range binaries, filter/function/test expressions, `do`, `include`, `extends`, `use`, ...) implement it. Spread arguments are materialised and policy-checked via the new `SandboxExtension::ensureSpreadAllowed()`, and dynamic attribute names are checked at runtime inside `CoreExtension::getAttribute()`.\n\n### Credits\n\nTwig would like to thank Anthropic Glasswing and El Kharoubi Iosif for reporting the issues, and Fabien Potencier for providing the fixes.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -269,8 +269,8 @@
             },
             "CVE-2026-48805": {
                 "cve_id": "CVE-2026-48805",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -299,8 +299,8 @@
             },
             "CVE-2026-48807": {
                 "cve_id": "CVE-2026-48807",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -312,8 +312,8 @@
             },
             "CVE-2026-48808": {
                 "cve_id": "CVE-2026-48808",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -383,9 +383,9 @@
             },
             "CVE-2026-46627": {
                 "cve_id": "CVE-2026-46627",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
-                "severity": "MEDIUM",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
+                "severity": "LOW",
                 "status": "fixed",
                 "events": [
                     {
@@ -400,8 +400,8 @@
             },
             "CVE-2026-46628": {
                 "cve_id": "CVE-2026-46628",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -417,8 +417,8 @@
             },
             "CVE-2026-46629": {
                 "cve_id": "CVE-2026-46629",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "twig/intl-extra: Unbounded formatter memoisation in keyed on template-controlled arguments",
+                "description": "### Description\n\n`IntlExtension` memoises every `\\IntlDateFormatter` and `\\NumberFormatter` it creates in instance-level arrays keyed on a hash that includes `locale`, `pattern`, `attrs` and other values that are ordinary named arguments of the `format_datetime` / `format_date` / `format_time` / `format_number` / `format_currency` filters. There is no size limit and no eviction.\n\nA template that iterates over many distinct `pattern` (or `locale`, or `grouping_used`, ...) values therefore allocates one ICU formatter object per distinct value and pins it for the entire lifetime of the `Twig\\Environment`. Because ICU allocates its backing buffers outside the Zend memory manager, this growth is not bounded by `memory_limit`. On long-running runtimes (RoadRunner, Swoole, FrankenPHP worker mode, ReactPHP) where the `Environment` outlives a single request, the cache also accumulates across requests.\n\n### Resolution\n\nThe formatter caches are now bounded in size (100 entries each) and evict on a FIFO basis.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -434,8 +434,8 @@
             },
             "CVE-2026-46633": {
                 "cve_id": "CVE-2026-46633",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -464,8 +464,8 @@
             },
             "CVE-2026-46635": {
                 "cve_id": "CVE-2026-46635",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -481,8 +481,8 @@
             },
             "CVE-2026-46636": {
                 "cve_id": "CVE-2026-46636",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -498,8 +498,8 @@
             },
             "CVE-2026-46637": {
                 "cve_id": "CVE-2026-46637",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: HTML-output filters in twig/* extras incorrectly declared `is_safe => ['all']`",
+                "description": "### Description\n\nSeveral filters in the `twig/*` extras packages are registered with `is_safe => ['all']`, which tells Twig's autoescaper to treat their output as safe in every context (`html`, `js`, `css`, `url`, ...). The output of these filters is plain text or HTML markup, neither of which is safe in every escaping context.\n\nAffected filters:\n\n- `html_to_markdown` (`twig/markdown-extra`) emits plain Markdown text. `league/html-to-markdown` decodes HTML entities when producing code spans and fenced blocks, so an attacker-controlled `<code>&lt;img src=x onerror=alert(1)&gt;</code>` becomes `` `<img src=x onerror=alert(1)>` ``, which renders live when interpolated into an HTML page.\n- `markdown_to_html` (`twig/markdown-extra`) emits HTML. Safe in an HTML context but not in JS, CSS or URL contexts (e.g. when interpolated into an inline `<script>` block).\n- `inline_css` (`twig/cssinliner-extra`) emits HTML with inlined styles. Same constraint as `markdown_to_html`.\n\nIn all three cases, `is_safe => ['all']` causes the autoescaper to emit the output verbatim in any context, even when the developer never wrote `|raw`. In a context such as a JS string or a URL parameter, this produces unescaped HTML and is exploitable as XSS.\n\n### Resolution\n\n- `html_to_markdown` no longer claims to be safe in any escaping context; its plain-text output is now autoescaped for the surrounding context.\n- `markdown_to_html` and `inline_css` are now declared `is_safe => ['html']`, asserting only what they actually guarantee.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix for `html_to_markdown` and `markdown_to_html` in `twig/markdown-extra`, and Christophe Coevoet for extending the audit to `inline_css` in `twig/cssinliner-extra`.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -515,8 +515,8 @@
             },
             "CVE-2026-46638": {
                 "cve_id": "CVE-2026-46638",
-                "title": "Twig: `{% sandbox %}{% include %}` skips checkSecurity() on cached templates (incomplete fix for CVE-2024-45411)",
-                "description": "### Description\n\nThe fix for CVE-2024-45411 / GHSA-6j75-5wfj-gh66 added an explicit `$loaded->unwrap()->checkSecurity()` call in `CoreExtension::include()` so that a template already cached in `Environment::$loadedTemplates` is re-checked when included with `sandboxed = true`.\n\nThe deprecated but still functional `{% sandbox %}{% include ... %}{% endsandbox %}` tag path was not updated: it compiles to `enableSandbox(); yield from $this->load(...)->unwrap()->yield(...); disableSandbox();` with no `checkSecurity()` re-invocation. If the included template was loaded once outside the sandbox in the same `Environment` instance, its constructor (and therefore its compiled `checkSecurity()` call) already ran while `isSandboxed()` was `false`, so the tags/filters/functions allowlist enforced by `SecurityPolicy::checkSecurity()` is never applied.\n\nAn attacker who can author the included template gains access to every filter, function and tag registered in the environment, regardless of the sandbox policy.\n\n### Resolution\n\nThe compiled output of `{% sandbox %}{% include %}` now calls `checkSecurity()` on the loaded template, matching the behaviour of `CoreExtension::include()` with `sandboxed = true`.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -545,8 +545,8 @@
             },
             "CVE-2026-46640": {
                 "cve_id": "CVE-2026-46640",
-                "title": "Twig: Arbitrary PHP code execution via `_self.(<string>)` macro-reference compilation",
-                "description": "### Description\n\nThe `obj.(expr)` dynamic-attribute syntax (added in 3.15.0 as the replacement for the deprecated `attribute()` function) lets the attribute be an arbitrary expression. When the receiver is `_self` (or any `{% import %}` alias) and the parenthesised expression is a string literal, `DotExpressionParser` short-circuits to the macro-call path and concatenates the attacker-controlled string into a `MacroReferenceExpression` name with no identifier validation. `MacroReferenceExpression::compile()` then emits that name raw into the generated PHP source.\n\nAn attacker who can supply template source can inject arbitrary PHP into the compiled template and execute it at template-load time, before `checkSecurity()` is ever called. This is a complete bypass of `SandboxExtension`, including a globally-enabled sandbox with an empty `SecurityPolicy` allowlist.\n\n### Resolution\n\nThe parser now validates that the dynamic attribute resolves to a valid macro identifier before routing through `MacroReferenceExpression`, and the macro-reference compiler emits the name through a properly escaped path.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -558,8 +558,8 @@
             },
             "CVE-2026-47730": {
                 "cve_id": "CVE-2026-47730",
-                "title": "Twig: XSS in profiler HtmlDumper via unescaped template and profile names",
-                "description": "### Description\n\n`Twig\\Profiler\\Dumper\\HtmlDumper` writes `Profile::getTemplate()` and `Profile::getName()` straight into its HTML output without escaping:\n\n```php\nprotected function formatTemplate(Profile $profile, $prefix): string\n{\n    return \\sprintf('%s\u2514 <span style=\"background-color: %s\">%s</span>', $prefix, self::$colors['template'], $profile->getTemplate());\n}\n```\n\nThe template name comes from the loader (the array key for `ArrayLoader`, a row id for a database-backed loader, etc.). When that name is attacker-controlled, the profiler dump emits arbitrary HTML, and any browser that renders it executes the injected markup. This is an output-encoding bug in profiler/debug tooling, not a sandbox escape.\n\n### Resolution\n\n`HtmlDumper` now runs both `Profile::getTemplate()` and `Profile::getName()` through `htmlspecialchars()` before inserting them into the HTML output.\n\n### Credits\n\nTwig would like to thank El Kharoubi Iosif for reporting the issue and Nicolas Grekas for fixing it.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -575,8 +575,8 @@
             },
             "CVE-2026-47732": {
                 "cve_id": "CVE-2026-47732",
-                "title": "Twig: Sandbox: multiple `__toString()` policy bypasses via unguarded string coercion points",
-                "description": "### Description\n\n`SandboxNodeVisitor` enforces `SecurityPolicy::checkMethodAllowed()` for implicit `__toString()` calls by wrapping selected AST nodes in `CheckToStringNode`. The set of wrapped nodes is incomplete, and several Twig language constructs still trigger PHP string coercion on a `Stringable` operand without first consulting the policy. A sandboxed template author can therefore invoke `__toString()` on any object reachable in the render context, even when `__toString` on its class is not allowlisted.\n\nConfirmed bypass vectors:\n\n- Conditional expressions (`a ? b : c`, `a ?: b`, `a ?? b`) used as the input of a string-coercing filter or as a filter/function argument.\n- The `matches` operator and the loose comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`, `<=>`), which coerce a `Stringable` operand to string and can be used as an oracle to recover the value byte by byte (no tag, filter or function needs to be allowlisted).\n- Twig tests in general (which were never policy-gated), in particular `is empty` which casts a `Stringable` value via `(string) $value` in `CoreExtension::testEmpty()`.\n- Null-coalesce expressions nested in concatenation, and the direct output of allowed functions or filters that return a `Stringable` object.\n- Arguments passed to allowed object methods, template-name expressions of template-loading tags (`include`, `extends`, `use`, ...), dynamic attribute/property names, and spread arguments from `Traversable` objects.\n- The `do` tag and the `..` range operator.\n\n### Resolution\n\nThe sandbox now wraps every child node that the parent will string-coerce at runtime, instead of relying on a hardcoded list of node types in `SandboxNodeVisitor`. A new `Twig\\Node\\CoercesChildrenToStringInterface` lets nodes declare which of their children must be guarded; core nodes (concatenation, comparison and range binaries, filter/function/test expressions, `do`, `include`, `extends`, `use`, ...) implement it. Spread arguments are materialised and policy-checked via the new `SandboxExtension::ensureSpreadAllowed()`, and dynamic attribute names are checked at runtime inside `CoreExtension::getAttribute()`.\n\n### Credits\n\nTwig would like to thank Anthropic Glasswing and El Kharoubi Iosif for reporting the issues, and Fabien Potencier for providing the fixes.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -592,8 +592,8 @@
             },
             "CVE-2026-48805": {
                 "cve_id": "CVE-2026-48805",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -622,8 +622,8 @@
             },
             "CVE-2026-48807": {
                 "cve_id": "CVE-2026-48807",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -635,8 +635,8 @@
             },
             "CVE-2026-48808": {
                 "cve_id": "CVE-2026-48808",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -706,9 +706,9 @@
             },
             "CVE-2026-46627": {
                 "cve_id": "CVE-2026-46627",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
-                "severity": "MEDIUM",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
+                "severity": "LOW",
                 "status": "fixed",
                 "events": [
                     {
@@ -723,8 +723,8 @@
             },
             "CVE-2026-46628": {
                 "cve_id": "CVE-2026-46628",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -740,8 +740,8 @@
             },
             "CVE-2026-46629": {
                 "cve_id": "CVE-2026-46629",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "twig/intl-extra: Unbounded formatter memoisation in keyed on template-controlled arguments",
+                "description": "### Description\n\n`IntlExtension` memoises every `\\IntlDateFormatter` and `\\NumberFormatter` it creates in instance-level arrays keyed on a hash that includes `locale`, `pattern`, `attrs` and other values that are ordinary named arguments of the `format_datetime` / `format_date` / `format_time` / `format_number` / `format_currency` filters. There is no size limit and no eviction.\n\nA template that iterates over many distinct `pattern` (or `locale`, or `grouping_used`, ...) values therefore allocates one ICU formatter object per distinct value and pins it for the entire lifetime of the `Twig\\Environment`. Because ICU allocates its backing buffers outside the Zend memory manager, this growth is not bounded by `memory_limit`. On long-running runtimes (RoadRunner, Swoole, FrankenPHP worker mode, ReactPHP) where the `Environment` outlives a single request, the cache also accumulates across requests.\n\n### Resolution\n\nThe formatter caches are now bounded in size (100 entries each) and evict on a FIFO basis.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -757,8 +757,8 @@
             },
             "CVE-2026-46633": {
                 "cve_id": "CVE-2026-46633",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -787,8 +787,8 @@
             },
             "CVE-2026-46635": {
                 "cve_id": "CVE-2026-46635",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -804,8 +804,8 @@
             },
             "CVE-2026-46636": {
                 "cve_id": "CVE-2026-46636",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -821,8 +821,8 @@
             },
             "CVE-2026-46637": {
                 "cve_id": "CVE-2026-46637",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: HTML-output filters in twig/* extras incorrectly declared `is_safe => ['all']`",
+                "description": "### Description\n\nSeveral filters in the `twig/*` extras packages are registered with `is_safe => ['all']`, which tells Twig's autoescaper to treat their output as safe in every context (`html`, `js`, `css`, `url`, ...). The output of these filters is plain text or HTML markup, neither of which is safe in every escaping context.\n\nAffected filters:\n\n- `html_to_markdown` (`twig/markdown-extra`) emits plain Markdown text. `league/html-to-markdown` decodes HTML entities when producing code spans and fenced blocks, so an attacker-controlled `<code>&lt;img src=x onerror=alert(1)&gt;</code>` becomes `` `<img src=x onerror=alert(1)>` ``, which renders live when interpolated into an HTML page.\n- `markdown_to_html` (`twig/markdown-extra`) emits HTML. Safe in an HTML context but not in JS, CSS or URL contexts (e.g. when interpolated into an inline `<script>` block).\n- `inline_css` (`twig/cssinliner-extra`) emits HTML with inlined styles. Same constraint as `markdown_to_html`.\n\nIn all three cases, `is_safe => ['all']` causes the autoescaper to emit the output verbatim in any context, even when the developer never wrote `|raw`. In a context such as a JS string or a URL parameter, this produces unescaped HTML and is exploitable as XSS.\n\n### Resolution\n\n- `html_to_markdown` no longer claims to be safe in any escaping context; its plain-text output is now autoescaped for the surrounding context.\n- `markdown_to_html` and `inline_css` are now declared `is_safe => ['html']`, asserting only what they actually guarantee.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix for `html_to_markdown` and `markdown_to_html` in `twig/markdown-extra`, and Christophe Coevoet for extending the audit to `inline_css` in `twig/cssinliner-extra`.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -838,8 +838,8 @@
             },
             "CVE-2026-46638": {
                 "cve_id": "CVE-2026-46638",
-                "title": "Twig: `{% sandbox %}{% include %}` skips checkSecurity() on cached templates (incomplete fix for CVE-2024-45411)",
-                "description": "### Description\n\nThe fix for CVE-2024-45411 / GHSA-6j75-5wfj-gh66 added an explicit `$loaded->unwrap()->checkSecurity()` call in `CoreExtension::include()` so that a template already cached in `Environment::$loadedTemplates` is re-checked when included with `sandboxed = true`.\n\nThe deprecated but still functional `{% sandbox %}{% include ... %}{% endsandbox %}` tag path was not updated: it compiles to `enableSandbox(); yield from $this->load(...)->unwrap()->yield(...); disableSandbox();` with no `checkSecurity()` re-invocation. If the included template was loaded once outside the sandbox in the same `Environment` instance, its constructor (and therefore its compiled `checkSecurity()` call) already ran while `isSandboxed()` was `false`, so the tags/filters/functions allowlist enforced by `SecurityPolicy::checkSecurity()` is never applied.\n\nAn attacker who can author the included template gains access to every filter, function and tag registered in the environment, regardless of the sandbox policy.\n\n### Resolution\n\nThe compiled output of `{% sandbox %}{% include %}` now calls `checkSecurity()` on the loaded template, matching the behaviour of `CoreExtension::include()` with `sandboxed = true`.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -868,8 +868,8 @@
             },
             "CVE-2026-46640": {
                 "cve_id": "CVE-2026-46640",
-                "title": "Twig: Arbitrary PHP code execution via `_self.(<string>)` macro-reference compilation",
-                "description": "### Description\n\nThe `obj.(expr)` dynamic-attribute syntax (added in 3.15.0 as the replacement for the deprecated `attribute()` function) lets the attribute be an arbitrary expression. When the receiver is `_self` (or any `{% import %}` alias) and the parenthesised expression is a string literal, `DotExpressionParser` short-circuits to the macro-call path and concatenates the attacker-controlled string into a `MacroReferenceExpression` name with no identifier validation. `MacroReferenceExpression::compile()` then emits that name raw into the generated PHP source.\n\nAn attacker who can supply template source can inject arbitrary PHP into the compiled template and execute it at template-load time, before `checkSecurity()` is ever called. This is a complete bypass of `SandboxExtension`, including a globally-enabled sandbox with an empty `SecurityPolicy` allowlist.\n\n### Resolution\n\nThe parser now validates that the dynamic attribute resolves to a valid macro identifier before routing through `MacroReferenceExpression`, and the macro-reference compiler emits the name through a properly escaped path.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -881,8 +881,8 @@
             },
             "CVE-2026-47730": {
                 "cve_id": "CVE-2026-47730",
-                "title": "Twig: XSS in profiler HtmlDumper via unescaped template and profile names",
-                "description": "### Description\n\n`Twig\\Profiler\\Dumper\\HtmlDumper` writes `Profile::getTemplate()` and `Profile::getName()` straight into its HTML output without escaping:\n\n```php\nprotected function formatTemplate(Profile $profile, $prefix): string\n{\n    return \\sprintf('%s\u2514 <span style=\"background-color: %s\">%s</span>', $prefix, self::$colors['template'], $profile->getTemplate());\n}\n```\n\nThe template name comes from the loader (the array key for `ArrayLoader`, a row id for a database-backed loader, etc.). When that name is attacker-controlled, the profiler dump emits arbitrary HTML, and any browser that renders it executes the injected markup. This is an output-encoding bug in profiler/debug tooling, not a sandbox escape.\n\n### Resolution\n\n`HtmlDumper` now runs both `Profile::getTemplate()` and `Profile::getName()` through `htmlspecialchars()` before inserting them into the HTML output.\n\n### Credits\n\nTwig would like to thank El Kharoubi Iosif for reporting the issue and Nicolas Grekas for fixing it.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -898,8 +898,8 @@
             },
             "CVE-2026-47732": {
                 "cve_id": "CVE-2026-47732",
-                "title": "Twig: Sandbox: multiple `__toString()` policy bypasses via unguarded string coercion points",
-                "description": "### Description\n\n`SandboxNodeVisitor` enforces `SecurityPolicy::checkMethodAllowed()` for implicit `__toString()` calls by wrapping selected AST nodes in `CheckToStringNode`. The set of wrapped nodes is incomplete, and several Twig language constructs still trigger PHP string coercion on a `Stringable` operand without first consulting the policy. A sandboxed template author can therefore invoke `__toString()` on any object reachable in the render context, even when `__toString` on its class is not allowlisted.\n\nConfirmed bypass vectors:\n\n- Conditional expressions (`a ? b : c`, `a ?: b`, `a ?? b`) used as the input of a string-coercing filter or as a filter/function argument.\n- The `matches` operator and the loose comparison operators (`==`, `!=`, `<`, `>`, `<=`, `>=`, `<=>`), which coerce a `Stringable` operand to string and can be used as an oracle to recover the value byte by byte (no tag, filter or function needs to be allowlisted).\n- Twig tests in general (which were never policy-gated), in particular `is empty` which casts a `Stringable` value via `(string) $value` in `CoreExtension::testEmpty()`.\n- Null-coalesce expressions nested in concatenation, and the direct output of allowed functions or filters that return a `Stringable` object.\n- Arguments passed to allowed object methods, template-name expressions of template-loading tags (`include`, `extends`, `use`, ...), dynamic attribute/property names, and spread arguments from `Traversable` objects.\n- The `do` tag and the `..` range operator.\n\n### Resolution\n\nThe sandbox now wraps every child node that the parent will string-coerce at runtime, instead of relying on a hardcoded list of node types in `SandboxNodeVisitor`. A new `Twig\\Node\\CoercesChildrenToStringInterface` lets nodes declare which of their children must be guarded; core nodes (concatenation, comparison and range binaries, filter/function/test expressions, `do`, `include`, `extends`, `use`, ...) implement it. Spread arguments are materialised and policy-checked via the new `SandboxExtension::ensureSpreadAllowed()`, and dynamic attribute names are checked at runtime inside `CoreExtension::getAttribute()`.\n\n### Credits\n\nTwig would like to thank Anthropic Glasswing and El Kharoubi Iosif for reporting the issues, and Fabien Potencier for providing the fixes.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -915,8 +915,8 @@
             },
             "CVE-2026-48805": {
                 "cve_id": "CVE-2026-48805",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -945,8 +945,8 @@
             },
             "CVE-2026-48807": {
                 "cve_id": "CVE-2026-48807",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -958,8 +958,8 @@
             },
             "CVE-2026-48808": {
                 "cve_id": "CVE-2026-48808",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
