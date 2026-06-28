@@ -29289,6 +29289,23 @@
                     }
                 ]
             },
+            "CVE-2026-46116": {
+                "cve_id": "CVE-2026-46116",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nxfrm: defensively unhash xfrm_state lists in __xfrm_state_delete\n\nKASAN reproduces a slab-use-after-free in __xfrm_state_delete()'s\nhlist_del_rcu calls under syzkaller load on linux-6.12.y stable\n(reproduced on 6.12.47, also reachable via the same code path on\ntorvalds/master and on the ipsec tree). Nine unique signatures cluster\nin the xfrm_state lifecycle, the load-bearing one being:\n\n  BUG: KASAN: slab-use-after-free in __hlist_del include/linux/list.h:990 [inline]\n  BUG: KASAN: slab-use-after-free in hlist_del_rcu include/linux/rculist.h:516 [inline]\n  BUG: KASAN: slab-use-after-free in __xfrm_state_delete net/xfrm/xfrm_state.c\n  Write of size 8 at addr ffff8881198bcb70 by task kworker/u8:9/435\n\n  Workqueue: netns cleanup_net\n  Call Trace:\n   __hlist_del / hlist_del_rcu\n   __xfrm_state_delete\n   xfrm_state_delete\n   xfrm_state_flush\n   xfrm_state_fini\n   ops_exit_list\n   cleanup_net\n\nThe other observed signatures hit the same slab object from\n__xfrm_state_lookup, xfrm_alloc_spi, __xfrm_state_insert and an OOB\nwrite variant of __xfrm_state_delete, all on the byseq/byspi\nhash chains.\n\n__xfrm_state_delete() guards its byseq and byspi unhashes with\nvalue-based predicates:\n\n\tif (x->km.seq)\n\t\thlist_del_rcu(&x->byseq);\n\tif (x->id.spi)\n\t\thlist_del_rcu(&x->byspi);\n\nwhile everywhere else in the file (e.g. state_cache, state_cache_input)\nthe safer hlist_unhashed() check is used. xfrm_alloc_spi() sets\nx->id.spi = newspi inside xfrm_state_lock and then immediately inserts\ninto byspi, but a path that observes x->id.spi != 0 outside of\nxfrm_state_lock can still skip-or-hit the byspi unhash inconsistently\nwith whether x is actually on the list. The same holds for x->km.seq\nversus byseq, and the bydst/bysrc unhashes have no predicate at all,\nso a second __xfrm_state_delete() on the same object writes through\nLIST_POISON pprev.\n\nThe defensive change here:\n\n  - Use hlist_del_init_rcu() instead of hlist_del_rcu() on bydst,\n    bysrc, byseq and byspi so a second deletion is a no-op rather\n    than a write through LIST_POISON pprev. The byseq/byspi nodes\n    are already initialised in xfrm_state_alloc().\n  - Test hlist_unhashed() rather than the value predicate for\n    byseq/byspi, so the unhash decision tracks list state rather than\n    mutable scalar fields.\n\nEmpirical verification: applied this patch on top of v6.12.47, rebuilt,\nand re-ran the same syzkaller harness for 1h16m on a previously-crashy\nconfiguration that produced ~100 hits each of slab-use-after-free\nRead in xfrm_alloc_spi / Read in __xfrm_state_lookup / Write in\n__xfrm_state_delete. After the patch, 7.1M execs across 32 VMs at\n~1550 exec/sec produced zero xfrm_state UAF/OOB hits. /proc/slabinfo\nconfirms the xfrm_state slab is actively allocated and freed during\nthe run (~143 KiB resident), so the fuzzer is still exercising those\ncode paths -- they just no longer crash.\n\nReproduction:\n\n  - Linux 6.12.47 x86_64 + KASAN_GENERIC + KASAN_INLINE + KCOV\n  - syzkaller @ 746545b8b1e4c3a128db8652b340d3df90ce61db\n  - 32 QEMU/KVM VMs x 2 vCPU on AWS c5.metal bare metal\n  - 9 unique signatures collected in ~9h, all within xfrm_state\n    lifecycle",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46119": {
                 "cve_id": "CVE-2026-46119",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -29408,6 +29425,40 @@
                     }
                 ]
             },
+            "CVE-2026-46137": {
+                "cve_id": "CVE-2026-46137",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmptcp: pm: ADD_ADDR rtx: fix potential data-race\n\nThis mptcp_pm_add_timer() helper is executed as a timer callback in\nsoftirq context. To avoid any data races, the socket lock needs to be\nheld with bh_lock_sock().\n\nIf the socket is in use, retry again soon after, similar to what is done\nwith the keepalive timer.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46138": {
+                "cve_id": "CVE-2026-46138",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: hci_event: Fix OOB read and infinite loop in hci_le_create_big_complete_evt\n\nhci_le_create_big_complete_evt() iterates over BT_BOUND connections for\na BIG handle using a while loop, accessing ev->bis_handle[i++] on each\niteration.  However, there is no check that i stays within ev->num_bis\nbefore the array access.\n\nWhen a controller sends a LE_Create_BIG_Complete event with fewer\nbis_handle entries than there are BT_BOUND connections for that BIG,\nor with num_bis=0, the loop reads beyond the valid bis_handle[] flex\narray into adjacent heap memory.  Since the out-of-bounds values\ntypically exceed HCI_CONN_HANDLE_MAX (0x0EFF), hci_conn_set_handle()\nrejects them and the connection remains in BT_BOUND state.  The same\nconnection is then found again by hci_conn_hash_lookup_big_state(),\ncreating an infinite loop with hci_dev_lock held.\n\nFix this by terminating the BIG if in case not all BIS could be setup\nproperly.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46139": {
                 "cve_id": "CVE-2026-46139",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -29464,6 +29515,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: usb-audio: Avoid potential endless loop in convert_chmap_v3()\n\nThe convert_chmap_v3() has a loop with its increment size of\ncs_desc->wLength, but we forgot to validate cs_desc->wLength itself,\nwhich may lead to potential endless loop by a malformed descriptor.\n\nAdd a proper size check to abort the loop for plugging the hole.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46149": {
+                "cve_id": "CVE-2026-46149",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: target: configfs: Bound snprintf() return in tg_pt_gp_members_show()\n\ntarget_tg_pt_gp_members_show() formats LUN paths with snprintf() into a\n256-byte stack buffer, then will memcpy() cur_len bytes from that\nbuffer.  snprintf() returns the length the output would have had, which\ncan exceed the buffer size when the fabric WWN is long because iSCSI IQN\nnames can be up to 223 bytes.  The check at the memcpy() site only\nguards the destination page write, not the source read, so memcpy() will\nread past the stack buffer and copy adjacent stack contents to the sysfs\nreader, which when CONFIG_FORTIFY_SOURCE is enabled, fortify_panic()\nwill be triggered.\n\nCommit 27e06650a5ea (\"scsi: target: target_core_configfs: Add length\ncheck to avoid buffer overflow\") added the same bound to the\ntarget_lu_gp_members_show() but the tg_pt_gp variant was missed so\nresolve that here.",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -29736,6 +29804,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsound: ua101: fix division by zero at probe\n\nAdd a missing sanity check for bNrChannels in detect_usb_format()\nto prevent a division by zero in playback_urb_complete() and\ncapture_urb_complete().\n\nUSB core does not validate class-specific descriptor fields such\nas bNrChannels, so drivers must verify them before use. If a\ndevice provides bNrChannels = 0, frame_bytes becomes zero and is\nlater used as a divisor in the URB completion handlers, leading\nto a kernel crash.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46185": {
+                "cve_id": "CVE-2026-46185",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb/client: fix out-of-bounds read in symlink_data()\n\nSince smb2_check_message() returns success without length validation for\nthe symlink error response, in symlink_data() it is possible for\niov->iov_len to be smaller than sizeof(struct smb2_err_rsp). If the buffer\nonly contains the base SMB2 header (64 bytes), accessing\nerr->ErrorContextCount (at offset 66) or err->ByteCount later in\nsymlink_data() will cause an out-of-bounds read.",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -31331,6 +31416,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: tls: fix strparser anchor skb leak on offload RX setup failure\n\nWhen tls_set_device_offload_rx() fails at tls_dev_add(), the error path\ncalls tls_sw_free_resources_rx() to clean up the SW context that was\ninitialized by tls_set_sw_offload(). This function calls\ntls_sw_release_resources_rx() (which stops the strparser via\ntls_strp_stop()) and tls_sw_free_ctx_rx() (which kfrees the context),\nbut never frees the anchor skb that was allocated by alloc_skb(0) in\ntls_strp_init().\n\nNote that tls_sw_free_resources_rx() is exclusively used for this\n\"failed to start offload\" code path, there's no other caller.\n\nThe leak did not exist before commit 84c61fe1a75b (\"tls: rx: do not use\nthe standard strparser\"), because the standard strparser doesn't try\nto pre-allocate an skb.\n\nThe normal close path in tls_sk_proto_close() handles cleanup by calling\ntls_sw_strparser_done() (which calls tls_strp_done()) after dropping\nthe socket lock, because tls_strp_done() does cancel_work_sync() and\nthe strparser work handler takes the socket lock.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-52975": {
+                "cve_id": "CVE-2026-52975",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbonding: 3ad: implement proper RCU rules for port->aggregator\n\nsyzbot found a data-race in bond_3ad_get_active_agg_info /\nbond_3ad_state_machine_handler [1] which hints at lack of proper\nRCU implementation.\n\nAdd __rcu qualifier to port->aggregator, and add proper RCU API.\n\n[1]\n\nBUG: KCSAN: data-race in bond_3ad_get_active_agg_info / bond_3ad_state_machine_handler\n\nwrite to 0xffff88813cf5c4b0 of 8 bytes by task 36 on cpu 0:\n  ad_port_selection_logic drivers/net/bonding/bond_3ad.c:1659 [inline]\n  bond_3ad_state_machine_handler+0x9d5/0x2d60 drivers/net/bonding/bond_3ad.c:2569\n  process_one_work kernel/workqueue.c:3302 [inline]\n  process_scheduled_works+0x4f0/0x9c0 kernel/workqueue.c:3385\n  worker_thread+0x58a/0x780 kernel/workqueue.c:3466\n  kthread+0x22a/0x280 kernel/kthread.c:436\n  ret_from_fork+0x146/0x330 arch/x86/kernel/process.c:158\n  ret_from_fork_asm+0x1a/0x30 arch/x86/entry/entry_64.S:245\n\nread to 0xffff88813cf5c4b0 of 8 bytes by task 22063 on cpu 1:\n  __bond_3ad_get_active_agg_info drivers/net/bonding/bond_3ad.c:2858 [inline]\n  bond_3ad_get_active_agg_info+0x8c/0x230 drivers/net/bonding/bond_3ad.c:2881\n  bond_fill_info+0xe0f/0x10f0 drivers/net/bonding/bond_netlink.c:853\n  rtnl_link_info_fill net/core/rtnetlink.c:906 [inline]\n  rtnl_link_fill+0x1d7/0x4e0 net/core/rtnetlink.c:927\n  rtnl_fill_ifinfo+0xf8e/0x1380 net/core/rtnetlink.c:2168\n  rtmsg_ifinfo_build_skb+0x11c/0x1b0 net/core/rtnetlink.c:4453\n  rtmsg_ifinfo_event net/core/rtnetlink.c:4486 [inline]\n  rtmsg_ifinfo+0x6d/0x110 net/core/rtnetlink.c:4495\n  __dev_notify_flags+0x76/0x390 net/core/dev.c:9790\n  netif_change_flags+0xac/0xd0 net/core/dev.c:9823\n  do_setlink+0x905/0x2950 net/core/rtnetlink.c:3180\n  rtnl_group_changelink net/core/rtnetlink.c:3813 [inline]\n  __rtnl_newlink net/core/rtnetlink.c:3981 [inline]\n  rtnl_newlink+0xf55/0x1400 net/core/rtnetlink.c:4109\n  rtnetlink_rcv_msg+0x64b/0x720 net/core/rtnetlink.c:6995\n  netlink_rcv_skb+0x123/0x220 net/netlink/af_netlink.c:2550\n  rtnetlink_rcv+0x1c/0x30 net/core/rtnetlink.c:7022\n  netlink_unicast_kernel net/netlink/af_netlink.c:1318 [inline]\n  netlink_unicast+0x5a8/0x680 net/netlink/af_netlink.c:1344\n  netlink_sendmsg+0x5c8/0x6f0 net/netlink/af_netlink.c:1894\n  sock_sendmsg_nosec net/socket.c:787 [inline]\n  __sock_sendmsg net/socket.c:802 [inline]\n  ____sys_sendmsg+0x563/0x5b0 net/socket.c:2698\n  ___sys_sendmsg+0x195/0x1e0 net/socket.c:2752\n  __sys_sendmsg net/socket.c:2784 [inline]\n  __do_sys_sendmsg net/socket.c:2789 [inline]\n  __se_sys_sendmsg net/socket.c:2787 [inline]\n  __x64_sys_sendmsg+0xd4/0x160 net/socket.c:2787\n  x64_sys_call+0x194c/0x3020 arch/x86/include/generated/asm/syscalls_64.h:47\n  do_syscall_x64 arch/x86/entry/syscall_64.c:63 [inline]\n  do_syscall_64+0x12c/0x3b0 arch/x86/entry/syscall_64.c:94\n entry_SYSCALL_64_after_hwframe+0x77/0x7f\n\nvalue changed: 0x0000000000000000 -> 0xffff88813cf5c400\n\nReported by Kernel Concurrency Sanitizer on:\nCPU: 1 UID: 0 PID: 22063 Comm: syz.0.31122 Tainted: G        W           syzkaller #0 PREEMPT(full)\nTainted: [W]=WARN\nHardware name: Google Google Compute Engine/Google Compute Engine, BIOS Google 04/18/2026",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -33162,6 +33264,23 @@
                     }
                 ]
             },
+            "CVE-2026-53185": {
+                "cve_id": "CVE-2026-53185",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nzram: fix use-after-free in zram_bvec_write_partial()\n\nzram_read_page() picks the sync or async backing device read path based on\nwhether the parent bio is NULL.  zram_bvec_write_partial() passes its\nparent bio down, so for ZRAM_WB slots the read is dispatched\nasynchronously and zram_read_page() returns 0 while the bio is still in\nflight.  The caller then runs memcpy_from_bvec(), zram_write_page() and\n__free_page() on the buffer, leaving the async read to write into a freed\npage.\n\nzram_bvec_read_partial() was switched to NULL in commit 4e3c87b9421d\n(\"zram: fix synchronous reads\") for the same reason; the write_partial\ncounterpart was missed.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-53187": {
                 "cve_id": "CVE-2026-53187",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -33557,6 +33676,23 @@
                 "cve_id": "CVE-2026-53227",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: openvswitch: fix possible kfree_skb of ERR_PTR\n\nAfter the patch in the \"Fixes\" tag, the allocation of the \"reply\" skb\ncan happen either before or after locking the ovs_mutex.\n\nHowever, error cleanups still follow the classical reversed order,\nassuming \"reply\" is allocated before locking: it is freed after unlocking.\n\nIf \"reply\" allocation happens after locking the mutex and it fails,\n\"reply\" is left with an ERR_PTR, and execution jumps to the correspondent\ncleanup stage which will try to free an invalid pointer.\n\nFix this by setting the pointer to NULL after having saved its error\nvalue.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53228": {
+                "cve_id": "CVE-2026-53228",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: sit: reload inner IPv6 header after GSO offloads\n\nipip6_tunnel_xmit() caches the inner IPv6 header pointer at function\nentry and continues using it after iptunnel_handle_offloads().\n\nFor GSO skbs, iptunnel_handle_offloads() calls skb_header_unclone().\nWhen the skb header is cloned, skb_header_unclone() can call\npskb_expand_head(), which may move the skb head. The pskb_expand_head()\ncontract requires pointers into the skb header to be reloaded after the\ncall.\n\nIf the later skb_realloc_headroom() branch is not taken, SIT uses the\nstale iph6 pointer to read the inner hop limit and DS field. That can\nread from a freed skb head after the old head's remaining clone is\nreleased.\n\nReload iph6 after the offload helper succeeds and before subsequent\nreads from the inner IPv6 header. Keep the existing reload after\nskb_realloc_headroom(), since that branch can also replace the skb.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -63291,6 +63427,23 @@
                     }
                 ]
             },
+            "CVE-2026-46116": {
+                "cve_id": "CVE-2026-46116",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nxfrm: defensively unhash xfrm_state lists in __xfrm_state_delete\n\nKASAN reproduces a slab-use-after-free in __xfrm_state_delete()'s\nhlist_del_rcu calls under syzkaller load on linux-6.12.y stable\n(reproduced on 6.12.47, also reachable via the same code path on\ntorvalds/master and on the ipsec tree). Nine unique signatures cluster\nin the xfrm_state lifecycle, the load-bearing one being:\n\n  BUG: KASAN: slab-use-after-free in __hlist_del include/linux/list.h:990 [inline]\n  BUG: KASAN: slab-use-after-free in hlist_del_rcu include/linux/rculist.h:516 [inline]\n  BUG: KASAN: slab-use-after-free in __xfrm_state_delete net/xfrm/xfrm_state.c\n  Write of size 8 at addr ffff8881198bcb70 by task kworker/u8:9/435\n\n  Workqueue: netns cleanup_net\n  Call Trace:\n   __hlist_del / hlist_del_rcu\n   __xfrm_state_delete\n   xfrm_state_delete\n   xfrm_state_flush\n   xfrm_state_fini\n   ops_exit_list\n   cleanup_net\n\nThe other observed signatures hit the same slab object from\n__xfrm_state_lookup, xfrm_alloc_spi, __xfrm_state_insert and an OOB\nwrite variant of __xfrm_state_delete, all on the byseq/byspi\nhash chains.\n\n__xfrm_state_delete() guards its byseq and byspi unhashes with\nvalue-based predicates:\n\n\tif (x->km.seq)\n\t\thlist_del_rcu(&x->byseq);\n\tif (x->id.spi)\n\t\thlist_del_rcu(&x->byspi);\n\nwhile everywhere else in the file (e.g. state_cache, state_cache_input)\nthe safer hlist_unhashed() check is used. xfrm_alloc_spi() sets\nx->id.spi = newspi inside xfrm_state_lock and then immediately inserts\ninto byspi, but a path that observes x->id.spi != 0 outside of\nxfrm_state_lock can still skip-or-hit the byspi unhash inconsistently\nwith whether x is actually on the list. The same holds for x->km.seq\nversus byseq, and the bydst/bysrc unhashes have no predicate at all,\nso a second __xfrm_state_delete() on the same object writes through\nLIST_POISON pprev.\n\nThe defensive change here:\n\n  - Use hlist_del_init_rcu() instead of hlist_del_rcu() on bydst,\n    bysrc, byseq and byspi so a second deletion is a no-op rather\n    than a write through LIST_POISON pprev. The byseq/byspi nodes\n    are already initialised in xfrm_state_alloc().\n  - Test hlist_unhashed() rather than the value predicate for\n    byseq/byspi, so the unhash decision tracks list state rather than\n    mutable scalar fields.\n\nEmpirical verification: applied this patch on top of v6.12.47, rebuilt,\nand re-ran the same syzkaller harness for 1h16m on a previously-crashy\nconfiguration that produced ~100 hits each of slab-use-after-free\nRead in xfrm_alloc_spi / Read in __xfrm_state_lookup / Write in\n__xfrm_state_delete. After the patch, 7.1M execs across 32 VMs at\n~1550 exec/sec produced zero xfrm_state UAF/OOB hits. /proc/slabinfo\nconfirms the xfrm_state slab is actively allocated and freed during\nthe run (~143 KiB resident), so the fuzzer is still exercising those\ncode paths -- they just no longer crash.\n\nReproduction:\n\n  - Linux 6.12.47 x86_64 + KASAN_GENERIC + KASAN_INLINE + KCOV\n  - syzkaller @ 746545b8b1e4c3a128db8652b340d3df90ce61db\n  - 32 QEMU/KVM VMs x 2 vCPU on AWS c5.metal bare metal\n  - 9 unique signatures collected in ~9h, all within xfrm_state\n    lifecycle",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46119": {
                 "cve_id": "CVE-2026-46119",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -63410,6 +63563,40 @@
                     }
                 ]
             },
+            "CVE-2026-46137": {
+                "cve_id": "CVE-2026-46137",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmptcp: pm: ADD_ADDR rtx: fix potential data-race\n\nThis mptcp_pm_add_timer() helper is executed as a timer callback in\nsoftirq context. To avoid any data races, the socket lock needs to be\nheld with bh_lock_sock().\n\nIf the socket is in use, retry again soon after, similar to what is done\nwith the keepalive timer.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46138": {
+                "cve_id": "CVE-2026-46138",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: hci_event: Fix OOB read and infinite loop in hci_le_create_big_complete_evt\n\nhci_le_create_big_complete_evt() iterates over BT_BOUND connections for\na BIG handle using a while loop, accessing ev->bis_handle[i++] on each\niteration.  However, there is no check that i stays within ev->num_bis\nbefore the array access.\n\nWhen a controller sends a LE_Create_BIG_Complete event with fewer\nbis_handle entries than there are BT_BOUND connections for that BIG,\nor with num_bis=0, the loop reads beyond the valid bis_handle[] flex\narray into adjacent heap memory.  Since the out-of-bounds values\ntypically exceed HCI_CONN_HANDLE_MAX (0x0EFF), hci_conn_set_handle()\nrejects them and the connection remains in BT_BOUND state.  The same\nconnection is then found again by hci_conn_hash_lookup_big_state(),\ncreating an infinite loop with hci_dev_lock held.\n\nFix this by terminating the BIG if in case not all BIS could be setup\nproperly.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46139": {
                 "cve_id": "CVE-2026-46139",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -63466,6 +63653,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: usb-audio: Avoid potential endless loop in convert_chmap_v3()\n\nThe convert_chmap_v3() has a loop with its increment size of\ncs_desc->wLength, but we forgot to validate cs_desc->wLength itself,\nwhich may lead to potential endless loop by a malformed descriptor.\n\nAdd a proper size check to abort the loop for plugging the hole.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46149": {
+                "cve_id": "CVE-2026-46149",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: target: configfs: Bound snprintf() return in tg_pt_gp_members_show()\n\ntarget_tg_pt_gp_members_show() formats LUN paths with snprintf() into a\n256-byte stack buffer, then will memcpy() cur_len bytes from that\nbuffer.  snprintf() returns the length the output would have had, which\ncan exceed the buffer size when the fabric WWN is long because iSCSI IQN\nnames can be up to 223 bytes.  The check at the memcpy() site only\nguards the destination page write, not the source read, so memcpy() will\nread past the stack buffer and copy adjacent stack contents to the sysfs\nreader, which when CONFIG_FORTIFY_SOURCE is enabled, fortify_panic()\nwill be triggered.\n\nCommit 27e06650a5ea (\"scsi: target: target_core_configfs: Add length\ncheck to avoid buffer overflow\") added the same bound to the\ntarget_lu_gp_members_show() but the tg_pt_gp variant was missed so\nresolve that here.",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -63738,6 +63942,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsound: ua101: fix division by zero at probe\n\nAdd a missing sanity check for bNrChannels in detect_usb_format()\nto prevent a division by zero in playback_urb_complete() and\ncapture_urb_complete().\n\nUSB core does not validate class-specific descriptor fields such\nas bNrChannels, so drivers must verify them before use. If a\ndevice provides bNrChannels = 0, frame_bytes becomes zero and is\nlater used as a divisor in the URB completion handlers, leading\nto a kernel crash.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46185": {
+                "cve_id": "CVE-2026-46185",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb/client: fix out-of-bounds read in symlink_data()\n\nSince smb2_check_message() returns success without length validation for\nthe symlink error response, in symlink_data() it is possible for\niov->iov_len to be smaller than sizeof(struct smb2_err_rsp). If the buffer\nonly contains the base SMB2 header (64 bytes), accessing\nerr->ErrorContextCount (at offset 66) or err->ByteCount later in\nsymlink_data() will cause an out-of-bounds read.",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -65333,6 +65554,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: tls: fix strparser anchor skb leak on offload RX setup failure\n\nWhen tls_set_device_offload_rx() fails at tls_dev_add(), the error path\ncalls tls_sw_free_resources_rx() to clean up the SW context that was\ninitialized by tls_set_sw_offload(). This function calls\ntls_sw_release_resources_rx() (which stops the strparser via\ntls_strp_stop()) and tls_sw_free_ctx_rx() (which kfrees the context),\nbut never frees the anchor skb that was allocated by alloc_skb(0) in\ntls_strp_init().\n\nNote that tls_sw_free_resources_rx() is exclusively used for this\n\"failed to start offload\" code path, there's no other caller.\n\nThe leak did not exist before commit 84c61fe1a75b (\"tls: rx: do not use\nthe standard strparser\"), because the standard strparser doesn't try\nto pre-allocate an skb.\n\nThe normal close path in tls_sk_proto_close() handles cleanup by calling\ntls_sw_strparser_done() (which calls tls_strp_done()) after dropping\nthe socket lock, because tls_strp_done() does cancel_work_sync() and\nthe strparser work handler takes the socket lock.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-52975": {
+                "cve_id": "CVE-2026-52975",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbonding: 3ad: implement proper RCU rules for port->aggregator\n\nsyzbot found a data-race in bond_3ad_get_active_agg_info /\nbond_3ad_state_machine_handler [1] which hints at lack of proper\nRCU implementation.\n\nAdd __rcu qualifier to port->aggregator, and add proper RCU API.\n\n[1]\n\nBUG: KCSAN: data-race in bond_3ad_get_active_agg_info / bond_3ad_state_machine_handler\n\nwrite to 0xffff88813cf5c4b0 of 8 bytes by task 36 on cpu 0:\n  ad_port_selection_logic drivers/net/bonding/bond_3ad.c:1659 [inline]\n  bond_3ad_state_machine_handler+0x9d5/0x2d60 drivers/net/bonding/bond_3ad.c:2569\n  process_one_work kernel/workqueue.c:3302 [inline]\n  process_scheduled_works+0x4f0/0x9c0 kernel/workqueue.c:3385\n  worker_thread+0x58a/0x780 kernel/workqueue.c:3466\n  kthread+0x22a/0x280 kernel/kthread.c:436\n  ret_from_fork+0x146/0x330 arch/x86/kernel/process.c:158\n  ret_from_fork_asm+0x1a/0x30 arch/x86/entry/entry_64.S:245\n\nread to 0xffff88813cf5c4b0 of 8 bytes by task 22063 on cpu 1:\n  __bond_3ad_get_active_agg_info drivers/net/bonding/bond_3ad.c:2858 [inline]\n  bond_3ad_get_active_agg_info+0x8c/0x230 drivers/net/bonding/bond_3ad.c:2881\n  bond_fill_info+0xe0f/0x10f0 drivers/net/bonding/bond_netlink.c:853\n  rtnl_link_info_fill net/core/rtnetlink.c:906 [inline]\n  rtnl_link_fill+0x1d7/0x4e0 net/core/rtnetlink.c:927\n  rtnl_fill_ifinfo+0xf8e/0x1380 net/core/rtnetlink.c:2168\n  rtmsg_ifinfo_build_skb+0x11c/0x1b0 net/core/rtnetlink.c:4453\n  rtmsg_ifinfo_event net/core/rtnetlink.c:4486 [inline]\n  rtmsg_ifinfo+0x6d/0x110 net/core/rtnetlink.c:4495\n  __dev_notify_flags+0x76/0x390 net/core/dev.c:9790\n  netif_change_flags+0xac/0xd0 net/core/dev.c:9823\n  do_setlink+0x905/0x2950 net/core/rtnetlink.c:3180\n  rtnl_group_changelink net/core/rtnetlink.c:3813 [inline]\n  __rtnl_newlink net/core/rtnetlink.c:3981 [inline]\n  rtnl_newlink+0xf55/0x1400 net/core/rtnetlink.c:4109\n  rtnetlink_rcv_msg+0x64b/0x720 net/core/rtnetlink.c:6995\n  netlink_rcv_skb+0x123/0x220 net/netlink/af_netlink.c:2550\n  rtnetlink_rcv+0x1c/0x30 net/core/rtnetlink.c:7022\n  netlink_unicast_kernel net/netlink/af_netlink.c:1318 [inline]\n  netlink_unicast+0x5a8/0x680 net/netlink/af_netlink.c:1344\n  netlink_sendmsg+0x5c8/0x6f0 net/netlink/af_netlink.c:1894\n  sock_sendmsg_nosec net/socket.c:787 [inline]\n  __sock_sendmsg net/socket.c:802 [inline]\n  ____sys_sendmsg+0x563/0x5b0 net/socket.c:2698\n  ___sys_sendmsg+0x195/0x1e0 net/socket.c:2752\n  __sys_sendmsg net/socket.c:2784 [inline]\n  __do_sys_sendmsg net/socket.c:2789 [inline]\n  __se_sys_sendmsg net/socket.c:2787 [inline]\n  __x64_sys_sendmsg+0xd4/0x160 net/socket.c:2787\n  x64_sys_call+0x194c/0x3020 arch/x86/include/generated/asm/syscalls_64.h:47\n  do_syscall_x64 arch/x86/entry/syscall_64.c:63 [inline]\n  do_syscall_64+0x12c/0x3b0 arch/x86/entry/syscall_64.c:94\n entry_SYSCALL_64_after_hwframe+0x77/0x7f\n\nvalue changed: 0x0000000000000000 -> 0xffff88813cf5c400\n\nReported by Kernel Concurrency Sanitizer on:\nCPU: 1 UID: 0 PID: 22063 Comm: syz.0.31122 Tainted: G        W           syzkaller #0 PREEMPT(full)\nTainted: [W]=WARN\nHardware name: Google Google Compute Engine/Google Compute Engine, BIOS Google 04/18/2026",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -67164,6 +67402,23 @@
                     }
                 ]
             },
+            "CVE-2026-53185": {
+                "cve_id": "CVE-2026-53185",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nzram: fix use-after-free in zram_bvec_write_partial()\n\nzram_read_page() picks the sync or async backing device read path based on\nwhether the parent bio is NULL.  zram_bvec_write_partial() passes its\nparent bio down, so for ZRAM_WB slots the read is dispatched\nasynchronously and zram_read_page() returns 0 while the bio is still in\nflight.  The caller then runs memcpy_from_bvec(), zram_write_page() and\n__free_page() on the buffer, leaving the async read to write into a freed\npage.\n\nzram_bvec_read_partial() was switched to NULL in commit 4e3c87b9421d\n(\"zram: fix synchronous reads\") for the same reason; the write_partial\ncounterpart was missed.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-53187": {
                 "cve_id": "CVE-2026-53187",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -67559,6 +67814,23 @@
                 "cve_id": "CVE-2026-53227",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: openvswitch: fix possible kfree_skb of ERR_PTR\n\nAfter the patch in the \"Fixes\" tag, the allocation of the \"reply\" skb\ncan happen either before or after locking the ovs_mutex.\n\nHowever, error cleanups still follow the classical reversed order,\nassuming \"reply\" is allocated before locking: it is freed after unlocking.\n\nIf \"reply\" allocation happens after locking the mutex and it fails,\n\"reply\" is left with an ERR_PTR, and execution jumps to the correspondent\ncleanup stage which will try to free an invalid pointer.\n\nFix this by setting the pointer to NULL after having saved its error\nvalue.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53228": {
+                "cve_id": "CVE-2026-53228",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: sit: reload inner IPv6 header after GSO offloads\n\nipip6_tunnel_xmit() caches the inner IPv6 header pointer at function\nentry and continues using it after iptunnel_handle_offloads().\n\nFor GSO skbs, iptunnel_handle_offloads() calls skb_header_unclone().\nWhen the skb header is cloned, skb_header_unclone() can call\npskb_expand_head(), which may move the skb head. The pskb_expand_head()\ncontract requires pointers into the skb header to be reloaded after the\ncall.\n\nIf the later skb_realloc_headroom() branch is not taken, SIT uses the\nstale iph6 pointer to read the inner hop limit and DS field. That can\nread from a freed skb head after the old head's remaining clone is\nreleased.\n\nReload iph6 after the offload helper succeeds and before subsequent\nreads from the inner IPv6 header. Keep the existing reload after\nskb_realloc_headroom(), since that branch can also replace the skb.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
