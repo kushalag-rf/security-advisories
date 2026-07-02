@@ -31263,11 +31263,101 @@
                     }
                 ]
             },
+            "CVE-2026-53341": {
+                "cve_id": "CVE-2026-53341",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfhandle: fix UAF due to unlocked ->mnt_ns read in may_decode_fh()\n\nmay_decode_fh() accesses mount::mnt_ns without holding any locks; that\nmeans the mount can concurrently be unmounted, and the mnt_namespace can\nconcurrently be freed after an RCU grace period.\n\nThis race can happens as follows, assuming that the mount point was\ncreated by open_tree(..., OPEN_TREE_CLONE):\n\nthread 1            thread 2            RCU\n                    __do_sys_open_by_handle_at\n                      do_handle_open\n                        handle_to_path\n                          may_decode_fh\n                            is_mounted\n                              [mount::mnt_ns access]\n                            [mount::mnt_ns access]\n__do_sys_close\n  fput_close_sync\n    __fput\n      dissolve_on_fput\n        umount_tree\n        class_namespace_excl_destructor\n          namespace_unlock\n            free_mnt_ns\n              mnt_ns_tree_remove\n                call_rcu(mnt_ns_release_rcu)\n                                        mnt_ns_release_rcu\n                                          mnt_ns_release\n                                            kfree\n                            [mnt_namespace::user_ns access] **UAF**\n\nFix it by taking rcu_read_lock() around the mount::mnt_ns access, like\nin __prepend_path().\nAdditionally, document the semantics of mount::mnt_ns, and use WRITE_ONCE()\nfor writers that can race with lockless readers.\n\nThis bug is unreachable unless one of the following is set:\n\n - CONFIG_PREEMPTION\n - CONFIG_RCU_STRICT_GRACE_PERIOD\n\nbecause it requires an RCU grace period to happen during a syscall without\nan explicit preemption.\n\nThis doesn't seem to have interesting security impact; worst-case, it could\nleak the result of an integer comparison to userspace (from the level\ncheck in cap_capable()), cause an endless loop, or crash the kernel by\ndereferencing an invalid address.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53348": {
+                "cve_id": "CVE-2026-53348",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SDCA: fix NULL pointer dereference in sdca_dev_unregister_functions\n\nsdca_dev_unregister_functions() iterates over all SDCA function\ndescriptors and calls sdca_dev_unregister() on each func_dev without\nchecking for NULL. When a function registration has failed partway\nthrough, or the device cleanup races with probe deferral, func_dev\nentries may be NULL, leading to a kernel oops:\n\n  BUG: kernel NULL pointer dereference, address: 0000000000000040\n  RIP: 0010:device_del+0x1e/0x3e0\n  Call Trace:\n   sdca_dev_unregister_functions+0x37/0x60 [snd_soc_sdca]\n   release_nodes+0x35/0xb0\n   devres_release_all+0x90/0x100\n   device_unbind_cleanup+0xe/0x80\n   device_release_driver_internal+0x1c1/0x200\n   bus_remove_device+0xc6/0x130\n   device_del+0x161/0x3e0\n   device_unregister+0x17/0x60\n   sdw_delete_slave+0xb6/0xd0 [soundwire_bus]\n   sdw_bus_master_delete+0x1e/0x50 [soundwire_bus]\n   ...\n   sof_probe_work+0x19/0x30 [snd_sof]\n\nThis was observed on a Lenovo ThinkPad X1 Carbon G14 (Panther Lake)\nwith the SOF audio driver probe failing due to missing Panther Lake\nfirmware, causing the subsequent cleanup of SoundWire devices to\ntrigger the crash.\n\nFix this with three changes:\n\n1) Add a NULL guard in sdca_dev_unregister() so that callers do not\n   need to pre-validate the pointer (defense in depth).\n\n2) In sdca_dev_unregister_functions(), skip NULL func_dev entries\n   and clear func_dev to NULL after unregistration, making the\n   function idempotent and safe against double-invocation.\n\n3) In sdca_dev_register_functions(), roll back all previously\n   registered functions when a later one fails, so the function\n   array is never left in a partially-populated state.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53349": {
+                "cve_id": "CVE-2026-53349",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_conntrack: destroy stale expectfn expectations on unregister\n\nNAT helpers such as nf_nat_h323 store a raw pointer to module text in\nexp->expectfn (e.g. ip_nat_q931_expect). nf_ct_helper_expectfn_unregister()\nonly unlinks the callback descriptor and never walks the expectation table,\nso an expectation pending at module removal survives with a dangling\nexp->expectfn into freed module text.\n\nWhen the expected connection arrives, init_conntrack() invokes\nexp->expectfn(), now a stale pointer into the unloaded module. Reproduced\non a KASAN build by loading the H.323 helpers, creating a Q.931\nexpectation, unloading nf_nat_h323, then connecting to the expected port:\n\n Oops: int3: 0000 [#1] SMP KASAN NOPTI\n RIP: 0010:0xffffffffa06102d1\n  init_conntrack.isra.0 (net/netfilter/nf_conntrack_core.c:1862)\n  nf_conntrack_in (net/netfilter/nf_conntrack_core.c:2049)\n  ipv4_conntrack_local (net/netfilter/nf_conntrack_proto.c:223)\n  nf_hook_slow (net/netfilter/core.c:619)\n  __ip_local_out (net/ipv4/ip_output.c:120)\n  __tcp_transmit_skb (net/ipv4/tcp_output.c:1715)\n  tcp_connect (net/ipv4/tcp_output.c:4374)\n  tcp_v4_connect (net/ipv4/tcp_ipv4.c:345)\n  __sys_connect (net/socket.c:2167)\n Modules linked in: nf_conntrack_h323 [last unloaded: nf_nat_h323]\n\nReaching the dangling state requires CAP_SYS_MODULE in the initial user\nnamespace to remove a NAT helper that still has live expectations, so this\nis a robustness fix; leaving an expectation pointing at freed text is wrong\nregardless.\n\nAdd nf_ct_helper_expectfn_destroy(), which walks the expectation table and\ndrops every expectation whose ->expectfn matches the descriptor being torn\ndown. Call it from each NAT helper's exit path after the existing RCU grace\nperiod, so no expectation outlives the code it points at and no extra\nsynchronize_rcu() is introduced. With the fix, the same reproducer runs to\ncompletion without the Oops.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-53350": {
                 "cve_id": "CVE-2026-53350",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: wm_adsp: Fix NULL dereference when removing firmware controls\n\nIn wm_adsp_control_remove() check that the priv pointer is not NULL\nbefore attempting to cleanup what it points to.\n\nWhen cs_dsp creates a control it calls wm_adsp_control_add_cb() so that\nwm_adsp can create its own private control data. There are two cases\nwhere private data is not created:\n\n1. The control is a SYSTEM control, so an ALSA control is not created.\n\n2. The codec driver has registered a control_add() callback that\n   hides the control, so wm_adsp_control_add() is not called.\n\nWhen cs_dsp_remove destroys its control list it calls\nwm_adsp_control_remove() for each control. But wm_adsp_control_remove()\nwas attempting to cleanup the private data pointed to by cs_ctl->priv\nwithout checking the pointer for NULL.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53352": {
+                "cve_id": "CVE-2026-53352",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsignal: clear JOBCTL_PENDING_MASK for caller in zap_other_threads()\n\nWhen a multi-threaded process receives a stop signal (e.g., SIGSTOP),\ndo_signal_stop() sets JOBCTL_STOP_PENDING and JOBCTL_STOP_CONSUME on all\nthreads and sets signal->group_stop_count to the number of threads. If\none of the threads concurrently calls execve(), de_thread() invokes\nzap_other_threads() to kill all other threads. zap_other_threads()\naborts the pending group stop by resetting signal->group_stop_count to 0\nand clears the JOBCTL_PENDING_MASK for all other threads. However, it\nfails to clear the job control flags for the calling thread.\n\nWhen execve() completes, the calling thread returns to user mode and\nchecks for pending signals. Seeing the stale JOBCTL_STOP_PENDING flag,\nit calls do_signal_stop(), which invokes task_participate_group_stop().\nSince JOBCTL_STOP_CONSUME is still set, it attempts to decrement the\nalready-zero signal->group_stop_count, triggering a warning:\n\nsig->group_stop_count == 0\nWARNING: CPU: 1 PID: 6475 at kernel/signal.c:373\ntask_participate_group_stop+0x215/0x2d0\nCall Trace:\n <TASK>\n do_signal_stop+0x3be/0x5c0 kernel/signal.c:2619\n get_signal+0xa8c/0x1330 kernel/signal.c:2884\n arch_do_signal_or_restart+0xbc/0x840 arch/x86/kernel/signal.c:337\n exit_to_user_mode_loop+0x8c/0x4d0 kernel/entry/common.c:98\n do_syscall_64+0x33e/0xf80 arch/x86/entry/syscall_64.c:100\n entry_SYSCALL_64_after_hwframe+0x77/0x7f\n </TASK>\n\nFix this race condition by clearing the JOBCTL_PENDING_MASK for the\ncalling thread in zap_other_threads(), ensuring it does not retain any\nstale job control state after the thread group is destroyed. This aligns\nwith other functions that tear down a thread group and abort group\nstops, such as zap_process() and complete_signal(), which correctly\nclear these flags for all threads including the current one.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53353": {
+                "cve_id": "CVE-2026-53353",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhsr: Remove WARN_ONCE() in hsr_addr_is_self().\n\nsyzbot reported the warning [0] in hsr_addr_is_self(),\nwhose assumption is simply wrong.\n\nhsr->self_node is cleared in hsr_del_self_node(), which\nis called from hsr_dellink().\n\nSince dev->rtnl_link_ops->dellink() is called before\nunregister_netdevice_many(), there is a window when\nuser can find the device but without hsr->self_node.\n\nLet's remove WARN_ONCE() in hsr_addr_is_self().\n\n[0]:\nHSR: No self node\nWARNING: net/hsr/hsr_framereg.c:39 at hsr_addr_is_self+0x211/0x3f0 net/hsr/hsr_framereg.c:39, CPU#0: syz.4.16848/17220\nModules linked in:\nCPU: 0 UID: 0 PID: 17220 Comm: syz.4.16848 Tainted: G             L      syzkaller #0 PREEMPT_{RT,(full)}\nTainted: [L]=SOFTLOCKUP\nHardware name: Google Google Compute Engine/Google Compute Engine, BIOS Google 04/18/2026\nRIP: 0010:hsr_addr_is_self+0x211/0x3f0 net/hsr/hsr_framereg.c:39\nCode: 33 2f 41 0f b7 dd 89 ee 09 de 31 ff e8 c8 b4 c6 f6 09 dd 74 54 e8 0f b0 c6 f6 31 ed eb 53 e8 06 b0 c6 f6 48 8d 3d 2f 50 9c 04 <67> 48 0f b9 3a 31 ed eb 42 e8 c1 13 1f 00 89 c5 31 ff 89 c6 e8 96\nRSP: 0018:ffffc900041c70e0 EFLAGS: 00010283\nRAX: ffffffff8afdc6ca RBX: ffffffff8afdc4e6 RCX: 0000000000080000\nRDX: ffffc90010493000 RSI: 0000000000000948 RDI: ffffffff8f9a1700\nRBP: 0000000000000001 R08: 0000000000000000 R09: 0000000000000000\nR10: ffffc900041c71e8 R11: fffff52000838e3f R12: dffffc0000000000\nR13: ffff888041f9e3c0 R14: ffff888086ee3802 R15: 0000000000000000\nFS:  00007f6fe985d6c0(0000) GS:ffff888126176000(0000) knlGS:0000000000000000\nCS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\nCR2: 00007f80bd437dac CR3: 0000000025096000 CR4: 00000000003526f0\nDR0: ffffffffffffffff DR1: 00000000000001f8 DR2: 0000000000000002\nDR3: ffffffffefffff15 DR6: 00000000ffff0ff0 DR7: 0000000000000400\nCall Trace:\n <TASK>\n check_local_dest net/hsr/hsr_forward.c:592 [inline]\n fill_frame_info net/hsr/hsr_forward.c:728 [inline]\n hsr_forward_skb+0xa11/0x2a80 net/hsr/hsr_forward.c:739\n hsr_dev_xmit+0x253/0x370 net/hsr/hsr_device.c:236\n __netdev_start_xmit include/linux/netdevice.h:5368 [inline]\n netdev_start_xmit include/linux/netdevice.h:5377 [inline]\n xmit_one net/core/dev.c:3888 [inline]\n dev_hard_start_xmit+0x2df/0x860 net/core/dev.c:3904\n __dev_queue_xmit+0x1428/0x3900 net/core/dev.c:4870\n neigh_output include/net/neighbour.h:556 [inline]\n ip_finish_output2+0xcec/0x10b0 net/ipv4/ip_output.c:237\n ip_send_skb net/ipv4/ip_output.c:1510 [inline]\n ip_push_pending_frames+0x8b/0x110 net/ipv4/ip_output.c:1530\n raw_sendmsg+0x1547/0x1a50 net/ipv4/raw.c:659\n sock_sendmsg_nosec net/socket.c:787 [inline]\n __sock_sendmsg net/socket.c:802 [inline]\n ____sys_sendmsg+0x7da/0x9c0 net/socket.c:2698\n ___sys_sendmsg+0x2a5/0x360 net/socket.c:2752\n __sys_sendmsg net/socket.c:2784 [inline]\n __do_sys_sendmsg net/socket.c:2789 [inline]\n __se_sys_sendmsg net/socket.c:2787 [inline]\n __x64_sys_sendmsg+0x1c3/0x2a0 net/socket.c:2787\n do_syscall_x64 arch/x86/entry/syscall_64.c:63 [inline]\n do_syscall_64+0x15f/0xf80 arch/x86/entry/syscall_64.c:94\n entry_SYSCALL_64_after_hwframe+0x77/0x7f\nRIP: 0033:0x7f6feb62ce59\nCode: ff c3 66 2e 0f 1f 84 00 00 00 00 00 0f 1f 44 00 00 48 89 f8 48 89 f7 48 89 d6 48 89 ca 4d 89 c2 4d 89 c8 4c 8b 4c 24 08 0f 05 <48> 3d 01 f0 ff ff 73 01 c3 48 c7 c1 e8 ff ff ff f7 d8 64 89 01 48\nRSP: 002b:00007f6fe985d028 EFLAGS: 00000246 ORIG_RAX: 000000000000002e\nRAX: ffffffffffffffda RBX: 00007f6feb8a6090 RCX: 00007f6feb62ce59\nRDX: 0000000000000000 RSI: 0000200000000000 RDI: 0000000000000004\nRBP: 00007f6feb6c2d6f R08: 0000000000000000 R09: 0000000000000000\nR10: 0000000000000000 R11: 0000000000000246 R12: 0000000000000000\nR13: 00007f6feb8a6128 R14: 00007f6feb8a6090 R15: 00007ffcf01cc488\n </TASK>",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53354": {
+                "cve_id": "CVE-2026-53354",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\narm64: errata: Mitigate TLBI errata on various Arm CPUs\n\nA number of CPUs developed by Arm suffer from errata whereby a broadcast\nTLBI;DSB sequence may complete before the global observation of writes\nwhich are translated by an affected TLB entry.\n\nThese errata ONLY affect the completion of memory accesses which have\nbeen translated by an invalidated TLB entry, and these errata DO NOT\naffect the actual invalidation of TLB entries. TLB entries are removed\ncorrectly.\n\nThis issue has been assigned CVE ID CVE-2025-10263.\n\nTo mitigate this issue, Arm recommends that software follows any\naffected TLBI;DSB sequence with an additional TLBI;DSB, which will\nensure that all memory write effects affected by the first TLBI have\nbeen globally observed. The additional TLBI can use any operation that\nis broadcast to affected CPUs, and the additional DSB can use any option\nthat is sufficient to complete the additional TLBI.\n\nThe ARM64_WORKAROUND_REPEAT_TLBI workaround is sufficient to mitigate\nthe issue. Enable this workaround for affected CPUs, and update the\nsilicon errata documentation accordingly.\n\nNote that due to the manner in which Arm develops IP and tracks errata,\nsome CPUs share a common erratum number.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65775,11 +65865,113 @@
                     }
                 ]
             },
+            "CVE-2026-53341": {
+                "cve_id": "CVE-2026-53341",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfhandle: fix UAF due to unlocked ->mnt_ns read in may_decode_fh()\n\nmay_decode_fh() accesses mount::mnt_ns without holding any locks; that\nmeans the mount can concurrently be unmounted, and the mnt_namespace can\nconcurrently be freed after an RCU grace period.\n\nThis race can happens as follows, assuming that the mount point was\ncreated by open_tree(..., OPEN_TREE_CLONE):\n\nthread 1            thread 2            RCU\n                    __do_sys_open_by_handle_at\n                      do_handle_open\n                        handle_to_path\n                          may_decode_fh\n                            is_mounted\n                              [mount::mnt_ns access]\n                            [mount::mnt_ns access]\n__do_sys_close\n  fput_close_sync\n    __fput\n      dissolve_on_fput\n        umount_tree\n        class_namespace_excl_destructor\n          namespace_unlock\n            free_mnt_ns\n              mnt_ns_tree_remove\n                call_rcu(mnt_ns_release_rcu)\n                                        mnt_ns_release_rcu\n                                          mnt_ns_release\n                                            kfree\n                            [mnt_namespace::user_ns access] **UAF**\n\nFix it by taking rcu_read_lock() around the mount::mnt_ns access, like\nin __prepend_path().\nAdditionally, document the semantics of mount::mnt_ns, and use WRITE_ONCE()\nfor writers that can race with lockless readers.\n\nThis bug is unreachable unless one of the following is set:\n\n - CONFIG_PREEMPTION\n - CONFIG_RCU_STRICT_GRACE_PERIOD\n\nbecause it requires an RCU grace period to happen during a syscall without\nan explicit preemption.\n\nThis doesn't seem to have interesting security impact; worst-case, it could\nleak the result of an integer comparison to userspace (from the level\ncheck in cap_capable()), cause an endless loop, or crash the kernel by\ndereferencing an invalid address.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53348": {
+                "cve_id": "CVE-2026-53348",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SDCA: fix NULL pointer dereference in sdca_dev_unregister_functions\n\nsdca_dev_unregister_functions() iterates over all SDCA function\ndescriptors and calls sdca_dev_unregister() on each func_dev without\nchecking for NULL. When a function registration has failed partway\nthrough, or the device cleanup races with probe deferral, func_dev\nentries may be NULL, leading to a kernel oops:\n\n  BUG: kernel NULL pointer dereference, address: 0000000000000040\n  RIP: 0010:device_del+0x1e/0x3e0\n  Call Trace:\n   sdca_dev_unregister_functions+0x37/0x60 [snd_soc_sdca]\n   release_nodes+0x35/0xb0\n   devres_release_all+0x90/0x100\n   device_unbind_cleanup+0xe/0x80\n   device_release_driver_internal+0x1c1/0x200\n   bus_remove_device+0xc6/0x130\n   device_del+0x161/0x3e0\n   device_unregister+0x17/0x60\n   sdw_delete_slave+0xb6/0xd0 [soundwire_bus]\n   sdw_bus_master_delete+0x1e/0x50 [soundwire_bus]\n   ...\n   sof_probe_work+0x19/0x30 [snd_sof]\n\nThis was observed on a Lenovo ThinkPad X1 Carbon G14 (Panther Lake)\nwith the SOF audio driver probe failing due to missing Panther Lake\nfirmware, causing the subsequent cleanup of SoundWire devices to\ntrigger the crash.\n\nFix this with three changes:\n\n1) Add a NULL guard in sdca_dev_unregister() so that callers do not\n   need to pre-validate the pointer (defense in depth).\n\n2) In sdca_dev_unregister_functions(), skip NULL func_dev entries\n   and clear func_dev to NULL after unregistration, making the\n   function idempotent and safe against double-invocation.\n\n3) In sdca_dev_register_functions(), roll back all previously\n   registered functions when a later one fails, so the function\n   array is never left in a partially-populated state.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53349": {
+                "cve_id": "CVE-2026-53349",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_conntrack: destroy stale expectfn expectations on unregister\n\nNAT helpers such as nf_nat_h323 store a raw pointer to module text in\nexp->expectfn (e.g. ip_nat_q931_expect). nf_ct_helper_expectfn_unregister()\nonly unlinks the callback descriptor and never walks the expectation table,\nso an expectation pending at module removal survives with a dangling\nexp->expectfn into freed module text.\n\nWhen the expected connection arrives, init_conntrack() invokes\nexp->expectfn(), now a stale pointer into the unloaded module. Reproduced\non a KASAN build by loading the H.323 helpers, creating a Q.931\nexpectation, unloading nf_nat_h323, then connecting to the expected port:\n\n Oops: int3: 0000 [#1] SMP KASAN NOPTI\n RIP: 0010:0xffffffffa06102d1\n  init_conntrack.isra.0 (net/netfilter/nf_conntrack_core.c:1862)\n  nf_conntrack_in (net/netfilter/nf_conntrack_core.c:2049)\n  ipv4_conntrack_local (net/netfilter/nf_conntrack_proto.c:223)\n  nf_hook_slow (net/netfilter/core.c:619)\n  __ip_local_out (net/ipv4/ip_output.c:120)\n  __tcp_transmit_skb (net/ipv4/tcp_output.c:1715)\n  tcp_connect (net/ipv4/tcp_output.c:4374)\n  tcp_v4_connect (net/ipv4/tcp_ipv4.c:345)\n  __sys_connect (net/socket.c:2167)\n Modules linked in: nf_conntrack_h323 [last unloaded: nf_nat_h323]\n\nReaching the dangling state requires CAP_SYS_MODULE in the initial user\nnamespace to remove a NAT helper that still has live expectations, so this\nis a robustness fix; leaving an expectation pointing at freed text is wrong\nregardless.\n\nAdd nf_ct_helper_expectfn_destroy(), which walks the expectation table and\ndrops every expectation whose ->expectfn matches the descriptor being torn\ndown. Call it from each NAT helper's exit path after the existing RCU grace\nperiod, so no expectation outlives the code it points at and no extra\nsynchronize_rcu() is introduced. With the fix, the same reproducer runs to\ncompletion without the Oops.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-53350": {
                 "cve_id": "CVE-2026-53350",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: wm_adsp: Fix NULL dereference when removing firmware controls\n\nIn wm_adsp_control_remove() check that the priv pointer is not NULL\nbefore attempting to cleanup what it points to.\n\nWhen cs_dsp creates a control it calls wm_adsp_control_add_cb() so that\nwm_adsp can create its own private control data. There are two cases\nwhere private data is not created:\n\n1. The control is a SYSTEM control, so an ALSA control is not created.\n\n2. The codec driver has registered a control_add() callback that\n   hides the control, so wm_adsp_control_add() is not called.\n\nWhen cs_dsp_remove destroys its control list it calls\nwm_adsp_control_remove() for each control. But wm_adsp_control_remove()\nwas attempting to cleanup the private data pointed to by cs_ctl->priv\nwithout checking the pointer for NULL.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53352": {
+                "cve_id": "CVE-2026-53352",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsignal: clear JOBCTL_PENDING_MASK for caller in zap_other_threads()\n\nWhen a multi-threaded process receives a stop signal (e.g., SIGSTOP),\ndo_signal_stop() sets JOBCTL_STOP_PENDING and JOBCTL_STOP_CONSUME on all\nthreads and sets signal->group_stop_count to the number of threads. If\none of the threads concurrently calls execve(), de_thread() invokes\nzap_other_threads() to kill all other threads. zap_other_threads()\naborts the pending group stop by resetting signal->group_stop_count to 0\nand clears the JOBCTL_PENDING_MASK for all other threads. However, it\nfails to clear the job control flags for the calling thread.\n\nWhen execve() completes, the calling thread returns to user mode and\nchecks for pending signals. Seeing the stale JOBCTL_STOP_PENDING flag,\nit calls do_signal_stop(), which invokes task_participate_group_stop().\nSince JOBCTL_STOP_CONSUME is still set, it attempts to decrement the\nalready-zero signal->group_stop_count, triggering a warning:\n\nsig->group_stop_count == 0\nWARNING: CPU: 1 PID: 6475 at kernel/signal.c:373\ntask_participate_group_stop+0x215/0x2d0\nCall Trace:\n <TASK>\n do_signal_stop+0x3be/0x5c0 kernel/signal.c:2619\n get_signal+0xa8c/0x1330 kernel/signal.c:2884\n arch_do_signal_or_restart+0xbc/0x840 arch/x86/kernel/signal.c:337\n exit_to_user_mode_loop+0x8c/0x4d0 kernel/entry/common.c:98\n do_syscall_64+0x33e/0xf80 arch/x86/entry/syscall_64.c:100\n entry_SYSCALL_64_after_hwframe+0x77/0x7f\n </TASK>\n\nFix this race condition by clearing the JOBCTL_PENDING_MASK for the\ncalling thread in zap_other_threads(), ensuring it does not retain any\nstale job control state after the thread group is destroyed. This aligns\nwith other functions that tear down a thread group and abort group\nstops, such as zap_process() and complete_signal(), which correctly\nclear these flags for all threads including the current one.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53353": {
+                "cve_id": "CVE-2026-53353",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhsr: Remove WARN_ONCE() in hsr_addr_is_self().\n\nsyzbot reported the warning [0] in hsr_addr_is_self(),\nwhose assumption is simply wrong.\n\nhsr->self_node is cleared in hsr_del_self_node(), which\nis called from hsr_dellink().\n\nSince dev->rtnl_link_ops->dellink() is called before\nunregister_netdevice_many(), there is a window when\nuser can find the device but without hsr->self_node.\n\nLet's remove WARN_ONCE() in hsr_addr_is_self().\n\n[0]:\nHSR: No self node\nWARNING: net/hsr/hsr_framereg.c:39 at hsr_addr_is_self+0x211/0x3f0 net/hsr/hsr_framereg.c:39, CPU#0: syz.4.16848/17220\nModules linked in:\nCPU: 0 UID: 0 PID: 17220 Comm: syz.4.16848 Tainted: G             L      syzkaller #0 PREEMPT_{RT,(full)}\nTainted: [L]=SOFTLOCKUP\nHardware name: Google Google Compute Engine/Google Compute Engine, BIOS Google 04/18/2026\nRIP: 0010:hsr_addr_is_self+0x211/0x3f0 net/hsr/hsr_framereg.c:39\nCode: 33 2f 41 0f b7 dd 89 ee 09 de 31 ff e8 c8 b4 c6 f6 09 dd 74 54 e8 0f b0 c6 f6 31 ed eb 53 e8 06 b0 c6 f6 48 8d 3d 2f 50 9c 04 <67> 48 0f b9 3a 31 ed eb 42 e8 c1 13 1f 00 89 c5 31 ff 89 c6 e8 96\nRSP: 0018:ffffc900041c70e0 EFLAGS: 00010283\nRAX: ffffffff8afdc6ca RBX: ffffffff8afdc4e6 RCX: 0000000000080000\nRDX: ffffc90010493000 RSI: 0000000000000948 RDI: ffffffff8f9a1700\nRBP: 0000000000000001 R08: 0000000000000000 R09: 0000000000000000\nR10: ffffc900041c71e8 R11: fffff52000838e3f R12: dffffc0000000000\nR13: ffff888041f9e3c0 R14: ffff888086ee3802 R15: 0000000000000000\nFS:  00007f6fe985d6c0(0000) GS:ffff888126176000(0000) knlGS:0000000000000000\nCS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\nCR2: 00007f80bd437dac CR3: 0000000025096000 CR4: 00000000003526f0\nDR0: ffffffffffffffff DR1: 00000000000001f8 DR2: 0000000000000002\nDR3: ffffffffefffff15 DR6: 00000000ffff0ff0 DR7: 0000000000000400\nCall Trace:\n <TASK>\n check_local_dest net/hsr/hsr_forward.c:592 [inline]\n fill_frame_info net/hsr/hsr_forward.c:728 [inline]\n hsr_forward_skb+0xa11/0x2a80 net/hsr/hsr_forward.c:739\n hsr_dev_xmit+0x253/0x370 net/hsr/hsr_device.c:236\n __netdev_start_xmit include/linux/netdevice.h:5368 [inline]\n netdev_start_xmit include/linux/netdevice.h:5377 [inline]\n xmit_one net/core/dev.c:3888 [inline]\n dev_hard_start_xmit+0x2df/0x860 net/core/dev.c:3904\n __dev_queue_xmit+0x1428/0x3900 net/core/dev.c:4870\n neigh_output include/net/neighbour.h:556 [inline]\n ip_finish_output2+0xcec/0x10b0 net/ipv4/ip_output.c:237\n ip_send_skb net/ipv4/ip_output.c:1510 [inline]\n ip_push_pending_frames+0x8b/0x110 net/ipv4/ip_output.c:1530\n raw_sendmsg+0x1547/0x1a50 net/ipv4/raw.c:659\n sock_sendmsg_nosec net/socket.c:787 [inline]\n __sock_sendmsg net/socket.c:802 [inline]\n ____sys_sendmsg+0x7da/0x9c0 net/socket.c:2698\n ___sys_sendmsg+0x2a5/0x360 net/socket.c:2752\n __sys_sendmsg net/socket.c:2784 [inline]\n __do_sys_sendmsg net/socket.c:2789 [inline]\n __se_sys_sendmsg net/socket.c:2787 [inline]\n __x64_sys_sendmsg+0x1c3/0x2a0 net/socket.c:2787\n do_syscall_x64 arch/x86/entry/syscall_64.c:63 [inline]\n do_syscall_64+0x15f/0xf80 arch/x86/entry/syscall_64.c:94\n entry_SYSCALL_64_after_hwframe+0x77/0x7f\nRIP: 0033:0x7f6feb62ce59\nCode: ff c3 66 2e 0f 1f 84 00 00 00 00 00 0f 1f 44 00 00 48 89 f8 48 89 f7 48 89 d6 48 89 ca 4d 89 c2 4d 89 c8 4c 8b 4c 24 08 0f 05 <48> 3d 01 f0 ff ff 73 01 c3 48 c7 c1 e8 ff ff ff f7 d8 64 89 01 48\nRSP: 002b:00007f6fe985d028 EFLAGS: 00000246 ORIG_RAX: 000000000000002e\nRAX: ffffffffffffffda RBX: 00007f6feb8a6090 RCX: 00007f6feb62ce59\nRDX: 0000000000000000 RSI: 0000200000000000 RDI: 0000000000000004\nRBP: 00007f6feb6c2d6f R08: 0000000000000000 R09: 0000000000000000\nR10: 0000000000000000 R11: 0000000000000246 R12: 0000000000000000\nR13: 00007f6feb8a6128 R14: 00007f6feb8a6090 R15: 00007ffcf01cc488\n </TASK>",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53354": {
+                "cve_id": "CVE-2026-53354",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\narm64: errata: Mitigate TLBI errata on various Arm CPUs\n\nA number of CPUs developed by Arm suffer from errata whereby a broadcast\nTLBI;DSB sequence may complete before the global observation of writes\nwhich are translated by an affected TLB entry.\n\nThese errata ONLY affect the completion of memory accesses which have\nbeen translated by an invalidated TLB entry, and these errata DO NOT\naffect the actual invalidation of TLB entries. TLB entries are removed\ncorrectly.\n\nThis issue has been assigned CVE ID CVE-2025-10263.\n\nTo mitigate this issue, Arm recommends that software follows any\naffected TLBI;DSB sequence with an additional TLBI;DSB, which will\nensure that all memory write effects affected by the first TLBI have\nbeen globally observed. The additional TLBI can use any operation that\nis broadcast to affected CPUs, and the additional DSB can use any option\nthat is sufficient to complete the additional TLBI.\n\nThe ARM64_WORKAROUND_REPEAT_TLBI workaround is sufficient to mitigate\nthe issue. Enable this workaround for affected CPUs, and update the\nsilicon errata documentation accordingly.\n\nNote that due to the manner in which Arm develops IP and tracks errata,\nsome CPUs share a common erratum number.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -100287,11 +100479,113 @@
                     }
                 ]
             },
+            "CVE-2026-53341": {
+                "cve_id": "CVE-2026-53341",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfhandle: fix UAF due to unlocked ->mnt_ns read in may_decode_fh()\n\nmay_decode_fh() accesses mount::mnt_ns without holding any locks; that\nmeans the mount can concurrently be unmounted, and the mnt_namespace can\nconcurrently be freed after an RCU grace period.\n\nThis race can happens as follows, assuming that the mount point was\ncreated by open_tree(..., OPEN_TREE_CLONE):\n\nthread 1            thread 2            RCU\n                    __do_sys_open_by_handle_at\n                      do_handle_open\n                        handle_to_path\n                          may_decode_fh\n                            is_mounted\n                              [mount::mnt_ns access]\n                            [mount::mnt_ns access]\n__do_sys_close\n  fput_close_sync\n    __fput\n      dissolve_on_fput\n        umount_tree\n        class_namespace_excl_destructor\n          namespace_unlock\n            free_mnt_ns\n              mnt_ns_tree_remove\n                call_rcu(mnt_ns_release_rcu)\n                                        mnt_ns_release_rcu\n                                          mnt_ns_release\n                                            kfree\n                            [mnt_namespace::user_ns access] **UAF**\n\nFix it by taking rcu_read_lock() around the mount::mnt_ns access, like\nin __prepend_path().\nAdditionally, document the semantics of mount::mnt_ns, and use WRITE_ONCE()\nfor writers that can race with lockless readers.\n\nThis bug is unreachable unless one of the following is set:\n\n - CONFIG_PREEMPTION\n - CONFIG_RCU_STRICT_GRACE_PERIOD\n\nbecause it requires an RCU grace period to happen during a syscall without\nan explicit preemption.\n\nThis doesn't seem to have interesting security impact; worst-case, it could\nleak the result of an integer comparison to userspace (from the level\ncheck in cap_capable()), cause an endless loop, or crash the kernel by\ndereferencing an invalid address.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53348": {
+                "cve_id": "CVE-2026-53348",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SDCA: fix NULL pointer dereference in sdca_dev_unregister_functions\n\nsdca_dev_unregister_functions() iterates over all SDCA function\ndescriptors and calls sdca_dev_unregister() on each func_dev without\nchecking for NULL. When a function registration has failed partway\nthrough, or the device cleanup races with probe deferral, func_dev\nentries may be NULL, leading to a kernel oops:\n\n  BUG: kernel NULL pointer dereference, address: 0000000000000040\n  RIP: 0010:device_del+0x1e/0x3e0\n  Call Trace:\n   sdca_dev_unregister_functions+0x37/0x60 [snd_soc_sdca]\n   release_nodes+0x35/0xb0\n   devres_release_all+0x90/0x100\n   device_unbind_cleanup+0xe/0x80\n   device_release_driver_internal+0x1c1/0x200\n   bus_remove_device+0xc6/0x130\n   device_del+0x161/0x3e0\n   device_unregister+0x17/0x60\n   sdw_delete_slave+0xb6/0xd0 [soundwire_bus]\n   sdw_bus_master_delete+0x1e/0x50 [soundwire_bus]\n   ...\n   sof_probe_work+0x19/0x30 [snd_sof]\n\nThis was observed on a Lenovo ThinkPad X1 Carbon G14 (Panther Lake)\nwith the SOF audio driver probe failing due to missing Panther Lake\nfirmware, causing the subsequent cleanup of SoundWire devices to\ntrigger the crash.\n\nFix this with three changes:\n\n1) Add a NULL guard in sdca_dev_unregister() so that callers do not\n   need to pre-validate the pointer (defense in depth).\n\n2) In sdca_dev_unregister_functions(), skip NULL func_dev entries\n   and clear func_dev to NULL after unregistration, making the\n   function idempotent and safe against double-invocation.\n\n3) In sdca_dev_register_functions(), roll back all previously\n   registered functions when a later one fails, so the function\n   array is never left in a partially-populated state.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53349": {
+                "cve_id": "CVE-2026-53349",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_conntrack: destroy stale expectfn expectations on unregister\n\nNAT helpers such as nf_nat_h323 store a raw pointer to module text in\nexp->expectfn (e.g. ip_nat_q931_expect). nf_ct_helper_expectfn_unregister()\nonly unlinks the callback descriptor and never walks the expectation table,\nso an expectation pending at module removal survives with a dangling\nexp->expectfn into freed module text.\n\nWhen the expected connection arrives, init_conntrack() invokes\nexp->expectfn(), now a stale pointer into the unloaded module. Reproduced\non a KASAN build by loading the H.323 helpers, creating a Q.931\nexpectation, unloading nf_nat_h323, then connecting to the expected port:\n\n Oops: int3: 0000 [#1] SMP KASAN NOPTI\n RIP: 0010:0xffffffffa06102d1\n  init_conntrack.isra.0 (net/netfilter/nf_conntrack_core.c:1862)\n  nf_conntrack_in (net/netfilter/nf_conntrack_core.c:2049)\n  ipv4_conntrack_local (net/netfilter/nf_conntrack_proto.c:223)\n  nf_hook_slow (net/netfilter/core.c:619)\n  __ip_local_out (net/ipv4/ip_output.c:120)\n  __tcp_transmit_skb (net/ipv4/tcp_output.c:1715)\n  tcp_connect (net/ipv4/tcp_output.c:4374)\n  tcp_v4_connect (net/ipv4/tcp_ipv4.c:345)\n  __sys_connect (net/socket.c:2167)\n Modules linked in: nf_conntrack_h323 [last unloaded: nf_nat_h323]\n\nReaching the dangling state requires CAP_SYS_MODULE in the initial user\nnamespace to remove a NAT helper that still has live expectations, so this\nis a robustness fix; leaving an expectation pointing at freed text is wrong\nregardless.\n\nAdd nf_ct_helper_expectfn_destroy(), which walks the expectation table and\ndrops every expectation whose ->expectfn matches the descriptor being torn\ndown. Call it from each NAT helper's exit path after the existing RCU grace\nperiod, so no expectation outlives the code it points at and no extra\nsynchronize_rcu() is introduced. With the fix, the same reproducer runs to\ncompletion without the Oops.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-53350": {
                 "cve_id": "CVE-2026-53350",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: wm_adsp: Fix NULL dereference when removing firmware controls\n\nIn wm_adsp_control_remove() check that the priv pointer is not NULL\nbefore attempting to cleanup what it points to.\n\nWhen cs_dsp creates a control it calls wm_adsp_control_add_cb() so that\nwm_adsp can create its own private control data. There are two cases\nwhere private data is not created:\n\n1. The control is a SYSTEM control, so an ALSA control is not created.\n\n2. The codec driver has registered a control_add() callback that\n   hides the control, so wm_adsp_control_add() is not called.\n\nWhen cs_dsp_remove destroys its control list it calls\nwm_adsp_control_remove() for each control. But wm_adsp_control_remove()\nwas attempting to cleanup the private data pointed to by cs_ctl->priv\nwithout checking the pointer for NULL.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53352": {
+                "cve_id": "CVE-2026-53352",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsignal: clear JOBCTL_PENDING_MASK for caller in zap_other_threads()\n\nWhen a multi-threaded process receives a stop signal (e.g., SIGSTOP),\ndo_signal_stop() sets JOBCTL_STOP_PENDING and JOBCTL_STOP_CONSUME on all\nthreads and sets signal->group_stop_count to the number of threads. If\none of the threads concurrently calls execve(), de_thread() invokes\nzap_other_threads() to kill all other threads. zap_other_threads()\naborts the pending group stop by resetting signal->group_stop_count to 0\nand clears the JOBCTL_PENDING_MASK for all other threads. However, it\nfails to clear the job control flags for the calling thread.\n\nWhen execve() completes, the calling thread returns to user mode and\nchecks for pending signals. Seeing the stale JOBCTL_STOP_PENDING flag,\nit calls do_signal_stop(), which invokes task_participate_group_stop().\nSince JOBCTL_STOP_CONSUME is still set, it attempts to decrement the\nalready-zero signal->group_stop_count, triggering a warning:\n\nsig->group_stop_count == 0\nWARNING: CPU: 1 PID: 6475 at kernel/signal.c:373\ntask_participate_group_stop+0x215/0x2d0\nCall Trace:\n <TASK>\n do_signal_stop+0x3be/0x5c0 kernel/signal.c:2619\n get_signal+0xa8c/0x1330 kernel/signal.c:2884\n arch_do_signal_or_restart+0xbc/0x840 arch/x86/kernel/signal.c:337\n exit_to_user_mode_loop+0x8c/0x4d0 kernel/entry/common.c:98\n do_syscall_64+0x33e/0xf80 arch/x86/entry/syscall_64.c:100\n entry_SYSCALL_64_after_hwframe+0x77/0x7f\n </TASK>\n\nFix this race condition by clearing the JOBCTL_PENDING_MASK for the\ncalling thread in zap_other_threads(), ensuring it does not retain any\nstale job control state after the thread group is destroyed. This aligns\nwith other functions that tear down a thread group and abort group\nstops, such as zap_process() and complete_signal(), which correctly\nclear these flags for all threads including the current one.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53353": {
+                "cve_id": "CVE-2026-53353",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhsr: Remove WARN_ONCE() in hsr_addr_is_self().\n\nsyzbot reported the warning [0] in hsr_addr_is_self(),\nwhose assumption is simply wrong.\n\nhsr->self_node is cleared in hsr_del_self_node(), which\nis called from hsr_dellink().\n\nSince dev->rtnl_link_ops->dellink() is called before\nunregister_netdevice_many(), there is a window when\nuser can find the device but without hsr->self_node.\n\nLet's remove WARN_ONCE() in hsr_addr_is_self().\n\n[0]:\nHSR: No self node\nWARNING: net/hsr/hsr_framereg.c:39 at hsr_addr_is_self+0x211/0x3f0 net/hsr/hsr_framereg.c:39, CPU#0: syz.4.16848/17220\nModules linked in:\nCPU: 0 UID: 0 PID: 17220 Comm: syz.4.16848 Tainted: G             L      syzkaller #0 PREEMPT_{RT,(full)}\nTainted: [L]=SOFTLOCKUP\nHardware name: Google Google Compute Engine/Google Compute Engine, BIOS Google 04/18/2026\nRIP: 0010:hsr_addr_is_self+0x211/0x3f0 net/hsr/hsr_framereg.c:39\nCode: 33 2f 41 0f b7 dd 89 ee 09 de 31 ff e8 c8 b4 c6 f6 09 dd 74 54 e8 0f b0 c6 f6 31 ed eb 53 e8 06 b0 c6 f6 48 8d 3d 2f 50 9c 04 <67> 48 0f b9 3a 31 ed eb 42 e8 c1 13 1f 00 89 c5 31 ff 89 c6 e8 96\nRSP: 0018:ffffc900041c70e0 EFLAGS: 00010283\nRAX: ffffffff8afdc6ca RBX: ffffffff8afdc4e6 RCX: 0000000000080000\nRDX: ffffc90010493000 RSI: 0000000000000948 RDI: ffffffff8f9a1700\nRBP: 0000000000000001 R08: 0000000000000000 R09: 0000000000000000\nR10: ffffc900041c71e8 R11: fffff52000838e3f R12: dffffc0000000000\nR13: ffff888041f9e3c0 R14: ffff888086ee3802 R15: 0000000000000000\nFS:  00007f6fe985d6c0(0000) GS:ffff888126176000(0000) knlGS:0000000000000000\nCS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\nCR2: 00007f80bd437dac CR3: 0000000025096000 CR4: 00000000003526f0\nDR0: ffffffffffffffff DR1: 00000000000001f8 DR2: 0000000000000002\nDR3: ffffffffefffff15 DR6: 00000000ffff0ff0 DR7: 0000000000000400\nCall Trace:\n <TASK>\n check_local_dest net/hsr/hsr_forward.c:592 [inline]\n fill_frame_info net/hsr/hsr_forward.c:728 [inline]\n hsr_forward_skb+0xa11/0x2a80 net/hsr/hsr_forward.c:739\n hsr_dev_xmit+0x253/0x370 net/hsr/hsr_device.c:236\n __netdev_start_xmit include/linux/netdevice.h:5368 [inline]\n netdev_start_xmit include/linux/netdevice.h:5377 [inline]\n xmit_one net/core/dev.c:3888 [inline]\n dev_hard_start_xmit+0x2df/0x860 net/core/dev.c:3904\n __dev_queue_xmit+0x1428/0x3900 net/core/dev.c:4870\n neigh_output include/net/neighbour.h:556 [inline]\n ip_finish_output2+0xcec/0x10b0 net/ipv4/ip_output.c:237\n ip_send_skb net/ipv4/ip_output.c:1510 [inline]\n ip_push_pending_frames+0x8b/0x110 net/ipv4/ip_output.c:1530\n raw_sendmsg+0x1547/0x1a50 net/ipv4/raw.c:659\n sock_sendmsg_nosec net/socket.c:787 [inline]\n __sock_sendmsg net/socket.c:802 [inline]\n ____sys_sendmsg+0x7da/0x9c0 net/socket.c:2698\n ___sys_sendmsg+0x2a5/0x360 net/socket.c:2752\n __sys_sendmsg net/socket.c:2784 [inline]\n __do_sys_sendmsg net/socket.c:2789 [inline]\n __se_sys_sendmsg net/socket.c:2787 [inline]\n __x64_sys_sendmsg+0x1c3/0x2a0 net/socket.c:2787\n do_syscall_x64 arch/x86/entry/syscall_64.c:63 [inline]\n do_syscall_64+0x15f/0xf80 arch/x86/entry/syscall_64.c:94\n entry_SYSCALL_64_after_hwframe+0x77/0x7f\nRIP: 0033:0x7f6feb62ce59\nCode: ff c3 66 2e 0f 1f 84 00 00 00 00 00 0f 1f 44 00 00 48 89 f8 48 89 f7 48 89 d6 48 89 ca 4d 89 c2 4d 89 c8 4c 8b 4c 24 08 0f 05 <48> 3d 01 f0 ff ff 73 01 c3 48 c7 c1 e8 ff ff ff f7 d8 64 89 01 48\nRSP: 002b:00007f6fe985d028 EFLAGS: 00000246 ORIG_RAX: 000000000000002e\nRAX: ffffffffffffffda RBX: 00007f6feb8a6090 RCX: 00007f6feb62ce59\nRDX: 0000000000000000 RSI: 0000200000000000 RDI: 0000000000000004\nRBP: 00007f6feb6c2d6f R08: 0000000000000000 R09: 0000000000000000\nR10: 0000000000000000 R11: 0000000000000246 R12: 0000000000000000\nR13: 00007f6feb8a6128 R14: 00007f6feb8a6090 R15: 00007ffcf01cc488\n </TASK>",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53354": {
+                "cve_id": "CVE-2026-53354",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\narm64: errata: Mitigate TLBI errata on various Arm CPUs\n\nA number of CPUs developed by Arm suffer from errata whereby a broadcast\nTLBI;DSB sequence may complete before the global observation of writes\nwhich are translated by an affected TLB entry.\n\nThese errata ONLY affect the completion of memory accesses which have\nbeen translated by an invalidated TLB entry, and these errata DO NOT\naffect the actual invalidation of TLB entries. TLB entries are removed\ncorrectly.\n\nThis issue has been assigned CVE ID CVE-2025-10263.\n\nTo mitigate this issue, Arm recommends that software follows any\naffected TLBI;DSB sequence with an additional TLBI;DSB, which will\nensure that all memory write effects affected by the first TLBI have\nbeen globally observed. The additional TLBI can use any operation that\nis broadcast to affected CPUs, and the additional DSB can use any option\nthat is sufficient to complete the additional TLBI.\n\nThe ARM64_WORKAROUND_REPEAT_TLBI workaround is sufficient to mitigate\nthe issue. Enable this workaround for affected CPUs, and update the\nsilicon errata documentation accordingly.\n\nNote that due to the manner in which Arm develops IP and tracks errata,\nsome CPUs share a common erratum number.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
