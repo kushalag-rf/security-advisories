@@ -17297,23 +17297,6 @@
                     }
                 ]
             },
-            "CVE-2026-23002": {
-                "cve_id": "CVE-2026-23002",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nlib/buildid: use __kernel_read() for sleepable context\n\nPrevent a \"BUG: unable to handle kernel NULL pointer dereference in\nfilemap_read_folio\".\n\nFor the sleepable context, convert freader to use __kernel_read() instead\nof direct page cache access via read_cache_folio().  This simplifies the\nfaultable code path by using the standard kernel file reading interface\nwhich handles all the complexity of reading file data.\n\nAt the moment we are not changing the code for non-sleepable context which\nuses filemap_get_folio() and only succeeds if the target folios are\nalready in memory and up-to-date.  The reason is to keep the patch simple\nand easier to backport to stable kernels.\n\nSyzbot repro does not crash the kernel anymore and the selftests run\nsuccessfully.\n\nIn the follow up we will make __kernel_read() with IOCB_NOWAIT work for\nnon-sleepable contexts.  In addition, I would like to replace the\nsecretmem check with a more generic approach and will add fstest for the\nbuildid code.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-23003": {
                 "cve_id": "CVE-2026-23003",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -27283,23 +27266,6 @@
                     }
                 ]
             },
-            "CVE-2026-43503": {
-                "cve_id": "CVE-2026-43503",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: skbuff: propagate shared-frag marker through frag-transfer helpers\n\nTwo frag-transfer helpers (__pskb_copy_fclone() and skb_shift()) fail\nto propagate the SKBFL_SHARED_FRAG bit in skb_shinfo()->flags when\nmoving frags from source to destination.  __pskb_copy_fclone() defers\nthe rest of the shinfo metadata to skb_copy_header() after copying\nfrag descriptors, but that helper only carries over gso_{size,segs,\ntype} and never touches skb_shinfo()->flags; skb_shift() moves frag\ndescriptors directly and leaves flags untouched.  As a result, the\ndestination skb keeps a reference to the same externally-owned or\npage-cache-backed pages while reporting skb_has_shared_frag() as\nfalse.\n\nThe mismatch is harmful in any in-place writer that uses\nskb_has_shared_frag() to decide whether shared pages must be detoured\nthrough skb_cow_data().  ESP input is one such writer (esp4.c,\nesp6.c), and a single nft 'dup to <local>' rule -- or any other\nnf_dup_ipv4() / xt_TEE caller -- is enough to land a pskb_copy()'d\nskb in esp_input() with the marker stripped, letting an unprivileged\nuser write into the page cache of a root-owned read-only file via\nauthencesn-ESN stray writes.\n\nSet SKBFL_SHARED_FRAG on the destination whenever frag descriptors\nwere actually moved from the source.  skb_copy() and skb_copy_expand()\nshare skb_copy_header() too but linearize all paged data into freshly\nallocated head storage and emerge with nr_frags == 0, so\nskb_has_shared_frag() returns false on its own; they need no change.\n\nThe same omission exists in skb_gro_receive() and skb_gro_receive_list().\nThe former moves the incoming skb's frag descriptors into the\naccumulator's last sub-skb via two paths (a direct frag-move loop and\nthe head_frag + memcpy path); the latter chains the incoming skb whole\nonto p's frag_list.  Downstream skb_segment() reads only\nskb_shinfo(p)->flags, and skb_segment_list() reuses each sub-skb's\nshinfo as the nskb -- both p and lp must carry the marker.\n\nThe same omission also exists in tcp_clone_payload(), which builds an\nMTU probe skb by moving frag descriptors from skbs on sk_write_queue\ninto a freshly allocated nskb.  The helper falls into the same family\nand warrants the same fix for consistency; no TCP TX-side in-place\nwriter is currently known to reach a user page through this gap, but\na future consumer depending on the marker would regress silently.\n\nThe same omission exists in skb_segment(): the per-iteration flag\nmerge takes only head_skb's flag, and the inner switch that rebinds\nfrag_skb to list_skb on head_skb-frags exhaustion does not fold the\nnew frag_skb's flag into nskb.  Fold frag_skb's flag at both sites\nso segments drawing frags from frag_list members carry the marker.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-45834": {
                 "cve_id": "CVE-2026-45834",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -33438,7 +33404,7 @@
                 "cve_id": "CVE-2026-53196",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nUSB: serial: io_ti: fix heap overflow in get_manuf_info()\n\nget_manuf_info() reads le16_to_cpu(rom_desc->Size) bytes from the\ndevice I2C EEPROM into a buffer allocated with kmalloc_obj(), which\nis sizeof(struct edge_ti_manuf_descriptor) = 10 bytes.\n\nThe Size field comes from the device and is only validated (in\ncheck_i2c_image()) to make sure the descriptor fits within\nTI_MAX_I2C_SIZE (16384 bytes), not against the destination buffer size.\nA malicious USB device can therefore set Size to any value up to 16377,\ncausing a heap overflow of up to 16367 bytes when plugged into a host\nrunning this driver.\n\nvalid_csum() is called after read_rom() and also iterates\nbuffer[0..Size-1], compounding the out-of-bounds access.\n\nFix by rejecting descriptors with unexpected length before calling\nread_rom().\n\n[ johan: amend commit message; also check for short descriptors ]",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -34543,6 +34509,57 @@
                 "cve_id": "CVE-2026-53324",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mana: Use pci_name() for debugfs directory naming\n\nUse pci_name(pdev) for the per-device debugfs directory instead of\nhardcoded \"0\" for PFs and pci_slot_name(pdev->slot) for VFs. The\nprevious approach had two issues:\n\n1. pci_slot_name() dereferences pdev->slot, which can be NULL for VFs\n   in environments like generic VFIO passthrough or nested KVM,\n   causing a NULL pointer dereference.\n\n2. Multiple PFs would all use \"0\", and VFs across different PCI\n   domains or buses could share the same slot name, leading to\n   -EEXIST errors from debugfs_create_dir().\n\npci_name(pdev) returns the unique BDF address, is always valid, and is\nunique across the system.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53327": {
+                "cve_id": "CVE-2026-53327",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndebugobjects: Do not fill_pool() if pi_blocked_on\n\nOn RT enabled kernels, fill_pool() ends up calling rtlock_lock(), which\nasserts if current::pi_blocked_on is set, because a task can obviously only\nblock on one lock as otherwise the priority inheritenace chain gets\ncorrupted.\n\nPrevent this by expanding the conditional to take current::pi_blocked_on\ninto account.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53337": {
+                "cve_id": "CVE-2026-53337",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: bonding: fix NULL pointer dereference in bond_do_ioctl()\n\nIn bond_do_ioctl(), slave_dev is obtained via __dev_get_by_name() which\ncan return NULL if the requested interface name does not exist. However,\nthe subsequent slave_dbg() call is placed before the NULL check:\n\n    slave_dev = __dev_get_by_name(net, ifr->ifr_slave);\n    slave_dbg(bond_dev, slave_dev, \"slave_dev=%p:\\n\", slave_dev); //here\n    if (!slave_dev)\n        return -ENODEV;\n\nThe slave_dbg() macro expands to netdev_dbg(bond_dev, \"(slave %s): \" fmt,\n(slave_dev)->name, ...) which unconditionally dereferences slave_dev->name\nbefore the NULL check is performed. This results in a NULL pointer\ndereference kernel oops when a user calls bonding ioctl (e.g.\nSIOCBONDENSLAVE, SIOCBONDRELEASE, etc.) with a non-existent slave\ninterface name.\n\nThis is reachable from userspace via the bonding ioctl interface with\nCAP_NET_ADMIN capability, making it a potential local denial-of-service\nvector.\n\nFix by moving the slave_dbg() call after the NULL check.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53350": {
+                "cve_id": "CVE-2026-53350",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: wm_adsp: Fix NULL dereference when removing firmware controls\n\nIn wm_adsp_control_remove() check that the priv pointer is not NULL\nbefore attempting to cleanup what it points to.\n\nWhen cs_dsp creates a control it calls wm_adsp_control_add_cb() so that\nwm_adsp can create its own private control data. There are two cases\nwhere private data is not created:\n\n1. The control is a SYSTEM control, so an ALSA control is not created.\n\n2. The codec driver has registered a control_add() callback that\n   hides the control, so wm_adsp_control_add() is not called.\n\nWhen cs_dsp_remove destroys its control list it calls\nwm_adsp_control_remove() for each control. But wm_adsp_control_remove()\nwas attempting to cleanup the private data pointed to by cs_ctl->priv\nwithout checking the pointer for NULL.",
                 "severity": "LOW",
                 "status": "open",
                 "events": [
@@ -51877,23 +51894,6 @@
                     }
                 ]
             },
-            "CVE-2026-23002": {
-                "cve_id": "CVE-2026-23002",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nlib/buildid: use __kernel_read() for sleepable context\n\nPrevent a \"BUG: unable to handle kernel NULL pointer dereference in\nfilemap_read_folio\".\n\nFor the sleepable context, convert freader to use __kernel_read() instead\nof direct page cache access via read_cache_folio().  This simplifies the\nfaultable code path by using the standard kernel file reading interface\nwhich handles all the complexity of reading file data.\n\nAt the moment we are not changing the code for non-sleepable context which\nuses filemap_get_folio() and only succeeds if the target folios are\nalready in memory and up-to-date.  The reason is to keep the patch simple\nand easier to backport to stable kernels.\n\nSyzbot repro does not crash the kernel anymore and the selftests run\nsuccessfully.\n\nIn the follow up we will make __kernel_read() with IOCB_NOWAIT work for\nnon-sleepable contexts.  In addition, I would like to replace the\nsecretmem check with a more generic approach and will add fstest for the\nbuildid code.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-23003": {
                 "cve_id": "CVE-2026-23003",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -61863,23 +61863,6 @@
                     }
                 ]
             },
-            "CVE-2026-43503": {
-                "cve_id": "CVE-2026-43503",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: skbuff: propagate shared-frag marker through frag-transfer helpers\n\nTwo frag-transfer helpers (__pskb_copy_fclone() and skb_shift()) fail\nto propagate the SKBFL_SHARED_FRAG bit in skb_shinfo()->flags when\nmoving frags from source to destination.  __pskb_copy_fclone() defers\nthe rest of the shinfo metadata to skb_copy_header() after copying\nfrag descriptors, but that helper only carries over gso_{size,segs,\ntype} and never touches skb_shinfo()->flags; skb_shift() moves frag\ndescriptors directly and leaves flags untouched.  As a result, the\ndestination skb keeps a reference to the same externally-owned or\npage-cache-backed pages while reporting skb_has_shared_frag() as\nfalse.\n\nThe mismatch is harmful in any in-place writer that uses\nskb_has_shared_frag() to decide whether shared pages must be detoured\nthrough skb_cow_data().  ESP input is one such writer (esp4.c,\nesp6.c), and a single nft 'dup to <local>' rule -- or any other\nnf_dup_ipv4() / xt_TEE caller -- is enough to land a pskb_copy()'d\nskb in esp_input() with the marker stripped, letting an unprivileged\nuser write into the page cache of a root-owned read-only file via\nauthencesn-ESN stray writes.\n\nSet SKBFL_SHARED_FRAG on the destination whenever frag descriptors\nwere actually moved from the source.  skb_copy() and skb_copy_expand()\nshare skb_copy_header() too but linearize all paged data into freshly\nallocated head storage and emerge with nr_frags == 0, so\nskb_has_shared_frag() returns false on its own; they need no change.\n\nThe same omission exists in skb_gro_receive() and skb_gro_receive_list().\nThe former moves the incoming skb's frag descriptors into the\naccumulator's last sub-skb via two paths (a direct frag-move loop and\nthe head_frag + memcpy path); the latter chains the incoming skb whole\nonto p's frag_list.  Downstream skb_segment() reads only\nskb_shinfo(p)->flags, and skb_segment_list() reuses each sub-skb's\nshinfo as the nskb -- both p and lp must carry the marker.\n\nThe same omission also exists in tcp_clone_payload(), which builds an\nMTU probe skb by moving frag descriptors from skbs on sk_write_queue\ninto a freshly allocated nskb.  The helper falls into the same family\nand warrants the same fix for consistency; no TCP TX-side in-place\nwriter is currently known to reach a user page through this gap, but\na future consumer depending on the marker would regress silently.\n\nThe same omission exists in skb_segment(): the per-iteration flag\nmerge takes only head_skb's flag, and the inner switch that rebinds\nfrag_skb to list_skb on head_skb-frags exhaustion does not fold the\nnew frag_skb's flag into nskb.  Fold frag_skb's flag at both sites\nso segments drawing frags from frag_list members carry the marker.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-45834": {
                 "cve_id": "CVE-2026-45834",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -68018,7 +68001,7 @@
                 "cve_id": "CVE-2026-53196",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nUSB: serial: io_ti: fix heap overflow in get_manuf_info()\n\nget_manuf_info() reads le16_to_cpu(rom_desc->Size) bytes from the\ndevice I2C EEPROM into a buffer allocated with kmalloc_obj(), which\nis sizeof(struct edge_ti_manuf_descriptor) = 10 bytes.\n\nThe Size field comes from the device and is only validated (in\ncheck_i2c_image()) to make sure the descriptor fits within\nTI_MAX_I2C_SIZE (16384 bytes), not against the destination buffer size.\nA malicious USB device can therefore set Size to any value up to 16377,\ncausing a heap overflow of up to 16367 bytes when plugged into a host\nrunning this driver.\n\nvalid_csum() is called after read_rom() and also iterates\nbuffer[0..Size-1], compounding the out-of-bounds access.\n\nFix by rejecting descriptors with unexpected length before calling\nread_rom().\n\n[ johan: amend commit message; also check for short descriptors ]",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -69123,6 +69106,57 @@
                 "cve_id": "CVE-2026-53324",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mana: Use pci_name() for debugfs directory naming\n\nUse pci_name(pdev) for the per-device debugfs directory instead of\nhardcoded \"0\" for PFs and pci_slot_name(pdev->slot) for VFs. The\nprevious approach had two issues:\n\n1. pci_slot_name() dereferences pdev->slot, which can be NULL for VFs\n   in environments like generic VFIO passthrough or nested KVM,\n   causing a NULL pointer dereference.\n\n2. Multiple PFs would all use \"0\", and VFs across different PCI\n   domains or buses could share the same slot name, leading to\n   -EEXIST errors from debugfs_create_dir().\n\npci_name(pdev) returns the unique BDF address, is always valid, and is\nunique across the system.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53327": {
+                "cve_id": "CVE-2026-53327",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndebugobjects: Do not fill_pool() if pi_blocked_on\n\nOn RT enabled kernels, fill_pool() ends up calling rtlock_lock(), which\nasserts if current::pi_blocked_on is set, because a task can obviously only\nblock on one lock as otherwise the priority inheritenace chain gets\ncorrupted.\n\nPrevent this by expanding the conditional to take current::pi_blocked_on\ninto account.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53337": {
+                "cve_id": "CVE-2026-53337",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: bonding: fix NULL pointer dereference in bond_do_ioctl()\n\nIn bond_do_ioctl(), slave_dev is obtained via __dev_get_by_name() which\ncan return NULL if the requested interface name does not exist. However,\nthe subsequent slave_dbg() call is placed before the NULL check:\n\n    slave_dev = __dev_get_by_name(net, ifr->ifr_slave);\n    slave_dbg(bond_dev, slave_dev, \"slave_dev=%p:\\n\", slave_dev); //here\n    if (!slave_dev)\n        return -ENODEV;\n\nThe slave_dbg() macro expands to netdev_dbg(bond_dev, \"(slave %s): \" fmt,\n(slave_dev)->name, ...) which unconditionally dereferences slave_dev->name\nbefore the NULL check is performed. This results in a NULL pointer\ndereference kernel oops when a user calls bonding ioctl (e.g.\nSIOCBONDENSLAVE, SIOCBONDRELEASE, etc.) with a non-existent slave\ninterface name.\n\nThis is reachable from userspace via the bonding ioctl interface with\nCAP_NET_ADMIN capability, making it a potential local denial-of-service\nvector.\n\nFix by moving the slave_dbg() call after the NULL check.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-53350": {
+                "cve_id": "CVE-2026-53350",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: wm_adsp: Fix NULL dereference when removing firmware controls\n\nIn wm_adsp_control_remove() check that the priv pointer is not NULL\nbefore attempting to cleanup what it points to.\n\nWhen cs_dsp creates a control it calls wm_adsp_control_add_cb() so that\nwm_adsp can create its own private control data. There are two cases\nwhere private data is not created:\n\n1. The control is a SYSTEM control, so an ALSA control is not created.\n\n2. The codec driver has registered a control_add() callback that\n   hides the control, so wm_adsp_control_add() is not called.\n\nWhen cs_dsp_remove destroys its control list it calls\nwm_adsp_control_remove() for each control. But wm_adsp_control_remove()\nwas attempting to cleanup the private data pointed to by cs_ctl->priv\nwithout checking the pointer for NULL.",
                 "severity": "LOW",
                 "status": "open",
                 "events": [
