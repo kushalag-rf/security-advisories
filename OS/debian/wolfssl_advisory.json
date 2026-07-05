@@ -911,10 +911,15 @@
                 "title": "Out-of-bounds write in the Renesas TSIP TLS 1.3 transcript buffer ...",
                 "description": "Out-of-bounds write in the Renesas TSIP TLS 1.3 transcript buffer. In tsip_StoreMessage() the capacity check guarding the fixed message bag (MSGBAG_SIZE) sets an error code but fails to return, so execution falls through to an XMEMCPY that writes past the end of the buffer once the accumulated TLS 1.3 handshake transcript exceeds MSGBAG_SIZE (8 KB), corrupting adjacent heap state and potentially causing a remote denial of service crash. The bag is sized to hold a normal handshake, so this is reached only by an unusually large but valid certificate chain, or by a malicious or man-in-the-middle server sending an oversized handshake message to a client that does not strictly verify the chain. This only affects builds using the Renesas TSIP TLS port (WOLFSSL_RENESAS_TSIP_TLS) as a TLS 1.3 client on Renesas MCUs with TSIP hardware enabled, and is rated High within those builds. All other configurations are unaffected.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -923,10 +928,15 @@
                 "title": "Un-negotiated Raw Public Key (RFC 7250) accepted in place of an X ...",
                 "description": "Un-negotiated Raw Public Key (RFC 7250) accepted in place of an X.509 certificate, bypassing chain validation. A raw public key has no chain, so ParseCertRelative() accepts it without performing any trust verification; it must therefore only be accepted when RPK was actually negotiated for that peer. The check now defaults the expected type to X.509 (per RFC 7250/8446) when no type was negotiated, comparing against the received server certificate type on the client and the selected client certificate type on the server, and rejects any mismatch, including an un-negotiated raw public key, with UNSUPPORTED_CERTIFICATE. Only affects builds with Raw Public Key support (HAVE_RPK) enabled - disabled by default in a standalone build, but included in --enable-all.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -935,10 +945,15 @@
                 "title": "wolfSSL_PKCS7_verify() returning success for a degenerate (certs- ...",
                 "description": "wolfSSL_PKCS7_verify() returning success for a degenerate (certs-only) PKCS#7 object that contains no signer. Such an object has empty signerInfos, so the underlying signed-data verification succeeds without authenticating any content. The compatibility-layer verify path now rejects the object when no signer signature has actually been verified, so a PKCS#7 carrying no valid signature is no longer reported as verified. This is enforced regardless of the PKCS7_NOVERIFY flag, which only suppresses signer certificate chain validation and was never intended to waive the requirement that a signature exist. Only affects OpenSSL compatibility builds that call the PKCS7_verify() compatibility API on potentially degenerate PKCS#7 bundles.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -947,10 +962,15 @@
                 "title": "TLS 1.3 post-handshake authentication (PHA) issue where a server  ...",
                 "description": "TLS 1.3 post-handshake authentication (PHA) issue where a server could accept a client's Finished message without the client having sent a Certificate and CertificateVerify. The post-handshake-auth exemption that allows an empty/absent peer certificate was only intended for the initial handshake, but it was also being applied while a post-handshake CertificateRequest was still outstanding. The check is now scoped to the initial handshake only: on the server, once a post-handshake CertificateRequest has been sent (certReqCtx is set), a peer certificate and a valid CertificateVerify are required again before the Finished is accepted, with empty-certificate handling following the configured verify mode (FAIL_IF_NO_PEER_CERT) just as during first-handshake client authentication. Only affects TLS 1.3 servers built with post-handshake authentication support (WOLFSSL_POST_HANDSHAKE_AUTH / --enable-postauth, included in --enable-all) that enable WOLFSSL_VERIFY_POST_HANDSHAKE and request a client certificate after the handshake via wolfSSL_request_certificate(). Clients, and servers that do not use post-handshake authentication, are unaffected.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -959,10 +979,15 @@
                 "title": "Chain intermediate CA:TRUE without keyCertSign accepted as a sign ...",
                 "description": "Chain intermediate CA:TRUE without keyCertSign accepted as a signing CA. Intermediate CA certificates are required to have the keyCertSign key usage when a Key Usage extension is present, but chain-supplied temporary CAs (WOLFSSL_TEMP_CA) added while building a certificate path were previously exempted from this check, so an intermediate asserting CA:TRUE but lacking keyCertSign was accepted as a signing CA. The check now applies to chain-supplied temporary CAs as well; only operator-loaded root certificates (WOLFSSL_USER_CA) and self-signed roots remain exempt. Per RFC 5280 an absent Key Usage extension implies all usages, so the requirement is enforced only when the extension is actually present (extKeyUsageSet). Affects the OpenSSL-compatibility certificate-path-building path (X509_verify_cert / X509_STORE, OPENSSL_EXTRA/OPENSSL_ALL), where untrusted chain intermediates are added as temporary CAs; native (non-OpenSSL-compat) certificate verification does not create temporary CAs and is unaffected. Within those builds, the check applies unless ALLOW_INVALID_CERTSIGN is defined.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -971,10 +996,15 @@
                 "title": "AES-GCM encryption/decryption with extremely large cumulative sin ...",
                 "description": "AES-GCM encryption/decryption with extremely large cumulative single message sizes (>64 GiB) were not properly rejected by the streaming APIs, allowing counter wrap, keystream reuse, and consequent plaintext recovery.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1017,10 +1047,15 @@
                 "title": "Partial-chain certificate verification may accept chains that ter ...",
                 "description": "Partial-chain certificate verification may accept chains that terminate at a peer-supplied, untrusted intermediate certificate rather than a trusted anchor. An attacker could present a chain that ends at an intermediate they control and have it accepted as valid. This affects the OpenSSL compatibility certificate-path-building path (wolfSSL_X509_verify_cert / X509_STORE, OPENSSL_EXTRA) when the X509_V_FLAG_PARTIAL_CHAIN verify flag is enabled.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1029,10 +1064,15 @@
                 "title": "When HAVE_ENCRYPT_THEN_MAC is configured, the implementation coul ...",
                 "description": "When HAVE_ENCRYPT_THEN_MAC is configured, the implementation could fall back to MAC-then-Encrypt rather than enforcing Encrypt-then-MAC.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1041,10 +1081,15 @@
                 "title": "Heap buffer overread in wc_PKCS7_DecodeEnvelopedData when parsing ...",
                 "description": "Heap buffer overread in wc_PKCS7_DecodeEnvelopedData when parsing crafted PKCS7 EnvelopedData. This could theoretically be triggered by attacker-supplied data delivered via S/MIME or CMS.",
                 "severity": "CRITICAL",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1053,10 +1098,15 @@
                 "title": "Bleichenbacher padding oracle in PKCS#7 KTRI decryption. When dec ...",
                 "description": "Bleichenbacher padding oracle in PKCS#7 KTRI decryption. When decrypting PKCS#7 EnvelopedData using RSA PKCS#1 v1.5 key transport, wolfSSL returned distinguishable error codes depending on whether RSA padding validation failed versus whether the decrypted content was malformed. An attacker able to submit crafted EnvelopedData messages and observe error responses could use this as a padding oracle to incrementally recover the encrypted Content Encryption Key (CEK). The fix generates a deterministic pseudo-random fake CEK on padding failure (via HMAC-SHA256) and proceeds with decryption identically, using constant-time operations throughout, so that all failure paths produce the same error regardless of padding validity.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1065,10 +1115,15 @@
                 "title": "Out-of-bounds write in SetSuitesHashSigAlgo when processing an ov ...",
                 "description": "Out-of-bounds write in SetSuitesHashSigAlgo when processing an oversized signature algorithms list, allowing a write past the bounds of the destination buffer.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1077,10 +1132,15 @@
                 "title": "PKCS#12 MAC verification uses an attacker-controlled comparison l ...",
                 "description": "PKCS#12 MAC verification uses an attacker-controlled comparison length, weakening the integrity check on the MAC and allowing a mismatched MAC to be accepted. The PKCS#12 verify path compared the locally computed HMAC against the MAC parsed from the PKCS#12 structure using a length taken directly from the attacker-supplied input, without first verifying that it equals the length of the digest actually produced by the configured algorithm. A truncated or zero-length stored MAC could therefore be accepted, defeating the integrity protection of the MAC.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1089,10 +1149,15 @@
                 "title": "The ML-KEM ARM64 NEON ciphertext comparison only compares half of ...",
                 "description": "The ML-KEM ARM64 NEON ciphertext comparison only compares half of the input, breaking the Fujisaki-Okamoto transform's implicit rejection and weakening IND-CCA2 security on that code path. The constant-time comparison effectively ignored part of the re-encrypted ciphertext, so a decapsulating party could fail to detect a manipulated ciphertext and proceed without the standard's required implicit rejection.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1101,10 +1166,15 @@
                 "title": "HMAC zero-length tag forgery in EVP_DigestVerifyFinal, where a ze ...",
                 "description": "HMAC zero-length tag forgery in EVP_DigestVerifyFinal, where a zero-length tag could be accepted as valid during HMAC verification. In the OpenSSL-compatibility HMAC verify path the supplied signature length was only checked as not exceeding the MAC length, so a zero-length or otherwise truncated tag could pass verification. The fix requires the supplied tag length to exactly equal the MAC length and rejects a zero-length MAC, so a forged short or empty tag is no longer accepted.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1113,10 +1183,15 @@
                 "title": "Certificate policy and RFC 8446 compliance concerns regarding the ...",
                 "description": "Certificate policy and RFC 8446 compliance concerns regarding the continued acceptance of SHA-1/MD5 in certificate processing.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1125,10 +1200,15 @@
                 "title": "A CRL critical extension bypass exists in ParseCRL_Extensions whe ...",
                 "description": "A CRL critical extension bypass exists in ParseCRL_Extensions where critical extensions are not properly enforced, allowing a crafted CRL with an unhandled critical extension to be accepted. This only affects builds with CRL support enabled and where a crafted CRL had a trusted signature when parsed.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1137,10 +1217,15 @@
                 "title": "Integer underflow in wc_PKCS7_DecryptOri when handling crafted Ot ...",
                 "description": "Integer underflow in wc_PKCS7_DecryptOri when handling crafted Other Recipient Info, leading to incorrect length handling during decryption.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1153,11 +1238,11 @@
                 "events": [
                     {
                         "introduced": "0:5.5.4-2+deb12u2",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     },
                     {
                         "introduced": "0:5.7.2-0.1",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1170,11 +1255,11 @@
                 "events": [
                     {
                         "introduced": "0:5.5.4-2+deb12u2",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     },
                     {
                         "introduced": "0:5.7.2-0.1",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1183,10 +1268,15 @@
                 "title": "X.509 name constraint bypass via the Subject Common Name when tre ...",
                 "description": "X.509 name constraint bypass via the Subject Common Name when treated as a DNS-type name. A certificate whose Subject CN violates an issuing CA's DNS name constraints could be accepted.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1195,10 +1285,15 @@
                 "title": "PKCS7_verify signer confusion allows forged signatures, where the ...",
                 "description": "PKCS7_verify signer confusion allows forged signatures, where the signer associated with a signature is not correctly bound, permitting a forged signature to be accepted.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1207,10 +1302,15 @@
                 "title": "Use-after-free in PQC hybrid key-share handling. This is an incom ...",
                 "description": "Use-after-free in PQC hybrid key-share handling. This is an incomplete-fix follow-up to CVE-2026-5460 (released in 5.9.1): a malicious TLS 1.3 server sending a truncated PQC hybrid KeyShare can still trigger the error cleanup path to operate on freed memory.",
                 "severity": "CRITICAL",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1219,10 +1319,15 @@
                 "title": "iPAddress name constraints bypass when WOLFSSL_IP_ALT_NAME is not ...",
                 "description": "iPAddress name constraints bypass when WOLFSSL_IP_ALT_NAME is not defined. IP address name constraints are not enforced in that configuration, allowing a certificate to bypass an issuing CA's IP address constraints.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -1231,10 +1336,15 @@
                 "title": "wc_Blake2bHmacFinal and wc_Blake2sHmacFinal discard the message w ...",
                 "description": "wc_Blake2bHmacFinal and wc_Blake2sHmacFinal discard the message when the key length exceeds the block size, producing a MAC that is independent of the input. When the supplied key is longer than the BLAKE2 block size the key-hashing branch reinitialized the running hash state, discarding the accumulated message data, so the resulting MAC depended only on the key and not on the message being authenticated. This bug is specific to the HMAC-BLAKE2 APIs that were added in wolfSSL version 5.9.0.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             }
@@ -2149,10 +2259,15 @@
                 "title": "Out-of-bounds write in the Renesas TSIP TLS 1.3 transcript buffer ...",
                 "description": "Out-of-bounds write in the Renesas TSIP TLS 1.3 transcript buffer. In tsip_StoreMessage() the capacity check guarding the fixed message bag (MSGBAG_SIZE) sets an error code but fails to return, so execution falls through to an XMEMCPY that writes past the end of the buffer once the accumulated TLS 1.3 handshake transcript exceeds MSGBAG_SIZE (8 KB), corrupting adjacent heap state and potentially causing a remote denial of service crash. The bag is sized to hold a normal handshake, so this is reached only by an unusually large but valid certificate chain, or by a malicious or man-in-the-middle server sending an oversized handshake message to a client that does not strictly verify the chain. This only affects builds using the Renesas TSIP TLS port (WOLFSSL_RENESAS_TSIP_TLS) as a TLS 1.3 client on Renesas MCUs with TSIP hardware enabled, and is rated High within those builds. All other configurations are unaffected.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2161,10 +2276,15 @@
                 "title": "Un-negotiated Raw Public Key (RFC 7250) accepted in place of an X ...",
                 "description": "Un-negotiated Raw Public Key (RFC 7250) accepted in place of an X.509 certificate, bypassing chain validation. A raw public key has no chain, so ParseCertRelative() accepts it without performing any trust verification; it must therefore only be accepted when RPK was actually negotiated for that peer. The check now defaults the expected type to X.509 (per RFC 7250/8446) when no type was negotiated, comparing against the received server certificate type on the client and the selected client certificate type on the server, and rejects any mismatch, including an un-negotiated raw public key, with UNSUPPORTED_CERTIFICATE. Only affects builds with Raw Public Key support (HAVE_RPK) enabled - disabled by default in a standalone build, but included in --enable-all.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2173,10 +2293,15 @@
                 "title": "wolfSSL_PKCS7_verify() returning success for a degenerate (certs- ...",
                 "description": "wolfSSL_PKCS7_verify() returning success for a degenerate (certs-only) PKCS#7 object that contains no signer. Such an object has empty signerInfos, so the underlying signed-data verification succeeds without authenticating any content. The compatibility-layer verify path now rejects the object when no signer signature has actually been verified, so a PKCS#7 carrying no valid signature is no longer reported as verified. This is enforced regardless of the PKCS7_NOVERIFY flag, which only suppresses signer certificate chain validation and was never intended to waive the requirement that a signature exist. Only affects OpenSSL compatibility builds that call the PKCS7_verify() compatibility API on potentially degenerate PKCS#7 bundles.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2185,10 +2310,15 @@
                 "title": "TLS 1.3 post-handshake authentication (PHA) issue where a server  ...",
                 "description": "TLS 1.3 post-handshake authentication (PHA) issue where a server could accept a client's Finished message without the client having sent a Certificate and CertificateVerify. The post-handshake-auth exemption that allows an empty/absent peer certificate was only intended for the initial handshake, but it was also being applied while a post-handshake CertificateRequest was still outstanding. The check is now scoped to the initial handshake only: on the server, once a post-handshake CertificateRequest has been sent (certReqCtx is set), a peer certificate and a valid CertificateVerify are required again before the Finished is accepted, with empty-certificate handling following the configured verify mode (FAIL_IF_NO_PEER_CERT) just as during first-handshake client authentication. Only affects TLS 1.3 servers built with post-handshake authentication support (WOLFSSL_POST_HANDSHAKE_AUTH / --enable-postauth, included in --enable-all) that enable WOLFSSL_VERIFY_POST_HANDSHAKE and request a client certificate after the handshake via wolfSSL_request_certificate(). Clients, and servers that do not use post-handshake authentication, are unaffected.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2197,10 +2327,15 @@
                 "title": "Chain intermediate CA:TRUE without keyCertSign accepted as a sign ...",
                 "description": "Chain intermediate CA:TRUE without keyCertSign accepted as a signing CA. Intermediate CA certificates are required to have the keyCertSign key usage when a Key Usage extension is present, but chain-supplied temporary CAs (WOLFSSL_TEMP_CA) added while building a certificate path were previously exempted from this check, so an intermediate asserting CA:TRUE but lacking keyCertSign was accepted as a signing CA. The check now applies to chain-supplied temporary CAs as well; only operator-loaded root certificates (WOLFSSL_USER_CA) and self-signed roots remain exempt. Per RFC 5280 an absent Key Usage extension implies all usages, so the requirement is enforced only when the extension is actually present (extKeyUsageSet). Affects the OpenSSL-compatibility certificate-path-building path (X509_verify_cert / X509_STORE, OPENSSL_EXTRA/OPENSSL_ALL), where untrusted chain intermediates are added as temporary CAs; native (non-OpenSSL-compat) certificate verification does not create temporary CAs and is unaffected. Within those builds, the check applies unless ALLOW_INVALID_CERTSIGN is defined.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2209,10 +2344,15 @@
                 "title": "AES-GCM encryption/decryption with extremely large cumulative sin ...",
                 "description": "AES-GCM encryption/decryption with extremely large cumulative single message sizes (>64 GiB) were not properly rejected by the streaming APIs, allowing counter wrap, keystream reuse, and consequent plaintext recovery.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2255,10 +2395,15 @@
                 "title": "Partial-chain certificate verification may accept chains that ter ...",
                 "description": "Partial-chain certificate verification may accept chains that terminate at a peer-supplied, untrusted intermediate certificate rather than a trusted anchor. An attacker could present a chain that ends at an intermediate they control and have it accepted as valid. This affects the OpenSSL compatibility certificate-path-building path (wolfSSL_X509_verify_cert / X509_STORE, OPENSSL_EXTRA) when the X509_V_FLAG_PARTIAL_CHAIN verify flag is enabled.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2267,10 +2412,15 @@
                 "title": "When HAVE_ENCRYPT_THEN_MAC is configured, the implementation coul ...",
                 "description": "When HAVE_ENCRYPT_THEN_MAC is configured, the implementation could fall back to MAC-then-Encrypt rather than enforcing Encrypt-then-MAC.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2279,10 +2429,15 @@
                 "title": "Heap buffer overread in wc_PKCS7_DecodeEnvelopedData when parsing ...",
                 "description": "Heap buffer overread in wc_PKCS7_DecodeEnvelopedData when parsing crafted PKCS7 EnvelopedData. This could theoretically be triggered by attacker-supplied data delivered via S/MIME or CMS.",
                 "severity": "CRITICAL",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2291,10 +2446,15 @@
                 "title": "Bleichenbacher padding oracle in PKCS#7 KTRI decryption. When dec ...",
                 "description": "Bleichenbacher padding oracle in PKCS#7 KTRI decryption. When decrypting PKCS#7 EnvelopedData using RSA PKCS#1 v1.5 key transport, wolfSSL returned distinguishable error codes depending on whether RSA padding validation failed versus whether the decrypted content was malformed. An attacker able to submit crafted EnvelopedData messages and observe error responses could use this as a padding oracle to incrementally recover the encrypted Content Encryption Key (CEK). The fix generates a deterministic pseudo-random fake CEK on padding failure (via HMAC-SHA256) and proceeds with decryption identically, using constant-time operations throughout, so that all failure paths produce the same error regardless of padding validity.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2303,10 +2463,15 @@
                 "title": "Out-of-bounds write in SetSuitesHashSigAlgo when processing an ov ...",
                 "description": "Out-of-bounds write in SetSuitesHashSigAlgo when processing an oversized signature algorithms list, allowing a write past the bounds of the destination buffer.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2315,10 +2480,15 @@
                 "title": "PKCS#12 MAC verification uses an attacker-controlled comparison l ...",
                 "description": "PKCS#12 MAC verification uses an attacker-controlled comparison length, weakening the integrity check on the MAC and allowing a mismatched MAC to be accepted. The PKCS#12 verify path compared the locally computed HMAC against the MAC parsed from the PKCS#12 structure using a length taken directly from the attacker-supplied input, without first verifying that it equals the length of the digest actually produced by the configured algorithm. A truncated or zero-length stored MAC could therefore be accepted, defeating the integrity protection of the MAC.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2327,10 +2497,15 @@
                 "title": "The ML-KEM ARM64 NEON ciphertext comparison only compares half of ...",
                 "description": "The ML-KEM ARM64 NEON ciphertext comparison only compares half of the input, breaking the Fujisaki-Okamoto transform's implicit rejection and weakening IND-CCA2 security on that code path. The constant-time comparison effectively ignored part of the re-encrypted ciphertext, so a decapsulating party could fail to detect a manipulated ciphertext and proceed without the standard's required implicit rejection.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2339,10 +2514,15 @@
                 "title": "HMAC zero-length tag forgery in EVP_DigestVerifyFinal, where a ze ...",
                 "description": "HMAC zero-length tag forgery in EVP_DigestVerifyFinal, where a zero-length tag could be accepted as valid during HMAC verification. In the OpenSSL-compatibility HMAC verify path the supplied signature length was only checked as not exceeding the MAC length, so a zero-length or otherwise truncated tag could pass verification. The fix requires the supplied tag length to exactly equal the MAC length and rejects a zero-length MAC, so a forged short or empty tag is no longer accepted.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2351,10 +2531,15 @@
                 "title": "Certificate policy and RFC 8446 compliance concerns regarding the ...",
                 "description": "Certificate policy and RFC 8446 compliance concerns regarding the continued acceptance of SHA-1/MD5 in certificate processing.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2363,10 +2548,15 @@
                 "title": "A CRL critical extension bypass exists in ParseCRL_Extensions whe ...",
                 "description": "A CRL critical extension bypass exists in ParseCRL_Extensions where critical extensions are not properly enforced, allowing a crafted CRL with an unhandled critical extension to be accepted. This only affects builds with CRL support enabled and where a crafted CRL had a trusted signature when parsed.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2375,10 +2565,15 @@
                 "title": "Integer underflow in wc_PKCS7_DecryptOri when handling crafted Ot ...",
                 "description": "Integer underflow in wc_PKCS7_DecryptOri when handling crafted Other Recipient Info, leading to incorrect length handling during decryption.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2391,11 +2586,11 @@
                 "events": [
                     {
                         "introduced": "0:5.5.4-2+deb12u2",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     },
                     {
                         "introduced": "0:5.7.2-0.1",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2408,11 +2603,11 @@
                 "events": [
                     {
                         "introduced": "0:5.5.4-2+deb12u2",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     },
                     {
                         "introduced": "0:5.7.2-0.1",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2421,10 +2616,15 @@
                 "title": "X.509 name constraint bypass via the Subject Common Name when tre ...",
                 "description": "X.509 name constraint bypass via the Subject Common Name when treated as a DNS-type name. A certificate whose Subject CN violates an issuing CA's DNS name constraints could be accepted.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2433,10 +2633,15 @@
                 "title": "PKCS7_verify signer confusion allows forged signatures, where the ...",
                 "description": "PKCS7_verify signer confusion allows forged signatures, where the signer associated with a signature is not correctly bound, permitting a forged signature to be accepted.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2445,10 +2650,15 @@
                 "title": "Use-after-free in PQC hybrid key-share handling. This is an incom ...",
                 "description": "Use-after-free in PQC hybrid key-share handling. This is an incomplete-fix follow-up to CVE-2026-5460 (released in 5.9.1): a malicious TLS 1.3 server sending a truncated PQC hybrid KeyShare can still trigger the error cleanup path to operate on freed memory.",
                 "severity": "CRITICAL",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2457,10 +2667,15 @@
                 "title": "iPAddress name constraints bypass when WOLFSSL_IP_ALT_NAME is not ...",
                 "description": "iPAddress name constraints bypass when WOLFSSL_IP_ALT_NAME is not defined. IP address name constraints are not enforced in that configuration, allowing a certificate to bypass an issuing CA's IP address constraints.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -2469,10 +2684,15 @@
                 "title": "wc_Blake2bHmacFinal and wc_Blake2sHmacFinal discard the message w ...",
                 "description": "wc_Blake2bHmacFinal and wc_Blake2sHmacFinal discard the message when the key length exceeds the block size, producing a MAC that is independent of the input. When the supplied key is longer than the BLAKE2 block size the key-hashing branch reinitialized the running hash state, discarding the accumulated message data, so the resulting MAC depended only on the key and not on the message being authenticated. This bug is specific to the HMAC-BLAKE2 APIs that were added in wolfSSL version 5.9.0.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             }
@@ -3387,10 +3607,15 @@
                 "title": "Out-of-bounds write in the Renesas TSIP TLS 1.3 transcript buffer ...",
                 "description": "Out-of-bounds write in the Renesas TSIP TLS 1.3 transcript buffer. In tsip_StoreMessage() the capacity check guarding the fixed message bag (MSGBAG_SIZE) sets an error code but fails to return, so execution falls through to an XMEMCPY that writes past the end of the buffer once the accumulated TLS 1.3 handshake transcript exceeds MSGBAG_SIZE (8 KB), corrupting adjacent heap state and potentially causing a remote denial of service crash. The bag is sized to hold a normal handshake, so this is reached only by an unusually large but valid certificate chain, or by a malicious or man-in-the-middle server sending an oversized handshake message to a client that does not strictly verify the chain. This only affects builds using the Renesas TSIP TLS port (WOLFSSL_RENESAS_TSIP_TLS) as a TLS 1.3 client on Renesas MCUs with TSIP hardware enabled, and is rated High within those builds. All other configurations are unaffected.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3399,10 +3624,15 @@
                 "title": "Un-negotiated Raw Public Key (RFC 7250) accepted in place of an X ...",
                 "description": "Un-negotiated Raw Public Key (RFC 7250) accepted in place of an X.509 certificate, bypassing chain validation. A raw public key has no chain, so ParseCertRelative() accepts it without performing any trust verification; it must therefore only be accepted when RPK was actually negotiated for that peer. The check now defaults the expected type to X.509 (per RFC 7250/8446) when no type was negotiated, comparing against the received server certificate type on the client and the selected client certificate type on the server, and rejects any mismatch, including an un-negotiated raw public key, with UNSUPPORTED_CERTIFICATE. Only affects builds with Raw Public Key support (HAVE_RPK) enabled - disabled by default in a standalone build, but included in --enable-all.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3411,10 +3641,15 @@
                 "title": "wolfSSL_PKCS7_verify() returning success for a degenerate (certs- ...",
                 "description": "wolfSSL_PKCS7_verify() returning success for a degenerate (certs-only) PKCS#7 object that contains no signer. Such an object has empty signerInfos, so the underlying signed-data verification succeeds without authenticating any content. The compatibility-layer verify path now rejects the object when no signer signature has actually been verified, so a PKCS#7 carrying no valid signature is no longer reported as verified. This is enforced regardless of the PKCS7_NOVERIFY flag, which only suppresses signer certificate chain validation and was never intended to waive the requirement that a signature exist. Only affects OpenSSL compatibility builds that call the PKCS7_verify() compatibility API on potentially degenerate PKCS#7 bundles.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3423,10 +3658,15 @@
                 "title": "TLS 1.3 post-handshake authentication (PHA) issue where a server  ...",
                 "description": "TLS 1.3 post-handshake authentication (PHA) issue where a server could accept a client's Finished message without the client having sent a Certificate and CertificateVerify. The post-handshake-auth exemption that allows an empty/absent peer certificate was only intended for the initial handshake, but it was also being applied while a post-handshake CertificateRequest was still outstanding. The check is now scoped to the initial handshake only: on the server, once a post-handshake CertificateRequest has been sent (certReqCtx is set), a peer certificate and a valid CertificateVerify are required again before the Finished is accepted, with empty-certificate handling following the configured verify mode (FAIL_IF_NO_PEER_CERT) just as during first-handshake client authentication. Only affects TLS 1.3 servers built with post-handshake authentication support (WOLFSSL_POST_HANDSHAKE_AUTH / --enable-postauth, included in --enable-all) that enable WOLFSSL_VERIFY_POST_HANDSHAKE and request a client certificate after the handshake via wolfSSL_request_certificate(). Clients, and servers that do not use post-handshake authentication, are unaffected.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3435,10 +3675,15 @@
                 "title": "Chain intermediate CA:TRUE without keyCertSign accepted as a sign ...",
                 "description": "Chain intermediate CA:TRUE without keyCertSign accepted as a signing CA. Intermediate CA certificates are required to have the keyCertSign key usage when a Key Usage extension is present, but chain-supplied temporary CAs (WOLFSSL_TEMP_CA) added while building a certificate path were previously exempted from this check, so an intermediate asserting CA:TRUE but lacking keyCertSign was accepted as a signing CA. The check now applies to chain-supplied temporary CAs as well; only operator-loaded root certificates (WOLFSSL_USER_CA) and self-signed roots remain exempt. Per RFC 5280 an absent Key Usage extension implies all usages, so the requirement is enforced only when the extension is actually present (extKeyUsageSet). Affects the OpenSSL-compatibility certificate-path-building path (X509_verify_cert / X509_STORE, OPENSSL_EXTRA/OPENSSL_ALL), where untrusted chain intermediates are added as temporary CAs; native (non-OpenSSL-compat) certificate verification does not create temporary CAs and is unaffected. Within those builds, the check applies unless ALLOW_INVALID_CERTSIGN is defined.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3447,10 +3692,15 @@
                 "title": "AES-GCM encryption/decryption with extremely large cumulative sin ...",
                 "description": "AES-GCM encryption/decryption with extremely large cumulative single message sizes (>64 GiB) were not properly rejected by the streaming APIs, allowing counter wrap, keystream reuse, and consequent plaintext recovery.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3493,10 +3743,15 @@
                 "title": "Partial-chain certificate verification may accept chains that ter ...",
                 "description": "Partial-chain certificate verification may accept chains that terminate at a peer-supplied, untrusted intermediate certificate rather than a trusted anchor. An attacker could present a chain that ends at an intermediate they control and have it accepted as valid. This affects the OpenSSL compatibility certificate-path-building path (wolfSSL_X509_verify_cert / X509_STORE, OPENSSL_EXTRA) when the X509_V_FLAG_PARTIAL_CHAIN verify flag is enabled.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3505,10 +3760,15 @@
                 "title": "When HAVE_ENCRYPT_THEN_MAC is configured, the implementation coul ...",
                 "description": "When HAVE_ENCRYPT_THEN_MAC is configured, the implementation could fall back to MAC-then-Encrypt rather than enforcing Encrypt-then-MAC.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3517,10 +3777,15 @@
                 "title": "Heap buffer overread in wc_PKCS7_DecodeEnvelopedData when parsing ...",
                 "description": "Heap buffer overread in wc_PKCS7_DecodeEnvelopedData when parsing crafted PKCS7 EnvelopedData. This could theoretically be triggered by attacker-supplied data delivered via S/MIME or CMS.",
                 "severity": "CRITICAL",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3529,10 +3794,15 @@
                 "title": "Bleichenbacher padding oracle in PKCS#7 KTRI decryption. When dec ...",
                 "description": "Bleichenbacher padding oracle in PKCS#7 KTRI decryption. When decrypting PKCS#7 EnvelopedData using RSA PKCS#1 v1.5 key transport, wolfSSL returned distinguishable error codes depending on whether RSA padding validation failed versus whether the decrypted content was malformed. An attacker able to submit crafted EnvelopedData messages and observe error responses could use this as a padding oracle to incrementally recover the encrypted Content Encryption Key (CEK). The fix generates a deterministic pseudo-random fake CEK on padding failure (via HMAC-SHA256) and proceeds with decryption identically, using constant-time operations throughout, so that all failure paths produce the same error regardless of padding validity.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3541,10 +3811,15 @@
                 "title": "Out-of-bounds write in SetSuitesHashSigAlgo when processing an ov ...",
                 "description": "Out-of-bounds write in SetSuitesHashSigAlgo when processing an oversized signature algorithms list, allowing a write past the bounds of the destination buffer.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3553,10 +3828,15 @@
                 "title": "PKCS#12 MAC verification uses an attacker-controlled comparison l ...",
                 "description": "PKCS#12 MAC verification uses an attacker-controlled comparison length, weakening the integrity check on the MAC and allowing a mismatched MAC to be accepted. The PKCS#12 verify path compared the locally computed HMAC against the MAC parsed from the PKCS#12 structure using a length taken directly from the attacker-supplied input, without first verifying that it equals the length of the digest actually produced by the configured algorithm. A truncated or zero-length stored MAC could therefore be accepted, defeating the integrity protection of the MAC.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3565,10 +3845,15 @@
                 "title": "The ML-KEM ARM64 NEON ciphertext comparison only compares half of ...",
                 "description": "The ML-KEM ARM64 NEON ciphertext comparison only compares half of the input, breaking the Fujisaki-Okamoto transform's implicit rejection and weakening IND-CCA2 security on that code path. The constant-time comparison effectively ignored part of the re-encrypted ciphertext, so a decapsulating party could fail to detect a manipulated ciphertext and proceed without the standard's required implicit rejection.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3577,10 +3862,15 @@
                 "title": "HMAC zero-length tag forgery in EVP_DigestVerifyFinal, where a ze ...",
                 "description": "HMAC zero-length tag forgery in EVP_DigestVerifyFinal, where a zero-length tag could be accepted as valid during HMAC verification. In the OpenSSL-compatibility HMAC verify path the supplied signature length was only checked as not exceeding the MAC length, so a zero-length or otherwise truncated tag could pass verification. The fix requires the supplied tag length to exactly equal the MAC length and rejects a zero-length MAC, so a forged short or empty tag is no longer accepted.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3589,10 +3879,15 @@
                 "title": "Certificate policy and RFC 8446 compliance concerns regarding the ...",
                 "description": "Certificate policy and RFC 8446 compliance concerns regarding the continued acceptance of SHA-1/MD5 in certificate processing.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3601,10 +3896,15 @@
                 "title": "A CRL critical extension bypass exists in ParseCRL_Extensions whe ...",
                 "description": "A CRL critical extension bypass exists in ParseCRL_Extensions where critical extensions are not properly enforced, allowing a crafted CRL with an unhandled critical extension to be accepted. This only affects builds with CRL support enabled and where a crafted CRL had a trusted signature when parsed.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3613,10 +3913,15 @@
                 "title": "Integer underflow in wc_PKCS7_DecryptOri when handling crafted Ot ...",
                 "description": "Integer underflow in wc_PKCS7_DecryptOri when handling crafted Other Recipient Info, leading to incorrect length handling during decryption.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3629,11 +3934,11 @@
                 "events": [
                     {
                         "introduced": "0:5.5.4-2+deb12u2",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     },
                     {
                         "introduced": "0:5.7.2-0.1",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3646,11 +3951,11 @@
                 "events": [
                     {
                         "introduced": "0:5.5.4-2+deb12u2",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     },
                     {
                         "introduced": "0:5.7.2-0.1",
-                        "fixed": "0:5.9.1-0.1"
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3659,10 +3964,15 @@
                 "title": "X.509 name constraint bypass via the Subject Common Name when tre ...",
                 "description": "X.509 name constraint bypass via the Subject Common Name when treated as a DNS-type name. A certificate whose Subject CN violates an issuing CA's DNS name constraints could be accepted.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3671,10 +3981,15 @@
                 "title": "PKCS7_verify signer confusion allows forged signatures, where the ...",
                 "description": "PKCS7_verify signer confusion allows forged signatures, where the signer associated with a signature is not correctly bound, permitting a forged signature to be accepted.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3683,10 +3998,15 @@
                 "title": "Use-after-free in PQC hybrid key-share handling. This is an incom ...",
                 "description": "Use-after-free in PQC hybrid key-share handling. This is an incomplete-fix follow-up to CVE-2026-5460 (released in 5.9.1): a malicious TLS 1.3 server sending a truncated PQC hybrid KeyShare can still trigger the error cleanup path to operate on freed memory.",
                 "severity": "CRITICAL",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3695,10 +4015,15 @@
                 "title": "iPAddress name constraints bypass when WOLFSSL_IP_ALT_NAME is not ...",
                 "description": "iPAddress name constraints bypass when WOLFSSL_IP_ALT_NAME is not defined. IP address name constraints are not enforced in that configuration, allowing a certificate to bypass an issuing CA's IP address constraints.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             },
@@ -3707,10 +4032,15 @@
                 "title": "wc_Blake2bHmacFinal and wc_Blake2sHmacFinal discard the message w ...",
                 "description": "wc_Blake2bHmacFinal and wc_Blake2sHmacFinal discard the message when the key length exceeds the block size, producing a MAC that is independent of the input. When the supplied key is longer than the BLAKE2 block size the key-hashing branch reinitialized the running hash state, discarding the accumulated message data, so the resulting MAC depended only on the key and not on the message being authenticated. This bug is specific to the HMAC-BLAKE2 APIs that were added in wolfSSL version 5.9.0.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.5.4-2+deb12u2"
+                        "introduced": "0:5.5.4-2+deb12u2",
+                        "fixed": "0:5.9.2-1"
+                    },
+                    {
+                        "introduced": "0:5.7.2-0.1",
+                        "fixed": "0:5.9.2-1"
                     }
                 ]
             }
