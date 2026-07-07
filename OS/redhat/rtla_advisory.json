@@ -32805,7 +32805,7 @@
                 "cve_id": "CVE-2026-53129",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfs/mbcache: cancel shrink work before destroying the cache\n\nmb_cache_destroy() calls shrinker_free() and then frees all cache\nentries and the cache itself, but it does not cancel the pending\nc_shrink_work work item first.\n\nIf mb_cache_entry_create() schedules c_shrink_work via schedule_work()\nand the work item is still pending or running when mb_cache_destroy()\nruns, mb_cache_shrink_worker() will access the cache after its memory\nhas been freed, causing a use-after-free.\n\nThis is only reachable by a privileged user (root or CAP_SYS_ADMIN)\nwho can trigger the last put of a mounted ext2/ext4/ocfs2 filesystem.\n\nCancel the work item with cancel_work_sync() before calling\nshrinker_free(), ensuring the worker has finished and will not be\nrescheduled before the cache is torn down.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -32924,7 +32924,7 @@
                 "cve_id": "CVE-2026-53156",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnvmem: core: fix use-after-free bugs in error paths\n\nFix several instances of error paths in which we call\n__nvmem_device_put() - which may end up freeing the underlying memory\nand other resources - and then keep on using the nvmem structure. Always\nput the reference to the nvmem device as the last step before returning\nthe error code.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -33043,7 +33043,7 @@
                 "cve_id": "CVE-2026-53177",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbnxt_en: Fix NULL pointer dereference\n\nPCIe errors detected by a Root Port or Downstream Port cause error\nrecovery services to run on all subordinate devices regardless of\nadministrative state.\n\nThe .error_detected() callback, bnxt_io_error_detected(), disables\nand synchronizes IRQs via bnxt_disable_int_sync(), which calls\nbnxt_cp_num_to_irq_num() to map completion rings to IRQs using\nbp->bnapi.\n\nSince bp->bnapi is allocated on NIC open and freed on NIC close, PCIe\nerror recovery on a closed NIC can dereference a NULL pointer.\n\nCheck if bp->bnapi is NULL before disabling and synchronizing IRQs.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -34318,7 +34318,7 @@
                 "cve_id": "CVE-2026-53304",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: sg: Resolve soft lockup issue when opening /dev/sgX\n\nThe parameter def_reserved_size defines the default buffer size reserved\nfor each Sg_fd and should be restricted to a range between 0 and 1,048,576\n(see https://tldp.org/HOWTO/SCSI-Generic-HOWTO/proc.html).  Although the\nfunction sg_proc_write_dressz enforces this limit, it is possible to bypass\nit by directly modifying the module parameter as shown below, which then\ncauses a soft lockup:\n\necho -1 > /sys/module/sg/parameters/def_reserved_size\nexec 4<> /dev/sg0\n\nwatchdog: BUG: soft lockup - CPU#5 stuck for 26 seconds! [bash:537]\nModules loaded:\nCPU: 5 UID: 0 PID: 537 Command: bash, kernel version 6.19.0-rc3+ #134,\nPREEMPT disabled\nHardware: QEMU Standard PC (i440FX + PIIX, 1996), BIOS version\n1.16.1-2.fc37 dated 04/01/2014\n...\nCall Trace:\n\n  sg_build_reserve+0x5c/0xa0\n  sg_add_sfp+0x168/0x270\n  sg_open+0x16e/0x340\n  chrdev_open+0xbe/0x230\n  do_dentry_open+0x175/0x480\n  vfs_open+0x34/0xf0\n  do_open+0x265/0x3d0\n  path_openat+0x110/0x290\n  do_filp_open+0xc3/0x170\n  do_sys_openat2+0x71/0xe0\n  __x64_sys_openat+0x6d/0xa0\n  do_syscall_64+0x62/0x310\n  entry_SYSCALL_64_after_hwframe+0x76/0x7e\n\nThe fix is to use module_param_cb to validate and reject invalid values\nassigned to def_reserved_size.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -34352,7 +34352,7 @@
                 "cve_id": "CVE-2026-53314",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npadata: Put CPU offline callback in ONLINE section to allow failure\n\nsyzbot reported the following warning:\n\n    DEAD callback error for CPU1\n    WARNING: kernel/cpu.c:1463 at _cpu_down+0x759/0x1020 kernel/cpu.c:1463, CPU#0: syz.0.1960/14614\n\nat commit 4ae12d8bd9a8 (\"Merge tag 'kbuild-fixes-7.0-2' of git://git.kernel.org/pub/scm/linux/kernel/git/kbuild/linux\")\nwhich tglx traced to padata_cpu_dead() given it's the only\nsub-CPUHP_TEARDOWN_CPU callback that returns an error.\n\nFailure isn't allowed in hotplug states before CPUHP_TEARDOWN_CPU\nso move the CPU offline callback to the ONLINE section where failure is\npossible.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -34420,7 +34420,7 @@
                 "cve_id": "CVE-2026-53324",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mana: Use pci_name() for debugfs directory naming\n\nUse pci_name(pdev) for the per-device debugfs directory instead of\nhardcoded \"0\" for PFs and pci_slot_name(pdev->slot) for VFs. The\nprevious approach had two issues:\n\n1. pci_slot_name() dereferences pdev->slot, which can be NULL for VFs\n   in environments like generic VFIO passthrough or nested KVM,\n   causing a NULL pointer dereference.\n\n2. Multiple PFs would all use \"0\", and VFs across different PCI\n   domains or buses could share the same slot name, leading to\n   -EEXIST errors from debugfs_create_dir().\n\npci_name(pdev) returns the unique BDF address, is always valid, and is\nunique across the system.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -34633,7 +34633,13 @@
                     },
                     {
                         "introduced": "6.17.1-300.fc43",
+                        "fixed": "7.1.3-100.fc43",
                         "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "7.1.3-200.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -67487,7 +67493,7 @@
                 "cve_id": "CVE-2026-53129",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfs/mbcache: cancel shrink work before destroying the cache\n\nmb_cache_destroy() calls shrinker_free() and then frees all cache\nentries and the cache itself, but it does not cancel the pending\nc_shrink_work work item first.\n\nIf mb_cache_entry_create() schedules c_shrink_work via schedule_work()\nand the work item is still pending or running when mb_cache_destroy()\nruns, mb_cache_shrink_worker() will access the cache after its memory\nhas been freed, causing a use-after-free.\n\nThis is only reachable by a privileged user (root or CAP_SYS_ADMIN)\nwho can trigger the last put of a mounted ext2/ext4/ocfs2 filesystem.\n\nCancel the work item with cancel_work_sync() before calling\nshrinker_free(), ensuring the worker has finished and will not be\nrescheduled before the cache is torn down.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -67606,7 +67612,7 @@
                 "cve_id": "CVE-2026-53156",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnvmem: core: fix use-after-free bugs in error paths\n\nFix several instances of error paths in which we call\n__nvmem_device_put() - which may end up freeing the underlying memory\nand other resources - and then keep on using the nvmem structure. Always\nput the reference to the nvmem device as the last step before returning\nthe error code.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -67725,7 +67731,7 @@
                 "cve_id": "CVE-2026-53177",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbnxt_en: Fix NULL pointer dereference\n\nPCIe errors detected by a Root Port or Downstream Port cause error\nrecovery services to run on all subordinate devices regardless of\nadministrative state.\n\nThe .error_detected() callback, bnxt_io_error_detected(), disables\nand synchronizes IRQs via bnxt_disable_int_sync(), which calls\nbnxt_cp_num_to_irq_num() to map completion rings to IRQs using\nbp->bnapi.\n\nSince bp->bnapi is allocated on NIC open and freed on NIC close, PCIe\nerror recovery on a closed NIC can dereference a NULL pointer.\n\nCheck if bp->bnapi is NULL before disabling and synchronizing IRQs.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -69000,7 +69006,7 @@
                 "cve_id": "CVE-2026-53304",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: sg: Resolve soft lockup issue when opening /dev/sgX\n\nThe parameter def_reserved_size defines the default buffer size reserved\nfor each Sg_fd and should be restricted to a range between 0 and 1,048,576\n(see https://tldp.org/HOWTO/SCSI-Generic-HOWTO/proc.html).  Although the\nfunction sg_proc_write_dressz enforces this limit, it is possible to bypass\nit by directly modifying the module parameter as shown below, which then\ncauses a soft lockup:\n\necho -1 > /sys/module/sg/parameters/def_reserved_size\nexec 4<> /dev/sg0\n\nwatchdog: BUG: soft lockup - CPU#5 stuck for 26 seconds! [bash:537]\nModules loaded:\nCPU: 5 UID: 0 PID: 537 Command: bash, kernel version 6.19.0-rc3+ #134,\nPREEMPT disabled\nHardware: QEMU Standard PC (i440FX + PIIX, 1996), BIOS version\n1.16.1-2.fc37 dated 04/01/2014\n...\nCall Trace:\n\n  sg_build_reserve+0x5c/0xa0\n  sg_add_sfp+0x168/0x270\n  sg_open+0x16e/0x340\n  chrdev_open+0xbe/0x230\n  do_dentry_open+0x175/0x480\n  vfs_open+0x34/0xf0\n  do_open+0x265/0x3d0\n  path_openat+0x110/0x290\n  do_filp_open+0xc3/0x170\n  do_sys_openat2+0x71/0xe0\n  __x64_sys_openat+0x6d/0xa0\n  do_syscall_64+0x62/0x310\n  entry_SYSCALL_64_after_hwframe+0x76/0x7e\n\nThe fix is to use module_param_cb to validate and reject invalid values\nassigned to def_reserved_size.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -69034,7 +69040,7 @@
                 "cve_id": "CVE-2026-53314",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npadata: Put CPU offline callback in ONLINE section to allow failure\n\nsyzbot reported the following warning:\n\n    DEAD callback error for CPU1\n    WARNING: kernel/cpu.c:1463 at _cpu_down+0x759/0x1020 kernel/cpu.c:1463, CPU#0: syz.0.1960/14614\n\nat commit 4ae12d8bd9a8 (\"Merge tag 'kbuild-fixes-7.0-2' of git://git.kernel.org/pub/scm/linux/kernel/git/kbuild/linux\")\nwhich tglx traced to padata_cpu_dead() given it's the only\nsub-CPUHP_TEARDOWN_CPU callback that returns an error.\n\nFailure isn't allowed in hotplug states before CPUHP_TEARDOWN_CPU\nso move the CPU offline callback to the ONLINE section where failure is\npossible.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -69102,7 +69108,7 @@
                 "cve_id": "CVE-2026-53324",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mana: Use pci_name() for debugfs directory naming\n\nUse pci_name(pdev) for the per-device debugfs directory instead of\nhardcoded \"0\" for PFs and pci_slot_name(pdev->slot) for VFs. The\nprevious approach had two issues:\n\n1. pci_slot_name() dereferences pdev->slot, which can be NULL for VFs\n   in environments like generic VFIO passthrough or nested KVM,\n   causing a NULL pointer dereference.\n\n2. Multiple PFs would all use \"0\", and VFs across different PCI\n   domains or buses could share the same slot name, leading to\n   -EEXIST errors from debugfs_create_dir().\n\npci_name(pdev) returns the unique BDF address, is always valid, and is\nunique across the system.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -69315,7 +69321,13 @@
                     },
                     {
                         "introduced": "6.17.1-300.fc43",
+                        "fixed": "7.1.3-100.fc43",
                         "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "7.1.3-200.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
