@@ -22144,19 +22144,6 @@
                     }
                 ]
             },
-            "CVE-2026-43074": {
-                "cve_id": "CVE-2026-43074",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\neventpoll: defer struct eventpoll free to RCU grace period\n\nIn certain situations, ep_free() in eventpoll.c will kfree the epi->ep\neventpoll struct while it still being used by another concurrent thread.\nDefer the kfree() to an RCU callback to prevent UAF.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-43078": {
                 "cve_id": "CVE-2026-43078",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -24593,6 +24580,23 @@
                     }
                 ]
             },
+            "CVE-2026-43499": {
+                "cve_id": "CVE-2026-43499",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nrtmutex: Use waiter::task instead of current in remove_waiter()\n\nremove_waiter() is used by the slowlock paths, but it is also used for\nproxy-lock rollback in rt_mutex_start_proxy_lock() when invoked from\nfutex_requeue().\n\nIn the latter case waiter::task is not current, but remove_waiter()\noperates on current for the dequeue operation. That results in several\nproblems:\n\n  1) the rbtree dequeue happens without waiter::task::pi_lock being held\n\n  2) the waiter task's pi_blocked_on state is not cleared, which leaves a\n     dangling pointer primed for UAF around.\n\n  3) rt_mutex_adjust_prio_chain() operates on the wrong top priority waiter\n     task\n\nUse waiter::task instead of current in all related operations in\nremove_waiter() to cure those problems.\n\n[ tglx: Fixup rt_mutex_adjust_prio_chain(), add a comment and amend the\n  \tchangelog ]",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-45834": {
                 "cve_id": "CVE-2026-45834",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -27015,19 +27019,6 @@
                         "introduced": "0",
                         "identifier": "el8"
                     },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-46242": {
-                "cve_id": "CVE-2026-46242",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\neventpoll: fix ep_remove struct eventpoll / struct file UAF\n\nep_remove() (via ep_remove_file()) cleared file->f_ep under\nfile->f_lock but then kept using @file inside the critical section\n(is_file_epoll(), hlist_del_rcu() through the head, spin_unlock).\nA concurrent __fput() taking the eventpoll_release() fastpath in\nthat window observed the transient NULL, skipped\neventpoll_release_file() and ran to f_op->release / file_free().\n\nFor the epoll-watches-epoll case, f_op->release is\nep_eventpoll_release() -> ep_clear_and_put() -> ep_free(), which\nkfree()s the watched struct eventpoll. Its embedded ->refs\nhlist_head is exactly where epi->fllink.pprev points, so the\nsubsequent hlist_del_rcu()'s \"*pprev = next\" scribbles into freed\nkmalloc-192 memory.\n\nIn addition, struct file is SLAB_TYPESAFE_BY_RCU, so the slot\nbacking @file could be recycled by alloc_empty_file() --\nreinitializing f_lock and f_ep -- while ep_remove() is still\nnominally inside that lock. The upshot is an attacker-controllable\nkmem_cache_free() against the wrong slab cache.\n\nPin @file via epi_fget() at the top of ep_remove() and gate the\ncritical section on the pin succeeding. With the pin held @file\ncannot reach refcount zero, which holds __fput() off and\ntransitively keeps the watched struct eventpoll alive across the\nhlist_del_rcu() and the f_lock use, closing both UAFs.\n\nIf the pin fails @file has already reached refcount zero and its\n__fput() is in flight. Because we bailed before clearing f_ep,\nthat path takes the eventpoll_release() slow path into\neventpoll_release_file() and blocks on ep->mtx until the waiter\nside's ep_clear_and_put() drops it. The bailed epi's share of\nep->refcount stays intact, so the trailing ep_refcount_dec_and_test()\nin ep_clear_and_put() cannot free the eventpoll out from under\neventpoll_release_file(); the orphaned epi is then cleaned up\nthere.\n\nA successful pin also proves we are not racing\neventpoll_release_file() on this epi, so drop the now-redundant\nre-check of epi->dying under f_lock. The cheap lockless\nREAD_ONCE(epi->dying) fast-path bailout stays.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
@@ -30702,6 +30693,10 @@
                 "status": "open",
                 "events": [
                     {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
                     }
@@ -30775,7 +30770,7 @@
                 "cve_id": "CVE-2026-53274",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/smc: fix sleep-inside-lock in __smc_setsockopt() causing local DoS\n\nA logic flaw in __smc_setsockopt() allows a local unprivileged user to\ncause a Denial of Service (DoS) by holding the socket lock indefinitely.\n\nThe function __smc_setsockopt() calls copy_from_sockptr() while holding\nlock_sock(sk). By passing a userfaultfd-monitored memory page (or\nFUSE-backed memory on systems where unprivileged userfaultfd is disabled)\nas the optval, an attacker can halt execution during the copy operation,\nkeeping the lock held.\n\nCombined with asynchronous tear-down operations like shutdown(), this\nexhausts the kernel wq (kworkers) and triggers the hung task watchdog.\n\n[  240.123456] INFO: task kworker/u8:2 blocked for more than 120 seconds.\n[  240.123489] Call Trace:\n[  240.123501]  smc_shutdown+...\n[  240.123512]  lock_sock_nested+...\n\nThis patch moves the user-space copy outside the lock_sock() critical\nsection to prevent the issue.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -30809,7 +30804,7 @@
                 "cve_id": "CVE-2026-53278",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\narm_mpam: Check whether the config array is allocated before destroying it\n\n__destroy_component_cfg() is called to free the configuration array.\nIt uses the embedded 'garbage' structure, which means the array has\nto be allocated.\n\nIf __destroy_component_cfg() is called from mpam_disable() before the\nconfiguration was ever allocated, then a NULL pointer is dereferenced.\n\nCheck for this case and return early if the configuration is not\nallocated.\n\n__destroy_component_cfg() also frees the mbwu_state as this is allocated\nby __allocate_component_cfg(). As the mbwu_state is allocated after\ncomp->cfg is set, and is also under mpam_list_lock, only the first\npointer needs checking.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -30848,7 +30843,7 @@
                 "cve_id": "CVE-2026-53286",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nidpf: fix double free and use-after-free in aux device error paths\n\nWhen auxiliary_device_add() fails in idpf_plug_vport_aux_dev() or\nidpf_plug_core_aux_dev(), the err_aux_dev_add label calls\nauxiliary_device_uninit() and falls through to err_aux_dev_init.  The\nuninit call will trigger put_device(), which invokes the release\ncallback (idpf_vport_adev_release / idpf_core_adev_release) that frees\niadev.  The fall-through then reads adev->id from the freed iadev for\nida_free() and double-frees iadev with kfree().\n\nFree the IDA slot and clear the back-pointer before uninit, while adev\nis still valid, then return immediately.\n\nCommit 65637c3a1811 (\"idpf: fix UAF in RDMA core aux dev deinitialization\")\nfixed the same use-after-free in the matching unplug path in this file but\nmissed both probe error paths.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -30878,7 +30873,7 @@
                 "cve_id": "CVE-2026-53289",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nice: fix NULL pointer dereference in ice_reset_all_vfs()\n\nice_reset_all_vfs() ignores the return value of ice_vf_rebuild_vsi().\nWhen the VSI rebuild fails (e.g. during NVM firmware update via\nnvmupdate64e), ice_vsi_rebuild() tears down the VSI on its error path,\nleaving txq_map and rxq_map as NULL. The subsequent unconditional call\nto ice_vf_post_vsi_rebuild() leads to a NULL pointer dereference in\nice_ena_vf_q_mappings() when it accesses vsi->txq_map[0].\n\nThe single-VF reset path in ice_reset_vf() already handles this\ncorrectly by checking the return value of ice_vf_reconfig_vsi() and\nskipping ice_vf_post_vsi_rebuild() on failure.\n\nApply the same pattern to ice_reset_all_vfs(): check the return value\nof ice_vf_rebuild_vsi() and skip ice_vf_post_vsi_rebuild() and\nice_eswitch_attach_vf() on failure. The VF is left safely disabled\n(ICE_VF_STATE_INIT not set, VFGEN_RSTAT not set to VFACTIVE) and can\nbe recovered via a VFLR triggered by a PCI reset of the VF\n(sysfs reset or driver rebind).\n\nNote that this patch does not prevent the VF VSI rebuild from failing\nduring NVM update \u2014 the underlying cause is firmware being in a\ntransitional state while the EMP reset is processed, which can cause\nAdmin Queue commands (ice_add_vsi, ice_cfg_vsi_lan) to fail. This\npatch only prevents the subsequent NULL pointer dereference that\ncrashes the kernel when the rebuild does fail.\n\n crash> bt\n     PID: 50795    TASK: ff34c9ee708dc680  CPU: 1    COMMAND: \"kworker/u512:5\"\n      #0 [ff72159bcfe5bb50] machine_kexec at ffffffffaa8850ee\n      #1 [ff72159bcfe5bba8] __crash_kexec at ffffffffaaa15fba\n      #2 [ff72159bcfe5bc68] crash_kexec at ffffffffaaa16540\n      #3 [ff72159bcfe5bc70] oops_end at ffffffffaa837eda\n      #4 [ff72159bcfe5bc90] page_fault_oops at ffffffffaa893997\n      #5 [ff72159bcfe5bce8] exc_page_fault at ffffffffab528595\n      #6 [ff72159bcfe5bd10] asm_exc_page_fault at ffffffffab600bb2\n         [exception RIP: ice_ena_vf_q_mappings+0x79]\n         RIP: ffffffffc0a85b29  RSP: ff72159bcfe5bdc8  RFLAGS: 00010206\n         RAX: 00000000000f0000  RBX: ff34c9efc9c00000  RCX: 0000000000000000\n         RDX: 0000000000000000  RSI: 0000000000000010  RDI: ff34c9efc9c00000\n         RBP: ff34c9efc27d4828   R8: 0000000000000093   R9: 0000000000000040\n         R10: ff34c9efc27d4828  R11: 0000000000000040  R12: 0000000000100000\n         R13: 0000000000000010  R14:   R15:\n         ORIG_RAX: ffffffffffffffff  CS: 0010  SS: 0018\n      #7 [ff72159bcfe5bdf8] ice_sriov_post_vsi_rebuild at ffffffffc0a85e2e [ice]\n      #8 [ff72159bcfe5be08] ice_reset_all_vfs at ffffffffc0a920b4 [ice]\n      #9 [ff72159bcfe5be48] ice_service_task at ffffffffc0a31519 [ice]\n     #10 [ff72159bcfe5be88] process_one_work at ffffffffaa93dca4\n     #11 [ff72159bcfe5bec8] worker_thread at ffffffffaa93e9de\n     #12 [ff72159bcfe5bf18] kthread at ffffffffaa946663\n     #13 [ff72159bcfe5bf50] ret_from_fork at ffffffffaa8086b9\n\n The panic occurs attempting to dereference the NULL pointer in RDX at\n ice_sriov.c:294, which loads vsi->txq_map (offset 0x4b8 in ice_vsi).\n\n The faulting VSI is an allocated slab object but not fully initialized\n after a failed ice_vsi_rebuild():\n\n  crash> struct ice_vsi 0xff34c9efc27d4828\n    netdev = 0x0,\n    rx_rings = 0x0,\n    tx_rings = 0x0,\n    q_vectors = 0x0,\n    txq_map = 0x0,\n    rxq_map = 0x0,\n    alloc_txq = 0x10,\n    num_txq = 0x10,\n    alloc_rxq = 0x10,\n    num_rxq = 0x10,\n\n The nvmupdate64e process was performing NVM firmware update:\n\n  crash> bt 0xff34c9edd1a30000\n  PID: 49858    TASK: ff34c9edd1a30000  CPU: 1    COMMAND: \"nvmupdate64e\"\n   #0 [ff72159bcd617618] __schedule at ffffffffab5333f8\n   #4 [ff72159bcd617750] ice_sq_send_cmd at ffffffffc0a35347 [ice]\n   #5 [ff72159bcd6177a8] ice_sq_send_cmd_retry at ffffffffc0a35b47 [ice]\n   #6 [ff72159bcd617810] ice_aq_send_cmd at ffffffffc0a38018 [ice]\n   #7 [ff72159bcd617848] ice_aq_read_nvm at ffffffffc0a40254 [ice]\n   #8 \n---truncated---",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -30908,7 +30903,7 @@
                 "cve_id": "CVE-2026-53291",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: hda/conexant: Fix missing error check for jack detection\n\nIn cx_probe(), the return value of snd_hda_jack_detect_enable_callback()\nis ignored. This function returns a pointer, and if it fails (e.g., due\nto memory allocation failure), it returns an error pointer which must\nbe checked using IS_ERR().\n\nIf the registration fails, the driver continues to probe, but the jack\ndetection callback will not be registered. This can lead to a kernel\ncrash later when the driver attempts to handle jack events or accesses\nthe uninitialized structure.\n\nCheck the return value using IS_ERR() and propagate the error via\nPTR_ERR() to the probe caller.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -30921,7 +30916,7 @@
                 "cve_id": "CVE-2026-53294",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmailbox: mailbox-test: don't free the reused channel\n\nThe RX channel can be aliased to the TX channel if it has a different\nMMIO. This special case needs to be handled when freeing the channels\notherwise a double-free occurs.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -30938,7 +30933,7 @@
                 "cve_id": "CVE-2026-53295",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmailbox: add sanity check for channel array\n\nFail gracefully if there is no channel array attached to the mailbox\ncontroller. Otherwise the later dereference will cause an OOPS which\nmight not be seen because mailbox controllers might instantiate very\nearly. Remove the comment explaining the obvious while here.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -30955,7 +30950,7 @@
                 "cve_id": "CVE-2026-53296",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmailbox: mailbox-test: free channels on probe error\n\nOn probe error, free the previously obtained channels. This not only\nprevents a leak, but also UAF scenarios because the client structure\nwill be removed nonetheless because it was allocated with devm.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -30972,7 +30967,7 @@
                 "cve_id": "CVE-2026-53297",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mana: Guard mana_remove against double invocation\n\nIf PM resume fails (e.g., mana_attach() returns an error), mana_probe()\ncalls mana_remove(), which tears down the device and sets\ngd->gdma_context = NULL and gd->driver_data = NULL.\n\nHowever, a failed resume callback does not automatically unbind the\ndriver. When the device is eventually unbound, mana_remove() is invoked\na second time. Without a NULL check, it dereferences gc->dev with\ngc == NULL, causing a kernel panic.\n\nAdd an early return if gdma_context or driver_data is NULL so the second\ninvocation is harmless. Move the dev = gc->dev assignment after the\nguard so it cannot dereference NULL.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -55807,23 +55802,6 @@
                     }
                 ]
             },
-            "CVE-2026-43074": {
-                "cve_id": "CVE-2026-43074",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\neventpoll: defer struct eventpoll free to RCU grace period\n\nIn certain situations, ep_free() in eventpoll.c will kfree the epi->ep\neventpoll struct while it still being used by another concurrent thread.\nDefer the kfree() to an RCU callback to prevent UAF.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-43078": {
                 "cve_id": "CVE-2026-43078",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -58420,6 +58398,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: sch_red: Replace direct dequeue call with peek and qdisc_dequeue_peeked\n\nWhen red qdisc has children (eg qfq qdisc) whose peek() callback is\nqdisc_peek_dequeued(), we could get a kernel panic. When the parent of such\nqdiscs (eg illustrated in patch #3 as tbf) wants to retrieve an skb from\nits child (red in this case), it will do the following:\n 1a. do a peek() - and when sensing there's an skb the child can offer, then\n     - the child in this case(red) calls its child's (qfq) peek.\n        qfq does the right thing and will return the gso_skb queue packet.\n        Note: if there wasnt a gso_skb entry then qfq will store it there.\n 1b. invoke a dequeue() on the child (red). And herein lies the problem.\n     - red will call the child's dequeue() which will essentially just\n       try to grab something of qfq's queue.\n\n[   78.667668][  T363] KASAN: null-ptr-deref in range [0x0000000000000048-0x000000000000004f]\n[   78.667927][  T363] CPU: 1 UID: 0 PID: 363 Comm: ping Not tainted 7.1.0-rc1-00033-g46f74a3f7d57-dirty #790 PREEMPT(full)\n[   78.668263][  T363] Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011\n[   78.668486][  T363] RIP: 0010:qfq_dequeue+0x446/0xc90 [sch_qfq]\n[   78.668718][  T363] Code: 54 c0 e8 dd 90 00 f1 48 c7 c7 e0 03 54 c0 48 89 de e8 ce 90 00 f1 48 8d 7b 48 b8 ff ff 37 00 48 89 fa 48 c1 e0 2a 48 c1 ea 03 <80> 3c 02 00 74 05 e8 ef a1 e1 f1 48 8b 7b 48 48 8d 54 24 58 48 8d\n[   78.669312][  T363] RSP: 0018:ffff88810de573e0 EFLAGS: 00010216\n[   78.669533][  T363] RAX: dffffc0000000000 RBX: 0000000000000000 RCX: 0000000000000000\n[   78.669790][  T363] RDX: 0000000000000009 RSI: 0000000000000004 RDI: 0000000000000048\n[   78.670044][  T363] RBP: ffff888110dc4000 R08: ffffffffb1b0885a R09: fffffbfff6ba9078\n[   78.670297][  T363] R10: 0000000000000003 R11: ffff888110e31c80 R12: 0000001880000000\n[   78.670560][  T363] R13: ffff888110dc4150 R14: ffff888110dc42b8 R15: 0000000000000200\n[   78.670814][  T363] FS:  00007f66a8f09c40(0000) GS:ffff888163428000(0000) knlGS:0000000000000000\n[   78.671110][  T363] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[   78.671324][  T363] CR2: 000055db4c6a30a8 CR3: 000000010da67000 CR4: 0000000000750ef0\n[   78.671585][  T363] PKRU: 55555554\n[   78.671713][  T363] Call Trace:\n[   78.671843][  T363]  <TASK>\n[   78.671936][  T363]  ? __pfx_qfq_dequeue+0x10/0x10 [sch_qfq]\n[   78.672148][  T363]  ? __pfx__printk+0x10/0x10\n[   78.672322][  T363]  ? srso_alias_return_thunk+0x5/0xfbef5\n[   78.672496][  T363]  ? lockdep_hardirqs_on_prepare+0xa8/0x1a0\n[   78.672706][  T363]  ? srso_alias_return_thunk+0x5/0xfbef5\n[   78.672875][  T363]  ? trace_hardirqs_on+0x19/0x1a0\n[   78.673047][  T363]  red_dequeue+0x65/0x270 [sch_red]\n[   78.673217][  T363]  ? srso_alias_return_thunk+0x5/0xfbef5\n[   78.673385][  T363]  tbf_dequeue.cold+0xb0/0x70c [sch_tbf]\n[   78.673566][  T363]  __qdisc_run+0x169/0x1900\n\nThe right thing to do in #1b is to grab the skb off gso_skb queue.\nThis patchset fixes that issue by changing #1b to use qdisc_dequeue_peeked()\nmethod instead.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-43499": {
+                "cve_id": "CVE-2026-43499",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nrtmutex: Use waiter::task instead of current in remove_waiter()\n\nremove_waiter() is used by the slowlock paths, but it is also used for\nproxy-lock rollback in rt_mutex_start_proxy_lock() when invoked from\nfutex_requeue().\n\nIn the latter case waiter::task is not current, but remove_waiter()\noperates on current for the dequeue operation. That results in several\nproblems:\n\n  1) the rbtree dequeue happens without waiter::task::pi_lock being held\n\n  2) the waiter task's pi_blocked_on state is not cleared, which leaves a\n     dangling pointer primed for UAF around.\n\n  3) rt_mutex_adjust_prio_chain() operates on the wrong top priority waiter\n     task\n\nUse waiter::task instead of current in all related operations in\nremove_waiter() to cure those problems.\n\n[ tglx: Fixup rt_mutex_adjust_prio_chain(), add a comment and amend the\n  \tchangelog ]",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -61071,23 +61066,6 @@
                 "cve_id": "CVE-2026-46234",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock: fix buffer size clamping order\n\nIn vsock_update_buffer_size(), the buffer size was being clamped to the\nmaximum first, and then to the minimum. If a user sets a minimum buffer\nsize larger than the maximum, the minimum check overrides the maximum\ncheck, inverting the constraint.\n\nThis breaks the intended socket memory boundaries by allowing the\nvsk->buffer_size to grow beyond the configured vsk->buffer_max_size.\n\nFix this by checking the minimum first, and then the maximum. This\nensures the buffer size never exceeds the buffer_max_size.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-46242": {
-                "cve_id": "CVE-2026-46242",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\neventpoll: fix ep_remove struct eventpoll / struct file UAF\n\nep_remove() (via ep_remove_file()) cleared file->f_ep under\nfile->f_lock but then kept using @file inside the critical section\n(is_file_epoll(), hlist_del_rcu() through the head, spin_unlock).\nA concurrent __fput() taking the eventpoll_release() fastpath in\nthat window observed the transient NULL, skipped\neventpoll_release_file() and ran to f_op->release / file_free().\n\nFor the epoll-watches-epoll case, f_op->release is\nep_eventpoll_release() -> ep_clear_and_put() -> ep_free(), which\nkfree()s the watched struct eventpoll. Its embedded ->refs\nhlist_head is exactly where epi->fllink.pprev points, so the\nsubsequent hlist_del_rcu()'s \"*pprev = next\" scribbles into freed\nkmalloc-192 memory.\n\nIn addition, struct file is SLAB_TYPESAFE_BY_RCU, so the slot\nbacking @file could be recycled by alloc_empty_file() --\nreinitializing f_lock and f_ep -- while ep_remove() is still\nnominally inside that lock. The upshot is an attacker-controllable\nkmem_cache_free() against the wrong slab cache.\n\nPin @file via epi_fget() at the top of ep_remove() and gate the\ncritical section on the pin succeeding. With the pin held @file\ncannot reach refcount zero, which holds __fput() off and\ntransitively keeps the watched struct eventpoll alive across the\nhlist_del_rcu() and the f_lock use, closing both UAFs.\n\nIf the pin fails @file has already reached refcount zero and its\n__fput() is in flight. Because we bailed before clearing f_ep,\nthat path takes the eventpoll_release() slow path into\neventpoll_release_file() and blocks on ep->mtx until the waiter\nside's ep_clear_and_put() drops it. The bailed epi's share of\nep->refcount stays intact, so the trailing ep_refcount_dec_and_test()\nin ep_clear_and_put() cannot free the eventpoll out from under\neventpoll_release_file(); the orphaned epi is then cleaned up\nthere.\n\nA successful pin also proves we are not racing\neventpoll_release_file() on this epi, so drop the now-redundant\nre-check of epi->dying under f_lock. The cheap lockless\nREAD_ONCE(epi->dying) fast-path bailout stays.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -65250,7 +65228,7 @@
                 "cve_id": "CVE-2026-53274",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/smc: fix sleep-inside-lock in __smc_setsockopt() causing local DoS\n\nA logic flaw in __smc_setsockopt() allows a local unprivileged user to\ncause a Denial of Service (DoS) by holding the socket lock indefinitely.\n\nThe function __smc_setsockopt() calls copy_from_sockptr() while holding\nlock_sock(sk). By passing a userfaultfd-monitored memory page (or\nFUSE-backed memory on systems where unprivileged userfaultfd is disabled)\nas the optval, an attacker can halt execution during the copy operation,\nkeeping the lock held.\n\nCombined with asynchronous tear-down operations like shutdown(), this\nexhausts the kernel wq (kworkers) and triggers the hung task watchdog.\n\n[  240.123456] INFO: task kworker/u8:2 blocked for more than 120 seconds.\n[  240.123489] Call Trace:\n[  240.123501]  smc_shutdown+...\n[  240.123512]  lock_sock_nested+...\n\nThis patch moves the user-space copy outside the lock_sock() critical\nsection to prevent the issue.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65284,7 +65262,7 @@
                 "cve_id": "CVE-2026-53278",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\narm_mpam: Check whether the config array is allocated before destroying it\n\n__destroy_component_cfg() is called to free the configuration array.\nIt uses the embedded 'garbage' structure, which means the array has\nto be allocated.\n\nIf __destroy_component_cfg() is called from mpam_disable() before the\nconfiguration was ever allocated, then a NULL pointer is dereferenced.\n\nCheck for this case and return early if the configuration is not\nallocated.\n\n__destroy_component_cfg() also frees the mbwu_state as this is allocated\nby __allocate_component_cfg(). As the mbwu_state is allocated after\ncomp->cfg is set, and is also under mpam_list_lock, only the first\npointer needs checking.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65335,7 +65313,7 @@
                 "cve_id": "CVE-2026-53286",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nidpf: fix double free and use-after-free in aux device error paths\n\nWhen auxiliary_device_add() fails in idpf_plug_vport_aux_dev() or\nidpf_plug_core_aux_dev(), the err_aux_dev_add label calls\nauxiliary_device_uninit() and falls through to err_aux_dev_init.  The\nuninit call will trigger put_device(), which invokes the release\ncallback (idpf_vport_adev_release / idpf_core_adev_release) that frees\niadev.  The fall-through then reads adev->id from the freed iadev for\nida_free() and double-frees iadev with kfree().\n\nFree the IDA slot and clear the back-pointer before uninit, while adev\nis still valid, then return immediately.\n\nCommit 65637c3a1811 (\"idpf: fix UAF in RDMA core aux dev deinitialization\")\nfixed the same use-after-free in the matching unplug path in this file but\nmissed both probe error paths.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -65369,7 +65347,7 @@
                 "cve_id": "CVE-2026-53289",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nice: fix NULL pointer dereference in ice_reset_all_vfs()\n\nice_reset_all_vfs() ignores the return value of ice_vf_rebuild_vsi().\nWhen the VSI rebuild fails (e.g. during NVM firmware update via\nnvmupdate64e), ice_vsi_rebuild() tears down the VSI on its error path,\nleaving txq_map and rxq_map as NULL. The subsequent unconditional call\nto ice_vf_post_vsi_rebuild() leads to a NULL pointer dereference in\nice_ena_vf_q_mappings() when it accesses vsi->txq_map[0].\n\nThe single-VF reset path in ice_reset_vf() already handles this\ncorrectly by checking the return value of ice_vf_reconfig_vsi() and\nskipping ice_vf_post_vsi_rebuild() on failure.\n\nApply the same pattern to ice_reset_all_vfs(): check the return value\nof ice_vf_rebuild_vsi() and skip ice_vf_post_vsi_rebuild() and\nice_eswitch_attach_vf() on failure. The VF is left safely disabled\n(ICE_VF_STATE_INIT not set, VFGEN_RSTAT not set to VFACTIVE) and can\nbe recovered via a VFLR triggered by a PCI reset of the VF\n(sysfs reset or driver rebind).\n\nNote that this patch does not prevent the VF VSI rebuild from failing\nduring NVM update \u2014 the underlying cause is firmware being in a\ntransitional state while the EMP reset is processed, which can cause\nAdmin Queue commands (ice_add_vsi, ice_cfg_vsi_lan) to fail. This\npatch only prevents the subsequent NULL pointer dereference that\ncrashes the kernel when the rebuild does fail.\n\n crash> bt\n     PID: 50795    TASK: ff34c9ee708dc680  CPU: 1    COMMAND: \"kworker/u512:5\"\n      #0 [ff72159bcfe5bb50] machine_kexec at ffffffffaa8850ee\n      #1 [ff72159bcfe5bba8] __crash_kexec at ffffffffaaa15fba\n      #2 [ff72159bcfe5bc68] crash_kexec at ffffffffaaa16540\n      #3 [ff72159bcfe5bc70] oops_end at ffffffffaa837eda\n      #4 [ff72159bcfe5bc90] page_fault_oops at ffffffffaa893997\n      #5 [ff72159bcfe5bce8] exc_page_fault at ffffffffab528595\n      #6 [ff72159bcfe5bd10] asm_exc_page_fault at ffffffffab600bb2\n         [exception RIP: ice_ena_vf_q_mappings+0x79]\n         RIP: ffffffffc0a85b29  RSP: ff72159bcfe5bdc8  RFLAGS: 00010206\n         RAX: 00000000000f0000  RBX: ff34c9efc9c00000  RCX: 0000000000000000\n         RDX: 0000000000000000  RSI: 0000000000000010  RDI: ff34c9efc9c00000\n         RBP: ff34c9efc27d4828   R8: 0000000000000093   R9: 0000000000000040\n         R10: ff34c9efc27d4828  R11: 0000000000000040  R12: 0000000000100000\n         R13: 0000000000000010  R14:   R15:\n         ORIG_RAX: ffffffffffffffff  CS: 0010  SS: 0018\n      #7 [ff72159bcfe5bdf8] ice_sriov_post_vsi_rebuild at ffffffffc0a85e2e [ice]\n      #8 [ff72159bcfe5be08] ice_reset_all_vfs at ffffffffc0a920b4 [ice]\n      #9 [ff72159bcfe5be48] ice_service_task at ffffffffc0a31519 [ice]\n     #10 [ff72159bcfe5be88] process_one_work at ffffffffaa93dca4\n     #11 [ff72159bcfe5bec8] worker_thread at ffffffffaa93e9de\n     #12 [ff72159bcfe5bf18] kthread at ffffffffaa946663\n     #13 [ff72159bcfe5bf50] ret_from_fork at ffffffffaa8086b9\n\n The panic occurs attempting to dereference the NULL pointer in RDX at\n ice_sriov.c:294, which loads vsi->txq_map (offset 0x4b8 in ice_vsi).\n\n The faulting VSI is an allocated slab object but not fully initialized\n after a failed ice_vsi_rebuild():\n\n  crash> struct ice_vsi 0xff34c9efc27d4828\n    netdev = 0x0,\n    rx_rings = 0x0,\n    tx_rings = 0x0,\n    q_vectors = 0x0,\n    txq_map = 0x0,\n    rxq_map = 0x0,\n    alloc_txq = 0x10,\n    num_txq = 0x10,\n    alloc_rxq = 0x10,\n    num_rxq = 0x10,\n\n The nvmupdate64e process was performing NVM firmware update:\n\n  crash> bt 0xff34c9edd1a30000\n  PID: 49858    TASK: ff34c9edd1a30000  CPU: 1    COMMAND: \"nvmupdate64e\"\n   #0 [ff72159bcd617618] __schedule at ffffffffab5333f8\n   #4 [ff72159bcd617750] ice_sq_send_cmd at ffffffffc0a35347 [ice]\n   #5 [ff72159bcd6177a8] ice_sq_send_cmd_retry at ffffffffc0a35b47 [ice]\n   #6 [ff72159bcd617810] ice_aq_send_cmd at ffffffffc0a38018 [ice]\n   #7 [ff72159bcd617848] ice_aq_read_nvm at ffffffffc0a40254 [ice]\n   #8 \n---truncated---",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65403,7 +65381,7 @@
                 "cve_id": "CVE-2026-53291",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: hda/conexant: Fix missing error check for jack detection\n\nIn cx_probe(), the return value of snd_hda_jack_detect_enable_callback()\nis ignored. This function returns a pointer, and if it fails (e.g., due\nto memory allocation failure), it returns an error pointer which must\nbe checked using IS_ERR().\n\nIf the registration fails, the driver continues to probe, but the jack\ndetection callback will not be registered. This can lead to a kernel\ncrash later when the driver attempts to handle jack events or accesses\nthe uninitialized structure.\n\nCheck the return value using IS_ERR() and propagate the error via\nPTR_ERR() to the probe caller.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65420,7 +65398,7 @@
                 "cve_id": "CVE-2026-53294",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmailbox: mailbox-test: don't free the reused channel\n\nThe RX channel can be aliased to the TX channel if it has a different\nMMIO. This special case needs to be handled when freeing the channels\notherwise a double-free occurs.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -65437,7 +65415,7 @@
                 "cve_id": "CVE-2026-53295",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmailbox: add sanity check for channel array\n\nFail gracefully if there is no channel array attached to the mailbox\ncontroller. Otherwise the later dereference will cause an OOPS which\nmight not be seen because mailbox controllers might instantiate very\nearly. Remove the comment explaining the obvious while here.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -65454,7 +65432,7 @@
                 "cve_id": "CVE-2026-53296",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmailbox: mailbox-test: free channels on probe error\n\nOn probe error, free the previously obtained channels. This not only\nprevents a leak, but also UAF scenarios because the client structure\nwill be removed nonetheless because it was allocated with devm.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -65471,7 +65449,7 @@
                 "cve_id": "CVE-2026-53297",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mana: Guard mana_remove against double invocation\n\nIf PM resume fails (e.g., mana_attach() returns an error), mana_probe()\ncalls mana_remove(), which tears down the device and sets\ngd->gdma_context = NULL and gd->driver_data = NULL.\n\nHowever, a failed resume callback does not automatically unbind the\ndriver. When the device is eventually unbound, mana_remove() is invoked\na second time. Without a NULL check, it dereferences gc->dev with\ngc == NULL, causing a kernel panic.\n\nAdd an early return if gdma_context or driver_data is NULL so the second\ninvocation is harmless. Move the dev = gc->dev assignment after the\nguard so it cannot dereference NULL.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -90338,23 +90316,6 @@
                     }
                 ]
             },
-            "CVE-2026-43074": {
-                "cve_id": "CVE-2026-43074",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\neventpoll: defer struct eventpoll free to RCU grace period\n\nIn certain situations, ep_free() in eventpoll.c will kfree the epi->ep\neventpoll struct while it still being used by another concurrent thread.\nDefer the kfree() to an RCU callback to prevent UAF.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-43078": {
                 "cve_id": "CVE-2026-43078",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -92951,6 +92912,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: sch_red: Replace direct dequeue call with peek and qdisc_dequeue_peeked\n\nWhen red qdisc has children (eg qfq qdisc) whose peek() callback is\nqdisc_peek_dequeued(), we could get a kernel panic. When the parent of such\nqdiscs (eg illustrated in patch #3 as tbf) wants to retrieve an skb from\nits child (red in this case), it will do the following:\n 1a. do a peek() - and when sensing there's an skb the child can offer, then\n     - the child in this case(red) calls its child's (qfq) peek.\n        qfq does the right thing and will return the gso_skb queue packet.\n        Note: if there wasnt a gso_skb entry then qfq will store it there.\n 1b. invoke a dequeue() on the child (red). And herein lies the problem.\n     - red will call the child's dequeue() which will essentially just\n       try to grab something of qfq's queue.\n\n[   78.667668][  T363] KASAN: null-ptr-deref in range [0x0000000000000048-0x000000000000004f]\n[   78.667927][  T363] CPU: 1 UID: 0 PID: 363 Comm: ping Not tainted 7.1.0-rc1-00033-g46f74a3f7d57-dirty #790 PREEMPT(full)\n[   78.668263][  T363] Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011\n[   78.668486][  T363] RIP: 0010:qfq_dequeue+0x446/0xc90 [sch_qfq]\n[   78.668718][  T363] Code: 54 c0 e8 dd 90 00 f1 48 c7 c7 e0 03 54 c0 48 89 de e8 ce 90 00 f1 48 8d 7b 48 b8 ff ff 37 00 48 89 fa 48 c1 e0 2a 48 c1 ea 03 <80> 3c 02 00 74 05 e8 ef a1 e1 f1 48 8b 7b 48 48 8d 54 24 58 48 8d\n[   78.669312][  T363] RSP: 0018:ffff88810de573e0 EFLAGS: 00010216\n[   78.669533][  T363] RAX: dffffc0000000000 RBX: 0000000000000000 RCX: 0000000000000000\n[   78.669790][  T363] RDX: 0000000000000009 RSI: 0000000000000004 RDI: 0000000000000048\n[   78.670044][  T363] RBP: ffff888110dc4000 R08: ffffffffb1b0885a R09: fffffbfff6ba9078\n[   78.670297][  T363] R10: 0000000000000003 R11: ffff888110e31c80 R12: 0000001880000000\n[   78.670560][  T363] R13: ffff888110dc4150 R14: ffff888110dc42b8 R15: 0000000000000200\n[   78.670814][  T363] FS:  00007f66a8f09c40(0000) GS:ffff888163428000(0000) knlGS:0000000000000000\n[   78.671110][  T363] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[   78.671324][  T363] CR2: 000055db4c6a30a8 CR3: 000000010da67000 CR4: 0000000000750ef0\n[   78.671585][  T363] PKRU: 55555554\n[   78.671713][  T363] Call Trace:\n[   78.671843][  T363]  <TASK>\n[   78.671936][  T363]  ? __pfx_qfq_dequeue+0x10/0x10 [sch_qfq]\n[   78.672148][  T363]  ? __pfx__printk+0x10/0x10\n[   78.672322][  T363]  ? srso_alias_return_thunk+0x5/0xfbef5\n[   78.672496][  T363]  ? lockdep_hardirqs_on_prepare+0xa8/0x1a0\n[   78.672706][  T363]  ? srso_alias_return_thunk+0x5/0xfbef5\n[   78.672875][  T363]  ? trace_hardirqs_on+0x19/0x1a0\n[   78.673047][  T363]  red_dequeue+0x65/0x270 [sch_red]\n[   78.673217][  T363]  ? srso_alias_return_thunk+0x5/0xfbef5\n[   78.673385][  T363]  tbf_dequeue.cold+0xb0/0x70c [sch_tbf]\n[   78.673566][  T363]  __qdisc_run+0x169/0x1900\n\nThe right thing to do in #1b is to grab the skb off gso_skb queue.\nThis patchset fixes that issue by changing #1b to use qdisc_dequeue_peeked()\nmethod instead.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-43499": {
+                "cve_id": "CVE-2026-43499",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nrtmutex: Use waiter::task instead of current in remove_waiter()\n\nremove_waiter() is used by the slowlock paths, but it is also used for\nproxy-lock rollback in rt_mutex_start_proxy_lock() when invoked from\nfutex_requeue().\n\nIn the latter case waiter::task is not current, but remove_waiter()\noperates on current for the dequeue operation. That results in several\nproblems:\n\n  1) the rbtree dequeue happens without waiter::task::pi_lock being held\n\n  2) the waiter task's pi_blocked_on state is not cleared, which leaves a\n     dangling pointer primed for UAF around.\n\n  3) rt_mutex_adjust_prio_chain() operates on the wrong top priority waiter\n     task\n\nUse waiter::task instead of current in all related operations in\nremove_waiter() to cure those problems.\n\n[ tglx: Fixup rt_mutex_adjust_prio_chain(), add a comment and amend the\n  \tchangelog ]",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -95602,23 +95580,6 @@
                 "cve_id": "CVE-2026-46234",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock: fix buffer size clamping order\n\nIn vsock_update_buffer_size(), the buffer size was being clamped to the\nmaximum first, and then to the minimum. If a user sets a minimum buffer\nsize larger than the maximum, the minimum check overrides the maximum\ncheck, inverting the constraint.\n\nThis breaks the intended socket memory boundaries by allowing the\nvsk->buffer_size to grow beyond the configured vsk->buffer_max_size.\n\nFix this by checking the minimum first, and then the maximum. This\nensures the buffer size never exceeds the buffer_max_size.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-46242": {
-                "cve_id": "CVE-2026-46242",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\neventpoll: fix ep_remove struct eventpoll / struct file UAF\n\nep_remove() (via ep_remove_file()) cleared file->f_ep under\nfile->f_lock but then kept using @file inside the critical section\n(is_file_epoll(), hlist_del_rcu() through the head, spin_unlock).\nA concurrent __fput() taking the eventpoll_release() fastpath in\nthat window observed the transient NULL, skipped\neventpoll_release_file() and ran to f_op->release / file_free().\n\nFor the epoll-watches-epoll case, f_op->release is\nep_eventpoll_release() -> ep_clear_and_put() -> ep_free(), which\nkfree()s the watched struct eventpoll. Its embedded ->refs\nhlist_head is exactly where epi->fllink.pprev points, so the\nsubsequent hlist_del_rcu()'s \"*pprev = next\" scribbles into freed\nkmalloc-192 memory.\n\nIn addition, struct file is SLAB_TYPESAFE_BY_RCU, so the slot\nbacking @file could be recycled by alloc_empty_file() --\nreinitializing f_lock and f_ep -- while ep_remove() is still\nnominally inside that lock. The upshot is an attacker-controllable\nkmem_cache_free() against the wrong slab cache.\n\nPin @file via epi_fget() at the top of ep_remove() and gate the\ncritical section on the pin succeeding. With the pin held @file\ncannot reach refcount zero, which holds __fput() off and\ntransitively keeps the watched struct eventpoll alive across the\nhlist_del_rcu() and the f_lock use, closing both UAFs.\n\nIf the pin fails @file has already reached refcount zero and its\n__fput() is in flight. Because we bailed before clearing f_ep,\nthat path takes the eventpoll_release() slow path into\neventpoll_release_file() and blocks on ep->mtx until the waiter\nside's ep_clear_and_put() drops it. The bailed epi's share of\nep->refcount stays intact, so the trailing ep_refcount_dec_and_test()\nin ep_clear_and_put() cannot free the eventpoll out from under\neventpoll_release_file(); the orphaned epi is then cleaned up\nthere.\n\nA successful pin also proves we are not racing\neventpoll_release_file() on this epi, so drop the now-redundant\nre-check of epi->dying under f_lock. The cheap lockless\nREAD_ONCE(epi->dying) fast-path bailout stays.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -99781,7 +99742,7 @@
                 "cve_id": "CVE-2026-53274",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/smc: fix sleep-inside-lock in __smc_setsockopt() causing local DoS\n\nA logic flaw in __smc_setsockopt() allows a local unprivileged user to\ncause a Denial of Service (DoS) by holding the socket lock indefinitely.\n\nThe function __smc_setsockopt() calls copy_from_sockptr() while holding\nlock_sock(sk). By passing a userfaultfd-monitored memory page (or\nFUSE-backed memory on systems where unprivileged userfaultfd is disabled)\nas the optval, an attacker can halt execution during the copy operation,\nkeeping the lock held.\n\nCombined with asynchronous tear-down operations like shutdown(), this\nexhausts the kernel wq (kworkers) and triggers the hung task watchdog.\n\n[  240.123456] INFO: task kworker/u8:2 blocked for more than 120 seconds.\n[  240.123489] Call Trace:\n[  240.123501]  smc_shutdown+...\n[  240.123512]  lock_sock_nested+...\n\nThis patch moves the user-space copy outside the lock_sock() critical\nsection to prevent the issue.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -99815,7 +99776,7 @@
                 "cve_id": "CVE-2026-53278",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\narm_mpam: Check whether the config array is allocated before destroying it\n\n__destroy_component_cfg() is called to free the configuration array.\nIt uses the embedded 'garbage' structure, which means the array has\nto be allocated.\n\nIf __destroy_component_cfg() is called from mpam_disable() before the\nconfiguration was ever allocated, then a NULL pointer is dereferenced.\n\nCheck for this case and return early if the configuration is not\nallocated.\n\n__destroy_component_cfg() also frees the mbwu_state as this is allocated\nby __allocate_component_cfg(). As the mbwu_state is allocated after\ncomp->cfg is set, and is also under mpam_list_lock, only the first\npointer needs checking.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -99866,7 +99827,7 @@
                 "cve_id": "CVE-2026-53286",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nidpf: fix double free and use-after-free in aux device error paths\n\nWhen auxiliary_device_add() fails in idpf_plug_vport_aux_dev() or\nidpf_plug_core_aux_dev(), the err_aux_dev_add label calls\nauxiliary_device_uninit() and falls through to err_aux_dev_init.  The\nuninit call will trigger put_device(), which invokes the release\ncallback (idpf_vport_adev_release / idpf_core_adev_release) that frees\niadev.  The fall-through then reads adev->id from the freed iadev for\nida_free() and double-frees iadev with kfree().\n\nFree the IDA slot and clear the back-pointer before uninit, while adev\nis still valid, then return immediately.\n\nCommit 65637c3a1811 (\"idpf: fix UAF in RDMA core aux dev deinitialization\")\nfixed the same use-after-free in the matching unplug path in this file but\nmissed both probe error paths.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -99900,7 +99861,7 @@
                 "cve_id": "CVE-2026-53289",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nice: fix NULL pointer dereference in ice_reset_all_vfs()\n\nice_reset_all_vfs() ignores the return value of ice_vf_rebuild_vsi().\nWhen the VSI rebuild fails (e.g. during NVM firmware update via\nnvmupdate64e), ice_vsi_rebuild() tears down the VSI on its error path,\nleaving txq_map and rxq_map as NULL. The subsequent unconditional call\nto ice_vf_post_vsi_rebuild() leads to a NULL pointer dereference in\nice_ena_vf_q_mappings() when it accesses vsi->txq_map[0].\n\nThe single-VF reset path in ice_reset_vf() already handles this\ncorrectly by checking the return value of ice_vf_reconfig_vsi() and\nskipping ice_vf_post_vsi_rebuild() on failure.\n\nApply the same pattern to ice_reset_all_vfs(): check the return value\nof ice_vf_rebuild_vsi() and skip ice_vf_post_vsi_rebuild() and\nice_eswitch_attach_vf() on failure. The VF is left safely disabled\n(ICE_VF_STATE_INIT not set, VFGEN_RSTAT not set to VFACTIVE) and can\nbe recovered via a VFLR triggered by a PCI reset of the VF\n(sysfs reset or driver rebind).\n\nNote that this patch does not prevent the VF VSI rebuild from failing\nduring NVM update \u2014 the underlying cause is firmware being in a\ntransitional state while the EMP reset is processed, which can cause\nAdmin Queue commands (ice_add_vsi, ice_cfg_vsi_lan) to fail. This\npatch only prevents the subsequent NULL pointer dereference that\ncrashes the kernel when the rebuild does fail.\n\n crash> bt\n     PID: 50795    TASK: ff34c9ee708dc680  CPU: 1    COMMAND: \"kworker/u512:5\"\n      #0 [ff72159bcfe5bb50] machine_kexec at ffffffffaa8850ee\n      #1 [ff72159bcfe5bba8] __crash_kexec at ffffffffaaa15fba\n      #2 [ff72159bcfe5bc68] crash_kexec at ffffffffaaa16540\n      #3 [ff72159bcfe5bc70] oops_end at ffffffffaa837eda\n      #4 [ff72159bcfe5bc90] page_fault_oops at ffffffffaa893997\n      #5 [ff72159bcfe5bce8] exc_page_fault at ffffffffab528595\n      #6 [ff72159bcfe5bd10] asm_exc_page_fault at ffffffffab600bb2\n         [exception RIP: ice_ena_vf_q_mappings+0x79]\n         RIP: ffffffffc0a85b29  RSP: ff72159bcfe5bdc8  RFLAGS: 00010206\n         RAX: 00000000000f0000  RBX: ff34c9efc9c00000  RCX: 0000000000000000\n         RDX: 0000000000000000  RSI: 0000000000000010  RDI: ff34c9efc9c00000\n         RBP: ff34c9efc27d4828   R8: 0000000000000093   R9: 0000000000000040\n         R10: ff34c9efc27d4828  R11: 0000000000000040  R12: 0000000000100000\n         R13: 0000000000000010  R14:   R15:\n         ORIG_RAX: ffffffffffffffff  CS: 0010  SS: 0018\n      #7 [ff72159bcfe5bdf8] ice_sriov_post_vsi_rebuild at ffffffffc0a85e2e [ice]\n      #8 [ff72159bcfe5be08] ice_reset_all_vfs at ffffffffc0a920b4 [ice]\n      #9 [ff72159bcfe5be48] ice_service_task at ffffffffc0a31519 [ice]\n     #10 [ff72159bcfe5be88] process_one_work at ffffffffaa93dca4\n     #11 [ff72159bcfe5bec8] worker_thread at ffffffffaa93e9de\n     #12 [ff72159bcfe5bf18] kthread at ffffffffaa946663\n     #13 [ff72159bcfe5bf50] ret_from_fork at ffffffffaa8086b9\n\n The panic occurs attempting to dereference the NULL pointer in RDX at\n ice_sriov.c:294, which loads vsi->txq_map (offset 0x4b8 in ice_vsi).\n\n The faulting VSI is an allocated slab object but not fully initialized\n after a failed ice_vsi_rebuild():\n\n  crash> struct ice_vsi 0xff34c9efc27d4828\n    netdev = 0x0,\n    rx_rings = 0x0,\n    tx_rings = 0x0,\n    q_vectors = 0x0,\n    txq_map = 0x0,\n    rxq_map = 0x0,\n    alloc_txq = 0x10,\n    num_txq = 0x10,\n    alloc_rxq = 0x10,\n    num_rxq = 0x10,\n\n The nvmupdate64e process was performing NVM firmware update:\n\n  crash> bt 0xff34c9edd1a30000\n  PID: 49858    TASK: ff34c9edd1a30000  CPU: 1    COMMAND: \"nvmupdate64e\"\n   #0 [ff72159bcd617618] __schedule at ffffffffab5333f8\n   #4 [ff72159bcd617750] ice_sq_send_cmd at ffffffffc0a35347 [ice]\n   #5 [ff72159bcd6177a8] ice_sq_send_cmd_retry at ffffffffc0a35b47 [ice]\n   #6 [ff72159bcd617810] ice_aq_send_cmd at ffffffffc0a38018 [ice]\n   #7 [ff72159bcd617848] ice_aq_read_nvm at ffffffffc0a40254 [ice]\n   #8 \n---truncated---",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -99934,7 +99895,7 @@
                 "cve_id": "CVE-2026-53291",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: hda/conexant: Fix missing error check for jack detection\n\nIn cx_probe(), the return value of snd_hda_jack_detect_enable_callback()\nis ignored. This function returns a pointer, and if it fails (e.g., due\nto memory allocation failure), it returns an error pointer which must\nbe checked using IS_ERR().\n\nIf the registration fails, the driver continues to probe, but the jack\ndetection callback will not be registered. This can lead to a kernel\ncrash later when the driver attempts to handle jack events or accesses\nthe uninitialized structure.\n\nCheck the return value using IS_ERR() and propagate the error via\nPTR_ERR() to the probe caller.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -99951,7 +99912,7 @@
                 "cve_id": "CVE-2026-53294",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmailbox: mailbox-test: don't free the reused channel\n\nThe RX channel can be aliased to the TX channel if it has a different\nMMIO. This special case needs to be handled when freeing the channels\notherwise a double-free occurs.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -99968,7 +99929,7 @@
                 "cve_id": "CVE-2026-53295",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmailbox: add sanity check for channel array\n\nFail gracefully if there is no channel array attached to the mailbox\ncontroller. Otherwise the later dereference will cause an OOPS which\nmight not be seen because mailbox controllers might instantiate very\nearly. Remove the comment explaining the obvious while here.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -99985,7 +99946,7 @@
                 "cve_id": "CVE-2026-53296",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmailbox: mailbox-test: free channels on probe error\n\nOn probe error, free the previously obtained channels. This not only\nprevents a leak, but also UAF scenarios because the client structure\nwill be removed nonetheless because it was allocated with devm.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -100002,7 +99963,7 @@
                 "cve_id": "CVE-2026-53297",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mana: Guard mana_remove against double invocation\n\nIf PM resume fails (e.g., mana_attach() returns an error), mana_probe()\ncalls mana_remove(), which tears down the device and sets\ngd->gdma_context = NULL and gd->driver_data = NULL.\n\nHowever, a failed resume callback does not automatically unbind the\ndriver. When the device is eventually unbound, mana_remove() is invoked\na second time. Without a NULL check, it dereferences gc->dev with\ngc == NULL, causing a kernel panic.\n\nAdd an early return if gdma_context or driver_data is NULL so the second\ninvocation is harmless. Move the dev = gc->dev assignment after the\nguard so it cannot dereference NULL.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
