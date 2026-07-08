@@ -74,20 +74,15 @@
             },
             "CVE-2024-13176": {
                 "cve_id": "CVE-2024-13176",
-                "title": "openssl: Timing side-channel in ECDSA signature computation",
-                "description": "A timing side-channel vulnerability was found in OpenSSL. This vulnerability allows an attacker to recover the private key. However, measuring the timing would require local access to the signing application or a fast network connection with low latency. There is a timing signal of around 300 nanoseconds when the top word of the inverted ECDSA nonce value is zero. This issue can happen with significant probability only for some of the supported elliptic curves. In particular, the NIST P-521 curve is affected.",
-                "severity": "LOW",
+                "title": "Issue summary: A timing side-channel which could potentially allo ...",
+                "description": "Issue summary: A timing side-channel which could potentially allow recovering\nthe private key exists in the ECDSA signature computation.\n\nImpact summary: A timing side-channel in ECDSA signature computations\ncould allow recovering the private key by an attacker. However, measuring\nthe timing would require either local access to the signing application or\na very fast network connection with low latency.\n\nThere is a timing signal of around 300 nanoseconds when the top word of\nthe inverted ECDSA nonce value is zero. This can happen with significant\nprobability only for some of the supported elliptic curves. In particular\nthe NIST P-521 curve is affected. To be able to measure this leak, the attacker\nprocess must either be located in the same physical computer or must\nhave a very fast network connection with low latency. For that reason\nthe severity of this vulnerability is Low.\n\nThe FIPS modules in 3.4, 3.3, 3.2, 3.1 and 3.0 are affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
                         "introduced": "0",
                         "fixed": "3.2.4-11.rf",
                         "identifier": "rf"
-                    },
-                    {
-                        "introduced": "3.2.2-9.fc41",
-                        "fixed": "3.2.4-1.fc41",
-                        "identifier": "fc41"
                     }
                 ]
             },
@@ -114,7 +109,8 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "fixed": "3.5.6"
+                        "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
                     }
                 ]
             },
@@ -139,29 +135,39 @@
             },
             "CVE-2025-15468": {
                 "cve_id": "CVE-2025-15468",
-                "title": "openssl: OpenSSL: Denial of Service via NULL pointer dereference in QUIC protocol handling",
-                "description": "A flaw was found in openssl. A remote attacker could trigger a NULL pointer dereference by sending an unknown or unsupported cipher ID during the client hello callback in applications using the QUIC (Quick UDP Internet Connections) protocol. This vulnerability, occurring when the SSL_CIPHER_find() function is called in this specific context, leads to an abnormal termination of the running process, causing a Denial of Service (DoS).",
-                "severity": "LOW",
+                "title": "Issue summary: If an application using the SSL_CIPHER_find() func ...",
+                "description": "Issue summary: If an application using the SSL_CIPHER_find() function in\na QUIC protocol client or server receives an unknown cipher suite from\nthe peer, a NULL dereference occurs.\n\nImpact summary: A NULL pointer dereference leads to abnormal termination of\nthe running process causing Denial of Service.\n\nSome applications call SSL_CIPHER_find() from the client_hello_cb callback\non the cipher ID received from the peer. If this is done with an SSL object\nimplementing the QUIC protocol, NULL pointer dereference will happen if\nthe examined cipher ID is unknown or unsupported.\n\nAs it is not very common to call this function in applications using the QUIC \nprotocol and the worst outcome is Denial of Service, the issue was assessed\nas Low severity.\n\nThe vulnerable code was introduced in the 3.2 version with the addition\nof the QUIC protocol support.\n\nThe FIPS modules in 3.6, 3.5, 3.4 and 3.3 are not affected by this issue,\nas the QUIC implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4 and 3.3 are vulnerable to this issue.\n\nOpenSSL 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-15469": {
                 "cve_id": "CVE-2025-15469",
-                "title": "openssl: OpenSSL: Data integrity bypass in `openssl dgst` command due to silent truncation",
-                "description": "A flaw was found in openssl. When a user signs or verifies files larger than 16MB using the `openssl dgst` command with one-shot algorithms, the tool silently truncates the input to 16MB. This creates an integrity gap, allowing trailing data beyond the initial 16MB to be modified without detection because it remains unauthenticated. This vulnerability primarily impacts workflows that both sign and verify files using the affected `openssl dgst` command.",
-                "severity": "LOW",
+                "title": "Issue summary: The 'openssl dgst' command-line tool silently trun ...",
+                "description": "Issue summary: The 'openssl dgst' command-line tool silently truncates input\ndata to 16MB when using one-shot signing algorithms and reports success instead\nof an error.\n\nImpact summary: A user signing or verifying files larger than 16MB with\none-shot algorithms (such as Ed25519, Ed448, or ML-DSA) may believe the entire\nfile is authenticated while trailing data beyond 16MB remains unauthenticated.\n\nWhen the 'openssl dgst' command is used with algorithms that only support\none-shot signing (Ed25519, Ed448, ML-DSA-44, ML-DSA-65, ML-DSA-87), the input\nis buffered with a 16MB limit. If the input exceeds this limit, the tool\nsilently truncates to the first 16MB and continues without signaling an error,\ncontrary to what the documentation states. This creates an integrity gap where\ntrailing bytes can be modified without detection if both signing and\nverification are performed using the same affected codepath.\n\nThe issue affects only the command-line tool behavior. Verifiers that process\nthe full message using library APIs will reject the signature, so the risk\nprimarily affects workflows that both sign and verify with the affected\n'openssl dgst' command. Streaming digest algorithms for 'openssl dgst' and\nlibrary users are unaffected.\n\nThe FIPS modules in 3.5 and 3.6 are not affected by this issue, as the\ncommand-line tools are outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.5 and 3.6 are vulnerable to this issue.\n\nOpenSSL 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -186,57 +192,77 @@
             },
             "CVE-2025-68160": {
                 "cve_id": "CVE-2025-68160",
-                "title": "openssl: OpenSSL: Denial of Service due to out-of-bounds write in BIO filter",
-                "description": "A flaw was found in OpenSSL. This vulnerability involves an out-of-bounds write in the line-buffering BIO filter, which can lead to memory corruption. While exploitation is unlikely to be under direct attacker control, a successful attack could cause an application to crash, resulting in a Denial of Service (DoS).",
-                "severity": "LOW",
+                "title": "Issue summary: Writing large, newline-free data into a BIO chain  ...",
+                "description": "Issue summary: Writing large, newline-free data into a BIO chain using the\nline-buffering filter where the next BIO performs short writes can trigger\na heap-based out-of-bounds write.\n\nImpact summary: This out-of-bounds write can cause memory corruption which\ntypically results in a crash, leading to Denial of Service for an application.\n\nThe line-buffering BIO filter (BIO_f_linebuffer) is not used by default in\nTLS/SSL data paths. In OpenSSL command-line applications, it is typically\nonly pushed onto stdout/stderr on VMS systems. Third-party applications that\nexplicitly use this filter with a BIO chain that can short-write and that\nwrite large, newline-free data influenced by an attacker would be affected.\nHowever, the circumstances where this could happen are unlikely to be under\nattacker control, and BIO_f_linebuffer is unlikely to be handling non-curated\ndata controlled by an attacker. For that reason the issue was assessed as\nLow severity.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the BIO implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69418": {
                 "cve_id": "CVE-2025-69418",
-                "title": "openssl: OpenSSL: Information disclosure and data tampering via specific low-level OCB encryption/decryption calls",
-                "description": "A flaw was found in OpenSSL. When applications directly call the low-level CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions with non-block-aligned lengths in a single call on hardware-accelerated builds, the trailing 1-15 bytes of a message may be exposed in cleartext. These exposed bytes are not covered by the authentication tag, allowing an attacker to read or tamper with them without detection.",
-                "severity": "LOW",
+                "title": "Issue summary: When using the low-level OCB API directly with AES ...",
+                "description": "Issue summary: When using the low-level OCB API directly with AES-NI or<br>other hardware-accelerated code paths, inputs whose length is not a multiple<br>of 16 bytes can leave the final partial block unencrypted and unauthenticated.<br><br>Impact summary: The trailing 1-15 bytes of a message may be exposed in<br>cleartext on encryption and are not covered by the authentication tag,<br>allowing an attacker to read or tamper with those bytes without detection.<br><br>The low-level OCB encrypt and decrypt routines in the hardware-accelerated<br>stream path process full 16-byte blocks but do not advance the input/output<br>pointers. The subsequent tail-handling code then operates on the original<br>base pointers, effectively reprocessing the beginning of the buffer while<br>leaving the actual trailing bytes unprocessed. The authentication checksum<br>also excludes the true tail bytes.<br><br>However, typical OpenSSL consumers using EVP are not affected because the<br>higher-level EVP and provider OCB implementations split inputs so that full<br>blocks and trailing partial blocks are processed in separate calls, avoiding<br>the problematic code path. Additionally, TLS does not use OCB ciphersuites.<br>The vulnerability only affects applications that call the low-level<br>CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions directly with<br>non-block-aligned lengths in a single call on hardware-accelerated builds.<br>For these reasons the issue was assessed as Low severity.<br><br>The FIPS modules in 3.6, 3.5, 3.4, 3.3, 3.2, 3.1 and 3.0 are not affected<br>by this issue, as OCB mode is not a FIPS-approved algorithm.<br><br>OpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.<br><br>OpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69420": {
                 "cve_id": "CVE-2025-69420",
-                "title": "openssl: OpenSSL: Denial of Service via malformed TimeStamp Response",
-                "description": "A flaw was found in OpenSSL. A type confusion vulnerability exists in the TimeStamp Response verification code, where an ASN1_TYPE union member is accessed without proper type validation. A remote attacker can exploit this by providing a malformed TimeStamp Response to an application that verifies timestamp responses. This can lead to an invalid or NULL pointer dereference, resulting in a Denial of Service (DoS) due to an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: A type confusion vulnerability exists in the TimeS ...",
+                "description": "Issue summary: A type confusion vulnerability exists in the TimeStamp Response\nverification code where an ASN1_TYPE union member is accessed without first\nvalidating the type, causing an invalid or NULL pointer dereference when\nprocessing a malformed TimeStamp Response file.\n\nImpact summary: An application calling TS_RESP_verify_response() with a\nmalformed TimeStamp Response can be caused to dereference an invalid or\nNULL pointer when reading, resulting in a Denial of Service.\n\nThe functions ossl_ess_get_signing_cert() and ossl_ess_get_signing_cert_v2()\naccess the signing cert attribute value without validating its type.\nWhen the type is not V_ASN1_SEQUENCE, this results in accessing invalid memory\nthrough the ASN1_TYPE union, causing a crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nTimeStamp Response to an application that verifies timestamp responses. The\nTimeStamp protocol (RFC 3161) is not widely used and the impact of the\nexploit is just a Denial of Service. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the TimeStamp Response implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69421": {
                 "cve_id": "CVE-2025-69421",
-                "title": "openssl: OpenSSL: Denial of Service via malformed PKCS#12 file processing",
-                "description": "A flaw was found in OpenSSL. This vulnerability allows a remote attacker to trigger a Denial of Service (DoS) by providing a specially crafted, malformed PKCS#12 file to an application that processes it. The flaw occurs due to a NULL pointer dereference in the PKCS12_item_decrypt_d2i_ex() function when handling the malformed file, leading to an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: Processing a malformed PKCS#12 file can trigger a  ...",
+                "description": "Issue summary: Processing a malformed PKCS#12 file can trigger a NULL pointer\ndereference in the PKCS12_item_decrypt_d2i_ex() function.\n\nImpact summary: A NULL pointer dereference can trigger a crash which leads to\nDenial of Service for an application processing PKCS#12 files.\n\nThe PKCS12_item_decrypt_d2i_ex() function does not check whether the oct\nparameter is NULL before dereferencing it. When called from\nPKCS12_unpack_p7encdata() with a malformed PKCS#12 file, this parameter can\nbe NULL, causing a crash. The vulnerability is limited to Denial of Service\nand cannot be escalated to achieve code execution or memory disclosure.\n\nExploiting this issue requires an attacker to provide a malformed PKCS#12 file\nto an application that processes it. For that reason the issue was assessed as\nLow severity according to our Security Policy.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -261,29 +287,39 @@
             },
             "CVE-2026-22795": {
                 "cve_id": "CVE-2026-22795",
-                "title": "openssl: OpenSSL: Denial of Service due to type confusion in PKCS#12 file processing",
-                "description": "A flaw was found in OpenSSL. This type confusion vulnerability allows a remote attacker to cause a Denial of Service (DoS) by tricking a user or application into processing a maliciously crafted PKCS#12 (Personal Information Exchange Syntax Standard) file. The vulnerability leads to an invalid or NULL pointer dereference, resulting in an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: An invalid or NULL pointer dereference can happen  ...",
+                "description": "Issue summary: An invalid or NULL pointer dereference can happen in\nan application processing a malformed PKCS#12 file.\n\nImpact summary: An application processing a malformed PKCS#12 file can be\ncaused to dereference an invalid or NULL pointer on memory read, resulting\nin a Denial of Service.\n\nA type confusion vulnerability exists in PKCS#12 parsing code where\nan ASN1_TYPE union member is accessed without first validating the type,\ncausing an invalid pointer read.\n\nThe location is constrained to a 1-byte address space, meaning any\nattempted pointer manipulation can only target addresses between 0x00 and 0xFF.\nThis range corresponds to the zero page, which is unmapped on most modern\noperating systems and will reliably result in a crash, leading only to a\nDenial of Service. Exploiting this issue also requires a user or application\nto process a maliciously crafted PKCS#12 file. It is uncommon to accept\nuntrusted PKCS#12 files in applications as they are usually used to store\nprivate keys which are trusted by definition. For these reasons, the issue\nwas assessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2026-22796": {
                 "cve_id": "CVE-2026-22796",
-                "title": "openssl: OpenSSL: Denial of Service via type confusion in PKCS#7 signature verification",
-                "description": "A flaw was found in OpenSSL. This type confusion vulnerability allows a remote attacker to cause a denial of service (DoS) by providing specially crafted PKCS#7 data to an application that performs signature verification. The vulnerability occurs because the application accesses an ASN1_TYPE union member without proper type validation, leading to an invalid or NULL pointer dereference and a crash.",
-                "severity": "LOW",
+                "title": "Issue summary: A type confusion vulnerability exists in the signa ...",
+                "description": "Issue summary: A type confusion vulnerability exists in the signature\nverification of signed PKCS#7 data where an ASN1_TYPE union member is\naccessed without first validating the type, causing an invalid or NULL\npointer dereference when processing malformed PKCS#7 data.\n\nImpact summary: An application performing signature verification of PKCS#7\ndata or calling directly the PKCS7_digest_from_attributes() function can be\ncaused to dereference an invalid or NULL pointer when reading, resulting in\na Denial of Service.\n\nThe function PKCS7_digest_from_attributes() accesses the message digest attribute\nvalue without validating its type. When the type is not V_ASN1_OCTET_STRING,\nthis results in accessing invalid memory through the ASN1_TYPE union, causing\na crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nsigned PKCS#7 to an application that verifies it. The impact of the\nexploit is just a Denial of Service, the PKCS7 API is legacy and applications\nshould be using the CMS API instead. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#7 parsing implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -624,90 +660,6 @@
                     {
                         "introduced": "0",
                         "fixed": "3.2.2-20.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2024-0727": {
-                "cve_id": "CVE-2024-0727",
-                "title": "openssl: denial of service via null dereference",
-                "description": "A flaw was found in OpenSSL. The optional ContentInfo fields can be set to null, even if the \"type\" is a valid value, which can lead to a null dereference error that may cause a denial of service.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2024-2511": {
-                "cve_id": "CVE-2024-2511",
-                "title": "openssl: Unbounded memory growth with session handling in TLSv1.3",
-                "description": "A flaw was found in OpenSSL. A malicious client can trigger an uncontrolled memory consumption, resulting in a Denial of Service. This issue occurs due to OpenSSL's TLSv1.3 session cache going into an incorrect state, leading to it failing to flush properly as it fills. OpenSSL must be configured with the non-default SSL_OP_NO_TICKET option enabled to be vulnerable. This issue only affects TLSv1.3 servers, while TLS clients are not affected.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-2650": {
-                "cve_id": "CVE-2023-2650",
-                "title": "openssl: Possible DoS translating ASN.1 object identifiers",
-                "description": "A flaw was found in OpenSSL resulting in a possible denial of service while translating ASN.1 object identifiers. Applications that use OBJ_obj2txt() directly, or use any of the OpenSSL subsystems OCSP, PKCS7/SMIME, CMS, CMP/CRMF or TS with no message size limit may experience long delays when processing messages, which may lead to a denial of service.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0464": {
-                "cve_id": "CVE-2023-0464",
-                "title": "openssl: Denial of service by excessive resource usage in verifying X509 policy constraints",
-                "description": "A security vulnerability has been identified in all supported OpenSSL versions related to verifying X.509 certificate chains that include policy constraints. This flaw allows attackers to exploit this vulnerability by creating a malicious certificate chain that triggers exponential use of computational resources, leading to a denial of service (DoS) attack on affected systems. Policy processing is disabled by default but can be enabled by passing the -policy' argument to the command line utilities or calling the X509_VERIFY_PARAM_set1_policies()' function.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0465": {
-                "cve_id": "CVE-2023-0465",
-                "title": "openssl: Invalid certificate policies in leaf certificates are silently ignored",
-                "description": "A flaw was found in OpenSSL. Applications that use a non-default option when verifying certificates may be vulnerable to an attack from a malicious CA to circumvent certain checks. OpenSSL and other certificate policy checks silently ignore invalid certificate policies in leaf certificates that are skipped for that certificate. A malicious CA could use this to deliberately assert invalid certificate policies to circumvent policy checking on the certificate altogether. Policy processing is disabled by default but can be enabled by passing the `-policy' argument to the command line utilities or by calling the `X509_VERIFY_PARAM_set1_policies()' function.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0466": {
-                "cve_id": "CVE-2023-0466",
-                "title": "openssl: Certificate policy check not enabled",
-                "description": "A flaw was found in OpenSSL. The X509_VERIFY_PARAM_add0_policy() function is documented to enable the certificate policy check when doing certificate verification implicitly. However, implementing the function does not enable the check, allowing certificates with invalid or incorrect policies to pass the certificate verification. Suddenly enabling the policy check could break existing deployments, so it was decided to keep the existing behavior of the X509_VERIFY_PARAM_add0_policy() function. The applications that require OpenSSL to perform certificate policy check need to use X509_VERIFY_PARAM_set1_policies() or explicitly enable the policy check by calling X509_VERIFY_PARAM_set_flags() with the X509_V_FLAG_POLICY_CHECK flag argument. Certificate policy checks are disabled by default in OpenSSL and are not commonly used by applications.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
                         "identifier": "rf"
                     }
                 ]
@@ -786,20 +738,15 @@
             },
             "CVE-2024-13176": {
                 "cve_id": "CVE-2024-13176",
-                "title": "openssl: Timing side-channel in ECDSA signature computation",
-                "description": "A timing side-channel vulnerability was found in OpenSSL. This vulnerability allows an attacker to recover the private key. However, measuring the timing would require local access to the signing application or a fast network connection with low latency. There is a timing signal of around 300 nanoseconds when the top word of the inverted ECDSA nonce value is zero. This issue can happen with significant probability only for some of the supported elliptic curves. In particular, the NIST P-521 curve is affected.",
-                "severity": "LOW",
+                "title": "Issue summary: A timing side-channel which could potentially allo ...",
+                "description": "Issue summary: A timing side-channel which could potentially allow recovering\nthe private key exists in the ECDSA signature computation.\n\nImpact summary: A timing side-channel in ECDSA signature computations\ncould allow recovering the private key by an attacker. However, measuring\nthe timing would require either local access to the signing application or\na very fast network connection with low latency.\n\nThere is a timing signal of around 300 nanoseconds when the top word of\nthe inverted ECDSA nonce value is zero. This can happen with significant\nprobability only for some of the supported elliptic curves. In particular\nthe NIST P-521 curve is affected. To be able to measure this leak, the attacker\nprocess must either be located in the same physical computer or must\nhave a very fast network connection with low latency. For that reason\nthe severity of this vulnerability is Low.\n\nThe FIPS modules in 3.4, 3.3, 3.2, 3.1 and 3.0 are affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
                         "introduced": "0",
                         "fixed": "3.2.4-11.rf",
                         "identifier": "rf"
-                    },
-                    {
-                        "introduced": "3.2.2-9.fc41",
-                        "fixed": "3.2.4-1.fc41",
-                        "identifier": "fc41"
                     }
                 ]
             },
@@ -826,7 +773,8 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "fixed": "3.5.6"
+                        "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
                     }
                 ]
             },
@@ -851,29 +799,39 @@
             },
             "CVE-2025-15468": {
                 "cve_id": "CVE-2025-15468",
-                "title": "openssl: OpenSSL: Denial of Service via NULL pointer dereference in QUIC protocol handling",
-                "description": "A flaw was found in openssl. A remote attacker could trigger a NULL pointer dereference by sending an unknown or unsupported cipher ID during the client hello callback in applications using the QUIC (Quick UDP Internet Connections) protocol. This vulnerability, occurring when the SSL_CIPHER_find() function is called in this specific context, leads to an abnormal termination of the running process, causing a Denial of Service (DoS).",
-                "severity": "LOW",
+                "title": "Issue summary: If an application using the SSL_CIPHER_find() func ...",
+                "description": "Issue summary: If an application using the SSL_CIPHER_find() function in\na QUIC protocol client or server receives an unknown cipher suite from\nthe peer, a NULL dereference occurs.\n\nImpact summary: A NULL pointer dereference leads to abnormal termination of\nthe running process causing Denial of Service.\n\nSome applications call SSL_CIPHER_find() from the client_hello_cb callback\non the cipher ID received from the peer. If this is done with an SSL object\nimplementing the QUIC protocol, NULL pointer dereference will happen if\nthe examined cipher ID is unknown or unsupported.\n\nAs it is not very common to call this function in applications using the QUIC \nprotocol and the worst outcome is Denial of Service, the issue was assessed\nas Low severity.\n\nThe vulnerable code was introduced in the 3.2 version with the addition\nof the QUIC protocol support.\n\nThe FIPS modules in 3.6, 3.5, 3.4 and 3.3 are not affected by this issue,\nas the QUIC implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4 and 3.3 are vulnerable to this issue.\n\nOpenSSL 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-15469": {
                 "cve_id": "CVE-2025-15469",
-                "title": "openssl: OpenSSL: Data integrity bypass in `openssl dgst` command due to silent truncation",
-                "description": "A flaw was found in openssl. When a user signs or verifies files larger than 16MB using the `openssl dgst` command with one-shot algorithms, the tool silently truncates the input to 16MB. This creates an integrity gap, allowing trailing data beyond the initial 16MB to be modified without detection because it remains unauthenticated. This vulnerability primarily impacts workflows that both sign and verify files using the affected `openssl dgst` command.",
-                "severity": "LOW",
+                "title": "Issue summary: The 'openssl dgst' command-line tool silently trun ...",
+                "description": "Issue summary: The 'openssl dgst' command-line tool silently truncates input\ndata to 16MB when using one-shot signing algorithms and reports success instead\nof an error.\n\nImpact summary: A user signing or verifying files larger than 16MB with\none-shot algorithms (such as Ed25519, Ed448, or ML-DSA) may believe the entire\nfile is authenticated while trailing data beyond 16MB remains unauthenticated.\n\nWhen the 'openssl dgst' command is used with algorithms that only support\none-shot signing (Ed25519, Ed448, ML-DSA-44, ML-DSA-65, ML-DSA-87), the input\nis buffered with a 16MB limit. If the input exceeds this limit, the tool\nsilently truncates to the first 16MB and continues without signaling an error,\ncontrary to what the documentation states. This creates an integrity gap where\ntrailing bytes can be modified without detection if both signing and\nverification are performed using the same affected codepath.\n\nThe issue affects only the command-line tool behavior. Verifiers that process\nthe full message using library APIs will reject the signature, so the risk\nprimarily affects workflows that both sign and verify with the affected\n'openssl dgst' command. Streaming digest algorithms for 'openssl dgst' and\nlibrary users are unaffected.\n\nThe FIPS modules in 3.5 and 3.6 are not affected by this issue, as the\ncommand-line tools are outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.5 and 3.6 are vulnerable to this issue.\n\nOpenSSL 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -898,57 +856,77 @@
             },
             "CVE-2025-68160": {
                 "cve_id": "CVE-2025-68160",
-                "title": "openssl: OpenSSL: Denial of Service due to out-of-bounds write in BIO filter",
-                "description": "A flaw was found in OpenSSL. This vulnerability involves an out-of-bounds write in the line-buffering BIO filter, which can lead to memory corruption. While exploitation is unlikely to be under direct attacker control, a successful attack could cause an application to crash, resulting in a Denial of Service (DoS).",
-                "severity": "LOW",
+                "title": "Issue summary: Writing large, newline-free data into a BIO chain  ...",
+                "description": "Issue summary: Writing large, newline-free data into a BIO chain using the\nline-buffering filter where the next BIO performs short writes can trigger\na heap-based out-of-bounds write.\n\nImpact summary: This out-of-bounds write can cause memory corruption which\ntypically results in a crash, leading to Denial of Service for an application.\n\nThe line-buffering BIO filter (BIO_f_linebuffer) is not used by default in\nTLS/SSL data paths. In OpenSSL command-line applications, it is typically\nonly pushed onto stdout/stderr on VMS systems. Third-party applications that\nexplicitly use this filter with a BIO chain that can short-write and that\nwrite large, newline-free data influenced by an attacker would be affected.\nHowever, the circumstances where this could happen are unlikely to be under\nattacker control, and BIO_f_linebuffer is unlikely to be handling non-curated\ndata controlled by an attacker. For that reason the issue was assessed as\nLow severity.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the BIO implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69418": {
                 "cve_id": "CVE-2025-69418",
-                "title": "openssl: OpenSSL: Information disclosure and data tampering via specific low-level OCB encryption/decryption calls",
-                "description": "A flaw was found in OpenSSL. When applications directly call the low-level CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions with non-block-aligned lengths in a single call on hardware-accelerated builds, the trailing 1-15 bytes of a message may be exposed in cleartext. These exposed bytes are not covered by the authentication tag, allowing an attacker to read or tamper with them without detection.",
-                "severity": "LOW",
+                "title": "Issue summary: When using the low-level OCB API directly with AES ...",
+                "description": "Issue summary: When using the low-level OCB API directly with AES-NI or<br>other hardware-accelerated code paths, inputs whose length is not a multiple<br>of 16 bytes can leave the final partial block unencrypted and unauthenticated.<br><br>Impact summary: The trailing 1-15 bytes of a message may be exposed in<br>cleartext on encryption and are not covered by the authentication tag,<br>allowing an attacker to read or tamper with those bytes without detection.<br><br>The low-level OCB encrypt and decrypt routines in the hardware-accelerated<br>stream path process full 16-byte blocks but do not advance the input/output<br>pointers. The subsequent tail-handling code then operates on the original<br>base pointers, effectively reprocessing the beginning of the buffer while<br>leaving the actual trailing bytes unprocessed. The authentication checksum<br>also excludes the true tail bytes.<br><br>However, typical OpenSSL consumers using EVP are not affected because the<br>higher-level EVP and provider OCB implementations split inputs so that full<br>blocks and trailing partial blocks are processed in separate calls, avoiding<br>the problematic code path. Additionally, TLS does not use OCB ciphersuites.<br>The vulnerability only affects applications that call the low-level<br>CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions directly with<br>non-block-aligned lengths in a single call on hardware-accelerated builds.<br>For these reasons the issue was assessed as Low severity.<br><br>The FIPS modules in 3.6, 3.5, 3.4, 3.3, 3.2, 3.1 and 3.0 are not affected<br>by this issue, as OCB mode is not a FIPS-approved algorithm.<br><br>OpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.<br><br>OpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69420": {
                 "cve_id": "CVE-2025-69420",
-                "title": "openssl: OpenSSL: Denial of Service via malformed TimeStamp Response",
-                "description": "A flaw was found in OpenSSL. A type confusion vulnerability exists in the TimeStamp Response verification code, where an ASN1_TYPE union member is accessed without proper type validation. A remote attacker can exploit this by providing a malformed TimeStamp Response to an application that verifies timestamp responses. This can lead to an invalid or NULL pointer dereference, resulting in a Denial of Service (DoS) due to an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: A type confusion vulnerability exists in the TimeS ...",
+                "description": "Issue summary: A type confusion vulnerability exists in the TimeStamp Response\nverification code where an ASN1_TYPE union member is accessed without first\nvalidating the type, causing an invalid or NULL pointer dereference when\nprocessing a malformed TimeStamp Response file.\n\nImpact summary: An application calling TS_RESP_verify_response() with a\nmalformed TimeStamp Response can be caused to dereference an invalid or\nNULL pointer when reading, resulting in a Denial of Service.\n\nThe functions ossl_ess_get_signing_cert() and ossl_ess_get_signing_cert_v2()\naccess the signing cert attribute value without validating its type.\nWhen the type is not V_ASN1_SEQUENCE, this results in accessing invalid memory\nthrough the ASN1_TYPE union, causing a crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nTimeStamp Response to an application that verifies timestamp responses. The\nTimeStamp protocol (RFC 3161) is not widely used and the impact of the\nexploit is just a Denial of Service. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the TimeStamp Response implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69421": {
                 "cve_id": "CVE-2025-69421",
-                "title": "openssl: OpenSSL: Denial of Service via malformed PKCS#12 file processing",
-                "description": "A flaw was found in OpenSSL. This vulnerability allows a remote attacker to trigger a Denial of Service (DoS) by providing a specially crafted, malformed PKCS#12 file to an application that processes it. The flaw occurs due to a NULL pointer dereference in the PKCS12_item_decrypt_d2i_ex() function when handling the malformed file, leading to an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: Processing a malformed PKCS#12 file can trigger a  ...",
+                "description": "Issue summary: Processing a malformed PKCS#12 file can trigger a NULL pointer\ndereference in the PKCS12_item_decrypt_d2i_ex() function.\n\nImpact summary: A NULL pointer dereference can trigger a crash which leads to\nDenial of Service for an application processing PKCS#12 files.\n\nThe PKCS12_item_decrypt_d2i_ex() function does not check whether the oct\nparameter is NULL before dereferencing it. When called from\nPKCS12_unpack_p7encdata() with a malformed PKCS#12 file, this parameter can\nbe NULL, causing a crash. The vulnerability is limited to Denial of Service\nand cannot be escalated to achieve code execution or memory disclosure.\n\nExploiting this issue requires an attacker to provide a malformed PKCS#12 file\nto an application that processes it. For that reason the issue was assessed as\nLow severity according to our Security Policy.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -973,29 +951,39 @@
             },
             "CVE-2026-22795": {
                 "cve_id": "CVE-2026-22795",
-                "title": "openssl: OpenSSL: Denial of Service due to type confusion in PKCS#12 file processing",
-                "description": "A flaw was found in OpenSSL. This type confusion vulnerability allows a remote attacker to cause a Denial of Service (DoS) by tricking a user or application into processing a maliciously crafted PKCS#12 (Personal Information Exchange Syntax Standard) file. The vulnerability leads to an invalid or NULL pointer dereference, resulting in an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: An invalid or NULL pointer dereference can happen  ...",
+                "description": "Issue summary: An invalid or NULL pointer dereference can happen in\nan application processing a malformed PKCS#12 file.\n\nImpact summary: An application processing a malformed PKCS#12 file can be\ncaused to dereference an invalid or NULL pointer on memory read, resulting\nin a Denial of Service.\n\nA type confusion vulnerability exists in PKCS#12 parsing code where\nan ASN1_TYPE union member is accessed without first validating the type,\ncausing an invalid pointer read.\n\nThe location is constrained to a 1-byte address space, meaning any\nattempted pointer manipulation can only target addresses between 0x00 and 0xFF.\nThis range corresponds to the zero page, which is unmapped on most modern\noperating systems and will reliably result in a crash, leading only to a\nDenial of Service. Exploiting this issue also requires a user or application\nto process a maliciously crafted PKCS#12 file. It is uncommon to accept\nuntrusted PKCS#12 files in applications as they are usually used to store\nprivate keys which are trusted by definition. For these reasons, the issue\nwas assessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2026-22796": {
                 "cve_id": "CVE-2026-22796",
-                "title": "openssl: OpenSSL: Denial of Service via type confusion in PKCS#7 signature verification",
-                "description": "A flaw was found in OpenSSL. This type confusion vulnerability allows a remote attacker to cause a denial of service (DoS) by providing specially crafted PKCS#7 data to an application that performs signature verification. The vulnerability occurs because the application accesses an ASN1_TYPE union member without proper type validation, leading to an invalid or NULL pointer dereference and a crash.",
-                "severity": "LOW",
+                "title": "Issue summary: A type confusion vulnerability exists in the signa ...",
+                "description": "Issue summary: A type confusion vulnerability exists in the signature\nverification of signed PKCS#7 data where an ASN1_TYPE union member is\naccessed without first validating the type, causing an invalid or NULL\npointer dereference when processing malformed PKCS#7 data.\n\nImpact summary: An application performing signature verification of PKCS#7\ndata or calling directly the PKCS7_digest_from_attributes() function can be\ncaused to dereference an invalid or NULL pointer when reading, resulting in\na Denial of Service.\n\nThe function PKCS7_digest_from_attributes() accesses the message digest attribute\nvalue without validating its type. When the type is not V_ASN1_OCTET_STRING,\nthis results in accessing invalid memory through the ASN1_TYPE union, causing\na crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nsigned PKCS#7 to an application that verifies it. The impact of the\nexploit is just a Denial of Service, the PKCS7 API is legacy and applications\nshould be using the CMS API instead. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#7 parsing implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -1336,90 +1324,6 @@
                     {
                         "introduced": "0",
                         "fixed": "3.2.2-20.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2024-0727": {
-                "cve_id": "CVE-2024-0727",
-                "title": "openssl: denial of service via null dereference",
-                "description": "A flaw was found in OpenSSL. The optional ContentInfo fields can be set to null, even if the \"type\" is a valid value, which can lead to a null dereference error that may cause a denial of service.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2024-2511": {
-                "cve_id": "CVE-2024-2511",
-                "title": "openssl: Unbounded memory growth with session handling in TLSv1.3",
-                "description": "A flaw was found in OpenSSL. A malicious client can trigger an uncontrolled memory consumption, resulting in a Denial of Service. This issue occurs due to OpenSSL's TLSv1.3 session cache going into an incorrect state, leading to it failing to flush properly as it fills. OpenSSL must be configured with the non-default SSL_OP_NO_TICKET option enabled to be vulnerable. This issue only affects TLSv1.3 servers, while TLS clients are not affected.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-2650": {
-                "cve_id": "CVE-2023-2650",
-                "title": "openssl: Possible DoS translating ASN.1 object identifiers",
-                "description": "A flaw was found in OpenSSL resulting in a possible denial of service while translating ASN.1 object identifiers. Applications that use OBJ_obj2txt() directly, or use any of the OpenSSL subsystems OCSP, PKCS7/SMIME, CMS, CMP/CRMF or TS with no message size limit may experience long delays when processing messages, which may lead to a denial of service.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0464": {
-                "cve_id": "CVE-2023-0464",
-                "title": "openssl: Denial of service by excessive resource usage in verifying X509 policy constraints",
-                "description": "A security vulnerability has been identified in all supported OpenSSL versions related to verifying X.509 certificate chains that include policy constraints. This flaw allows attackers to exploit this vulnerability by creating a malicious certificate chain that triggers exponential use of computational resources, leading to a denial of service (DoS) attack on affected systems. Policy processing is disabled by default but can be enabled by passing the -policy' argument to the command line utilities or calling the X509_VERIFY_PARAM_set1_policies()' function.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0465": {
-                "cve_id": "CVE-2023-0465",
-                "title": "openssl: Invalid certificate policies in leaf certificates are silently ignored",
-                "description": "A flaw was found in OpenSSL. Applications that use a non-default option when verifying certificates may be vulnerable to an attack from a malicious CA to circumvent certain checks. OpenSSL and other certificate policy checks silently ignore invalid certificate policies in leaf certificates that are skipped for that certificate. A malicious CA could use this to deliberately assert invalid certificate policies to circumvent policy checking on the certificate altogether. Policy processing is disabled by default but can be enabled by passing the `-policy' argument to the command line utilities or by calling the `X509_VERIFY_PARAM_set1_policies()' function.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0466": {
-                "cve_id": "CVE-2023-0466",
-                "title": "openssl: Certificate policy check not enabled",
-                "description": "A flaw was found in OpenSSL. The X509_VERIFY_PARAM_add0_policy() function is documented to enable the certificate policy check when doing certificate verification implicitly. However, implementing the function does not enable the check, allowing certificates with invalid or incorrect policies to pass the certificate verification. Suddenly enabling the policy check could break existing deployments, so it was decided to keep the existing behavior of the X509_VERIFY_PARAM_add0_policy() function. The applications that require OpenSSL to perform certificate policy check need to use X509_VERIFY_PARAM_set1_policies() or explicitly enable the policy check by calling X509_VERIFY_PARAM_set_flags() with the X509_V_FLAG_POLICY_CHECK flag argument. Certificate policy checks are disabled by default in OpenSSL and are not commonly used by applications.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
                         "identifier": "rf"
                     }
                 ]
@@ -1498,20 +1402,15 @@
             },
             "CVE-2024-13176": {
                 "cve_id": "CVE-2024-13176",
-                "title": "openssl: Timing side-channel in ECDSA signature computation",
-                "description": "A timing side-channel vulnerability was found in OpenSSL. This vulnerability allows an attacker to recover the private key. However, measuring the timing would require local access to the signing application or a fast network connection with low latency. There is a timing signal of around 300 nanoseconds when the top word of the inverted ECDSA nonce value is zero. This issue can happen with significant probability only for some of the supported elliptic curves. In particular, the NIST P-521 curve is affected.",
-                "severity": "LOW",
+                "title": "Issue summary: A timing side-channel which could potentially allo ...",
+                "description": "Issue summary: A timing side-channel which could potentially allow recovering\nthe private key exists in the ECDSA signature computation.\n\nImpact summary: A timing side-channel in ECDSA signature computations\ncould allow recovering the private key by an attacker. However, measuring\nthe timing would require either local access to the signing application or\na very fast network connection with low latency.\n\nThere is a timing signal of around 300 nanoseconds when the top word of\nthe inverted ECDSA nonce value is zero. This can happen with significant\nprobability only for some of the supported elliptic curves. In particular\nthe NIST P-521 curve is affected. To be able to measure this leak, the attacker\nprocess must either be located in the same physical computer or must\nhave a very fast network connection with low latency. For that reason\nthe severity of this vulnerability is Low.\n\nThe FIPS modules in 3.4, 3.3, 3.2, 3.1 and 3.0 are affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
                         "introduced": "0",
                         "fixed": "3.2.4-11.rf",
                         "identifier": "rf"
-                    },
-                    {
-                        "introduced": "3.2.2-9.fc41",
-                        "fixed": "3.2.4-1.fc41",
-                        "identifier": "fc41"
                     }
                 ]
             },
@@ -1538,7 +1437,8 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "fixed": "3.5.6"
+                        "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
                     }
                 ]
             },
@@ -1563,29 +1463,39 @@
             },
             "CVE-2025-15468": {
                 "cve_id": "CVE-2025-15468",
-                "title": "openssl: OpenSSL: Denial of Service via NULL pointer dereference in QUIC protocol handling",
-                "description": "A flaw was found in openssl. A remote attacker could trigger a NULL pointer dereference by sending an unknown or unsupported cipher ID during the client hello callback in applications using the QUIC (Quick UDP Internet Connections) protocol. This vulnerability, occurring when the SSL_CIPHER_find() function is called in this specific context, leads to an abnormal termination of the running process, causing a Denial of Service (DoS).",
-                "severity": "LOW",
+                "title": "Issue summary: If an application using the SSL_CIPHER_find() func ...",
+                "description": "Issue summary: If an application using the SSL_CIPHER_find() function in\na QUIC protocol client or server receives an unknown cipher suite from\nthe peer, a NULL dereference occurs.\n\nImpact summary: A NULL pointer dereference leads to abnormal termination of\nthe running process causing Denial of Service.\n\nSome applications call SSL_CIPHER_find() from the client_hello_cb callback\non the cipher ID received from the peer. If this is done with an SSL object\nimplementing the QUIC protocol, NULL pointer dereference will happen if\nthe examined cipher ID is unknown or unsupported.\n\nAs it is not very common to call this function in applications using the QUIC \nprotocol and the worst outcome is Denial of Service, the issue was assessed\nas Low severity.\n\nThe vulnerable code was introduced in the 3.2 version with the addition\nof the QUIC protocol support.\n\nThe FIPS modules in 3.6, 3.5, 3.4 and 3.3 are not affected by this issue,\nas the QUIC implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4 and 3.3 are vulnerable to this issue.\n\nOpenSSL 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-15469": {
                 "cve_id": "CVE-2025-15469",
-                "title": "openssl: OpenSSL: Data integrity bypass in `openssl dgst` command due to silent truncation",
-                "description": "A flaw was found in openssl. When a user signs or verifies files larger than 16MB using the `openssl dgst` command with one-shot algorithms, the tool silently truncates the input to 16MB. This creates an integrity gap, allowing trailing data beyond the initial 16MB to be modified without detection because it remains unauthenticated. This vulnerability primarily impacts workflows that both sign and verify files using the affected `openssl dgst` command.",
-                "severity": "LOW",
+                "title": "Issue summary: The 'openssl dgst' command-line tool silently trun ...",
+                "description": "Issue summary: The 'openssl dgst' command-line tool silently truncates input\ndata to 16MB when using one-shot signing algorithms and reports success instead\nof an error.\n\nImpact summary: A user signing or verifying files larger than 16MB with\none-shot algorithms (such as Ed25519, Ed448, or ML-DSA) may believe the entire\nfile is authenticated while trailing data beyond 16MB remains unauthenticated.\n\nWhen the 'openssl dgst' command is used with algorithms that only support\none-shot signing (Ed25519, Ed448, ML-DSA-44, ML-DSA-65, ML-DSA-87), the input\nis buffered with a 16MB limit. If the input exceeds this limit, the tool\nsilently truncates to the first 16MB and continues without signaling an error,\ncontrary to what the documentation states. This creates an integrity gap where\ntrailing bytes can be modified without detection if both signing and\nverification are performed using the same affected codepath.\n\nThe issue affects only the command-line tool behavior. Verifiers that process\nthe full message using library APIs will reject the signature, so the risk\nprimarily affects workflows that both sign and verify with the affected\n'openssl dgst' command. Streaming digest algorithms for 'openssl dgst' and\nlibrary users are unaffected.\n\nThe FIPS modules in 3.5 and 3.6 are not affected by this issue, as the\ncommand-line tools are outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.5 and 3.6 are vulnerable to this issue.\n\nOpenSSL 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -1610,57 +1520,77 @@
             },
             "CVE-2025-68160": {
                 "cve_id": "CVE-2025-68160",
-                "title": "openssl: OpenSSL: Denial of Service due to out-of-bounds write in BIO filter",
-                "description": "A flaw was found in OpenSSL. This vulnerability involves an out-of-bounds write in the line-buffering BIO filter, which can lead to memory corruption. While exploitation is unlikely to be under direct attacker control, a successful attack could cause an application to crash, resulting in a Denial of Service (DoS).",
-                "severity": "LOW",
+                "title": "Issue summary: Writing large, newline-free data into a BIO chain  ...",
+                "description": "Issue summary: Writing large, newline-free data into a BIO chain using the\nline-buffering filter where the next BIO performs short writes can trigger\na heap-based out-of-bounds write.\n\nImpact summary: This out-of-bounds write can cause memory corruption which\ntypically results in a crash, leading to Denial of Service for an application.\n\nThe line-buffering BIO filter (BIO_f_linebuffer) is not used by default in\nTLS/SSL data paths. In OpenSSL command-line applications, it is typically\nonly pushed onto stdout/stderr on VMS systems. Third-party applications that\nexplicitly use this filter with a BIO chain that can short-write and that\nwrite large, newline-free data influenced by an attacker would be affected.\nHowever, the circumstances where this could happen are unlikely to be under\nattacker control, and BIO_f_linebuffer is unlikely to be handling non-curated\ndata controlled by an attacker. For that reason the issue was assessed as\nLow severity.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the BIO implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69418": {
                 "cve_id": "CVE-2025-69418",
-                "title": "openssl: OpenSSL: Information disclosure and data tampering via specific low-level OCB encryption/decryption calls",
-                "description": "A flaw was found in OpenSSL. When applications directly call the low-level CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions with non-block-aligned lengths in a single call on hardware-accelerated builds, the trailing 1-15 bytes of a message may be exposed in cleartext. These exposed bytes are not covered by the authentication tag, allowing an attacker to read or tamper with them without detection.",
-                "severity": "LOW",
+                "title": "Issue summary: When using the low-level OCB API directly with AES ...",
+                "description": "Issue summary: When using the low-level OCB API directly with AES-NI or<br>other hardware-accelerated code paths, inputs whose length is not a multiple<br>of 16 bytes can leave the final partial block unencrypted and unauthenticated.<br><br>Impact summary: The trailing 1-15 bytes of a message may be exposed in<br>cleartext on encryption and are not covered by the authentication tag,<br>allowing an attacker to read or tamper with those bytes without detection.<br><br>The low-level OCB encrypt and decrypt routines in the hardware-accelerated<br>stream path process full 16-byte blocks but do not advance the input/output<br>pointers. The subsequent tail-handling code then operates on the original<br>base pointers, effectively reprocessing the beginning of the buffer while<br>leaving the actual trailing bytes unprocessed. The authentication checksum<br>also excludes the true tail bytes.<br><br>However, typical OpenSSL consumers using EVP are not affected because the<br>higher-level EVP and provider OCB implementations split inputs so that full<br>blocks and trailing partial blocks are processed in separate calls, avoiding<br>the problematic code path. Additionally, TLS does not use OCB ciphersuites.<br>The vulnerability only affects applications that call the low-level<br>CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions directly with<br>non-block-aligned lengths in a single call on hardware-accelerated builds.<br>For these reasons the issue was assessed as Low severity.<br><br>The FIPS modules in 3.6, 3.5, 3.4, 3.3, 3.2, 3.1 and 3.0 are not affected<br>by this issue, as OCB mode is not a FIPS-approved algorithm.<br><br>OpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.<br><br>OpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69420": {
                 "cve_id": "CVE-2025-69420",
-                "title": "openssl: OpenSSL: Denial of Service via malformed TimeStamp Response",
-                "description": "A flaw was found in OpenSSL. A type confusion vulnerability exists in the TimeStamp Response verification code, where an ASN1_TYPE union member is accessed without proper type validation. A remote attacker can exploit this by providing a malformed TimeStamp Response to an application that verifies timestamp responses. This can lead to an invalid or NULL pointer dereference, resulting in a Denial of Service (DoS) due to an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: A type confusion vulnerability exists in the TimeS ...",
+                "description": "Issue summary: A type confusion vulnerability exists in the TimeStamp Response\nverification code where an ASN1_TYPE union member is accessed without first\nvalidating the type, causing an invalid or NULL pointer dereference when\nprocessing a malformed TimeStamp Response file.\n\nImpact summary: An application calling TS_RESP_verify_response() with a\nmalformed TimeStamp Response can be caused to dereference an invalid or\nNULL pointer when reading, resulting in a Denial of Service.\n\nThe functions ossl_ess_get_signing_cert() and ossl_ess_get_signing_cert_v2()\naccess the signing cert attribute value without validating its type.\nWhen the type is not V_ASN1_SEQUENCE, this results in accessing invalid memory\nthrough the ASN1_TYPE union, causing a crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nTimeStamp Response to an application that verifies timestamp responses. The\nTimeStamp protocol (RFC 3161) is not widely used and the impact of the\nexploit is just a Denial of Service. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the TimeStamp Response implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69421": {
                 "cve_id": "CVE-2025-69421",
-                "title": "openssl: OpenSSL: Denial of Service via malformed PKCS#12 file processing",
-                "description": "A flaw was found in OpenSSL. This vulnerability allows a remote attacker to trigger a Denial of Service (DoS) by providing a specially crafted, malformed PKCS#12 file to an application that processes it. The flaw occurs due to a NULL pointer dereference in the PKCS12_item_decrypt_d2i_ex() function when handling the malformed file, leading to an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: Processing a malformed PKCS#12 file can trigger a  ...",
+                "description": "Issue summary: Processing a malformed PKCS#12 file can trigger a NULL pointer\ndereference in the PKCS12_item_decrypt_d2i_ex() function.\n\nImpact summary: A NULL pointer dereference can trigger a crash which leads to\nDenial of Service for an application processing PKCS#12 files.\n\nThe PKCS12_item_decrypt_d2i_ex() function does not check whether the oct\nparameter is NULL before dereferencing it. When called from\nPKCS12_unpack_p7encdata() with a malformed PKCS#12 file, this parameter can\nbe NULL, causing a crash. The vulnerability is limited to Denial of Service\nand cannot be escalated to achieve code execution or memory disclosure.\n\nExploiting this issue requires an attacker to provide a malformed PKCS#12 file\nto an application that processes it. For that reason the issue was assessed as\nLow severity according to our Security Policy.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -1685,29 +1615,39 @@
             },
             "CVE-2026-22795": {
                 "cve_id": "CVE-2026-22795",
-                "title": "openssl: OpenSSL: Denial of Service due to type confusion in PKCS#12 file processing",
-                "description": "A flaw was found in OpenSSL. This type confusion vulnerability allows a remote attacker to cause a Denial of Service (DoS) by tricking a user or application into processing a maliciously crafted PKCS#12 (Personal Information Exchange Syntax Standard) file. The vulnerability leads to an invalid or NULL pointer dereference, resulting in an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: An invalid or NULL pointer dereference can happen  ...",
+                "description": "Issue summary: An invalid or NULL pointer dereference can happen in\nan application processing a malformed PKCS#12 file.\n\nImpact summary: An application processing a malformed PKCS#12 file can be\ncaused to dereference an invalid or NULL pointer on memory read, resulting\nin a Denial of Service.\n\nA type confusion vulnerability exists in PKCS#12 parsing code where\nan ASN1_TYPE union member is accessed without first validating the type,\ncausing an invalid pointer read.\n\nThe location is constrained to a 1-byte address space, meaning any\nattempted pointer manipulation can only target addresses between 0x00 and 0xFF.\nThis range corresponds to the zero page, which is unmapped on most modern\noperating systems and will reliably result in a crash, leading only to a\nDenial of Service. Exploiting this issue also requires a user or application\nto process a maliciously crafted PKCS#12 file. It is uncommon to accept\nuntrusted PKCS#12 files in applications as they are usually used to store\nprivate keys which are trusted by definition. For these reasons, the issue\nwas assessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2026-22796": {
                 "cve_id": "CVE-2026-22796",
-                "title": "openssl: OpenSSL: Denial of Service via type confusion in PKCS#7 signature verification",
-                "description": "A flaw was found in OpenSSL. This type confusion vulnerability allows a remote attacker to cause a denial of service (DoS) by providing specially crafted PKCS#7 data to an application that performs signature verification. The vulnerability occurs because the application accesses an ASN1_TYPE union member without proper type validation, leading to an invalid or NULL pointer dereference and a crash.",
-                "severity": "LOW",
+                "title": "Issue summary: A type confusion vulnerability exists in the signa ...",
+                "description": "Issue summary: A type confusion vulnerability exists in the signature\nverification of signed PKCS#7 data where an ASN1_TYPE union member is\naccessed without first validating the type, causing an invalid or NULL\npointer dereference when processing malformed PKCS#7 data.\n\nImpact summary: An application performing signature verification of PKCS#7\ndata or calling directly the PKCS7_digest_from_attributes() function can be\ncaused to dereference an invalid or NULL pointer when reading, resulting in\na Denial of Service.\n\nThe function PKCS7_digest_from_attributes() accesses the message digest attribute\nvalue without validating its type. When the type is not V_ASN1_OCTET_STRING,\nthis results in accessing invalid memory through the ASN1_TYPE union, causing\na crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nsigned PKCS#7 to an application that verifies it. The impact of the\nexploit is just a Denial of Service, the PKCS7 API is legacy and applications\nshould be using the CMS API instead. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#7 parsing implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -2048,90 +1988,6 @@
                     {
                         "introduced": "0",
                         "fixed": "3.2.2-20.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2024-0727": {
-                "cve_id": "CVE-2024-0727",
-                "title": "openssl: denial of service via null dereference",
-                "description": "A flaw was found in OpenSSL. The optional ContentInfo fields can be set to null, even if the \"type\" is a valid value, which can lead to a null dereference error that may cause a denial of service.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2024-2511": {
-                "cve_id": "CVE-2024-2511",
-                "title": "openssl: Unbounded memory growth with session handling in TLSv1.3",
-                "description": "A flaw was found in OpenSSL. A malicious client can trigger an uncontrolled memory consumption, resulting in a Denial of Service. This issue occurs due to OpenSSL's TLSv1.3 session cache going into an incorrect state, leading to it failing to flush properly as it fills. OpenSSL must be configured with the non-default SSL_OP_NO_TICKET option enabled to be vulnerable. This issue only affects TLSv1.3 servers, while TLS clients are not affected.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-2650": {
-                "cve_id": "CVE-2023-2650",
-                "title": "openssl: Possible DoS translating ASN.1 object identifiers",
-                "description": "A flaw was found in OpenSSL resulting in a possible denial of service while translating ASN.1 object identifiers. Applications that use OBJ_obj2txt() directly, or use any of the OpenSSL subsystems OCSP, PKCS7/SMIME, CMS, CMP/CRMF or TS with no message size limit may experience long delays when processing messages, which may lead to a denial of service.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0464": {
-                "cve_id": "CVE-2023-0464",
-                "title": "openssl: Denial of service by excessive resource usage in verifying X509 policy constraints",
-                "description": "A security vulnerability has been identified in all supported OpenSSL versions related to verifying X.509 certificate chains that include policy constraints. This flaw allows attackers to exploit this vulnerability by creating a malicious certificate chain that triggers exponential use of computational resources, leading to a denial of service (DoS) attack on affected systems. Policy processing is disabled by default but can be enabled by passing the -policy' argument to the command line utilities or calling the X509_VERIFY_PARAM_set1_policies()' function.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0465": {
-                "cve_id": "CVE-2023-0465",
-                "title": "openssl: Invalid certificate policies in leaf certificates are silently ignored",
-                "description": "A flaw was found in OpenSSL. Applications that use a non-default option when verifying certificates may be vulnerable to an attack from a malicious CA to circumvent certain checks. OpenSSL and other certificate policy checks silently ignore invalid certificate policies in leaf certificates that are skipped for that certificate. A malicious CA could use this to deliberately assert invalid certificate policies to circumvent policy checking on the certificate altogether. Policy processing is disabled by default but can be enabled by passing the `-policy' argument to the command line utilities or by calling the `X509_VERIFY_PARAM_set1_policies()' function.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0466": {
-                "cve_id": "CVE-2023-0466",
-                "title": "openssl: Certificate policy check not enabled",
-                "description": "A flaw was found in OpenSSL. The X509_VERIFY_PARAM_add0_policy() function is documented to enable the certificate policy check when doing certificate verification implicitly. However, implementing the function does not enable the check, allowing certificates with invalid or incorrect policies to pass the certificate verification. Suddenly enabling the policy check could break existing deployments, so it was decided to keep the existing behavior of the X509_VERIFY_PARAM_add0_policy() function. The applications that require OpenSSL to perform certificate policy check need to use X509_VERIFY_PARAM_set1_policies() or explicitly enable the policy check by calling X509_VERIFY_PARAM_set_flags() with the X509_V_FLAG_POLICY_CHECK flag argument. Certificate policy checks are disabled by default in OpenSSL and are not commonly used by applications.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
                         "identifier": "rf"
                     }
                 ]
@@ -2210,20 +2066,15 @@
             },
             "CVE-2024-13176": {
                 "cve_id": "CVE-2024-13176",
-                "title": "openssl: Timing side-channel in ECDSA signature computation",
-                "description": "A timing side-channel vulnerability was found in OpenSSL. This vulnerability allows an attacker to recover the private key. However, measuring the timing would require local access to the signing application or a fast network connection with low latency. There is a timing signal of around 300 nanoseconds when the top word of the inverted ECDSA nonce value is zero. This issue can happen with significant probability only for some of the supported elliptic curves. In particular, the NIST P-521 curve is affected.",
-                "severity": "LOW",
+                "title": "Issue summary: A timing side-channel which could potentially allo ...",
+                "description": "Issue summary: A timing side-channel which could potentially allow recovering\nthe private key exists in the ECDSA signature computation.\n\nImpact summary: A timing side-channel in ECDSA signature computations\ncould allow recovering the private key by an attacker. However, measuring\nthe timing would require either local access to the signing application or\na very fast network connection with low latency.\n\nThere is a timing signal of around 300 nanoseconds when the top word of\nthe inverted ECDSA nonce value is zero. This can happen with significant\nprobability only for some of the supported elliptic curves. In particular\nthe NIST P-521 curve is affected. To be able to measure this leak, the attacker\nprocess must either be located in the same physical computer or must\nhave a very fast network connection with low latency. For that reason\nthe severity of this vulnerability is Low.\n\nThe FIPS modules in 3.4, 3.3, 3.2, 3.1 and 3.0 are affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
                         "introduced": "0",
                         "fixed": "3.2.4-11.rf",
                         "identifier": "rf"
-                    },
-                    {
-                        "introduced": "3.2.2-9.fc41",
-                        "fixed": "3.2.4-1.fc41",
-                        "identifier": "fc41"
                     }
                 ]
             },
@@ -2250,7 +2101,8 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "fixed": "3.5.6"
+                        "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
                     }
                 ]
             },
@@ -2275,29 +2127,39 @@
             },
             "CVE-2025-15468": {
                 "cve_id": "CVE-2025-15468",
-                "title": "openssl: OpenSSL: Denial of Service via NULL pointer dereference in QUIC protocol handling",
-                "description": "A flaw was found in openssl. A remote attacker could trigger a NULL pointer dereference by sending an unknown or unsupported cipher ID during the client hello callback in applications using the QUIC (Quick UDP Internet Connections) protocol. This vulnerability, occurring when the SSL_CIPHER_find() function is called in this specific context, leads to an abnormal termination of the running process, causing a Denial of Service (DoS).",
-                "severity": "LOW",
+                "title": "Issue summary: If an application using the SSL_CIPHER_find() func ...",
+                "description": "Issue summary: If an application using the SSL_CIPHER_find() function in\na QUIC protocol client or server receives an unknown cipher suite from\nthe peer, a NULL dereference occurs.\n\nImpact summary: A NULL pointer dereference leads to abnormal termination of\nthe running process causing Denial of Service.\n\nSome applications call SSL_CIPHER_find() from the client_hello_cb callback\non the cipher ID received from the peer. If this is done with an SSL object\nimplementing the QUIC protocol, NULL pointer dereference will happen if\nthe examined cipher ID is unknown or unsupported.\n\nAs it is not very common to call this function in applications using the QUIC \nprotocol and the worst outcome is Denial of Service, the issue was assessed\nas Low severity.\n\nThe vulnerable code was introduced in the 3.2 version with the addition\nof the QUIC protocol support.\n\nThe FIPS modules in 3.6, 3.5, 3.4 and 3.3 are not affected by this issue,\nas the QUIC implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4 and 3.3 are vulnerable to this issue.\n\nOpenSSL 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-15469": {
                 "cve_id": "CVE-2025-15469",
-                "title": "openssl: OpenSSL: Data integrity bypass in `openssl dgst` command due to silent truncation",
-                "description": "A flaw was found in openssl. When a user signs or verifies files larger than 16MB using the `openssl dgst` command with one-shot algorithms, the tool silently truncates the input to 16MB. This creates an integrity gap, allowing trailing data beyond the initial 16MB to be modified without detection because it remains unauthenticated. This vulnerability primarily impacts workflows that both sign and verify files using the affected `openssl dgst` command.",
-                "severity": "LOW",
+                "title": "Issue summary: The 'openssl dgst' command-line tool silently trun ...",
+                "description": "Issue summary: The 'openssl dgst' command-line tool silently truncates input\ndata to 16MB when using one-shot signing algorithms and reports success instead\nof an error.\n\nImpact summary: A user signing or verifying files larger than 16MB with\none-shot algorithms (such as Ed25519, Ed448, or ML-DSA) may believe the entire\nfile is authenticated while trailing data beyond 16MB remains unauthenticated.\n\nWhen the 'openssl dgst' command is used with algorithms that only support\none-shot signing (Ed25519, Ed448, ML-DSA-44, ML-DSA-65, ML-DSA-87), the input\nis buffered with a 16MB limit. If the input exceeds this limit, the tool\nsilently truncates to the first 16MB and continues without signaling an error,\ncontrary to what the documentation states. This creates an integrity gap where\ntrailing bytes can be modified without detection if both signing and\nverification are performed using the same affected codepath.\n\nThe issue affects only the command-line tool behavior. Verifiers that process\nthe full message using library APIs will reject the signature, so the risk\nprimarily affects workflows that both sign and verify with the affected\n'openssl dgst' command. Streaming digest algorithms for 'openssl dgst' and\nlibrary users are unaffected.\n\nThe FIPS modules in 3.5 and 3.6 are not affected by this issue, as the\ncommand-line tools are outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.5 and 3.6 are vulnerable to this issue.\n\nOpenSSL 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -2322,57 +2184,77 @@
             },
             "CVE-2025-68160": {
                 "cve_id": "CVE-2025-68160",
-                "title": "openssl: OpenSSL: Denial of Service due to out-of-bounds write in BIO filter",
-                "description": "A flaw was found in OpenSSL. This vulnerability involves an out-of-bounds write in the line-buffering BIO filter, which can lead to memory corruption. While exploitation is unlikely to be under direct attacker control, a successful attack could cause an application to crash, resulting in a Denial of Service (DoS).",
-                "severity": "LOW",
+                "title": "Issue summary: Writing large, newline-free data into a BIO chain  ...",
+                "description": "Issue summary: Writing large, newline-free data into a BIO chain using the\nline-buffering filter where the next BIO performs short writes can trigger\na heap-based out-of-bounds write.\n\nImpact summary: This out-of-bounds write can cause memory corruption which\ntypically results in a crash, leading to Denial of Service for an application.\n\nThe line-buffering BIO filter (BIO_f_linebuffer) is not used by default in\nTLS/SSL data paths. In OpenSSL command-line applications, it is typically\nonly pushed onto stdout/stderr on VMS systems. Third-party applications that\nexplicitly use this filter with a BIO chain that can short-write and that\nwrite large, newline-free data influenced by an attacker would be affected.\nHowever, the circumstances where this could happen are unlikely to be under\nattacker control, and BIO_f_linebuffer is unlikely to be handling non-curated\ndata controlled by an attacker. For that reason the issue was assessed as\nLow severity.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the BIO implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69418": {
                 "cve_id": "CVE-2025-69418",
-                "title": "openssl: OpenSSL: Information disclosure and data tampering via specific low-level OCB encryption/decryption calls",
-                "description": "A flaw was found in OpenSSL. When applications directly call the low-level CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions with non-block-aligned lengths in a single call on hardware-accelerated builds, the trailing 1-15 bytes of a message may be exposed in cleartext. These exposed bytes are not covered by the authentication tag, allowing an attacker to read or tamper with them without detection.",
-                "severity": "LOW",
+                "title": "Issue summary: When using the low-level OCB API directly with AES ...",
+                "description": "Issue summary: When using the low-level OCB API directly with AES-NI or<br>other hardware-accelerated code paths, inputs whose length is not a multiple<br>of 16 bytes can leave the final partial block unencrypted and unauthenticated.<br><br>Impact summary: The trailing 1-15 bytes of a message may be exposed in<br>cleartext on encryption and are not covered by the authentication tag,<br>allowing an attacker to read or tamper with those bytes without detection.<br><br>The low-level OCB encrypt and decrypt routines in the hardware-accelerated<br>stream path process full 16-byte blocks but do not advance the input/output<br>pointers. The subsequent tail-handling code then operates on the original<br>base pointers, effectively reprocessing the beginning of the buffer while<br>leaving the actual trailing bytes unprocessed. The authentication checksum<br>also excludes the true tail bytes.<br><br>However, typical OpenSSL consumers using EVP are not affected because the<br>higher-level EVP and provider OCB implementations split inputs so that full<br>blocks and trailing partial blocks are processed in separate calls, avoiding<br>the problematic code path. Additionally, TLS does not use OCB ciphersuites.<br>The vulnerability only affects applications that call the low-level<br>CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions directly with<br>non-block-aligned lengths in a single call on hardware-accelerated builds.<br>For these reasons the issue was assessed as Low severity.<br><br>The FIPS modules in 3.6, 3.5, 3.4, 3.3, 3.2, 3.1 and 3.0 are not affected<br>by this issue, as OCB mode is not a FIPS-approved algorithm.<br><br>OpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.<br><br>OpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69420": {
                 "cve_id": "CVE-2025-69420",
-                "title": "openssl: OpenSSL: Denial of Service via malformed TimeStamp Response",
-                "description": "A flaw was found in OpenSSL. A type confusion vulnerability exists in the TimeStamp Response verification code, where an ASN1_TYPE union member is accessed without proper type validation. A remote attacker can exploit this by providing a malformed TimeStamp Response to an application that verifies timestamp responses. This can lead to an invalid or NULL pointer dereference, resulting in a Denial of Service (DoS) due to an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: A type confusion vulnerability exists in the TimeS ...",
+                "description": "Issue summary: A type confusion vulnerability exists in the TimeStamp Response\nverification code where an ASN1_TYPE union member is accessed without first\nvalidating the type, causing an invalid or NULL pointer dereference when\nprocessing a malformed TimeStamp Response file.\n\nImpact summary: An application calling TS_RESP_verify_response() with a\nmalformed TimeStamp Response can be caused to dereference an invalid or\nNULL pointer when reading, resulting in a Denial of Service.\n\nThe functions ossl_ess_get_signing_cert() and ossl_ess_get_signing_cert_v2()\naccess the signing cert attribute value without validating its type.\nWhen the type is not V_ASN1_SEQUENCE, this results in accessing invalid memory\nthrough the ASN1_TYPE union, causing a crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nTimeStamp Response to an application that verifies timestamp responses. The\nTimeStamp protocol (RFC 3161) is not widely used and the impact of the\nexploit is just a Denial of Service. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the TimeStamp Response implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69421": {
                 "cve_id": "CVE-2025-69421",
-                "title": "openssl: OpenSSL: Denial of Service via malformed PKCS#12 file processing",
-                "description": "A flaw was found in OpenSSL. This vulnerability allows a remote attacker to trigger a Denial of Service (DoS) by providing a specially crafted, malformed PKCS#12 file to an application that processes it. The flaw occurs due to a NULL pointer dereference in the PKCS12_item_decrypt_d2i_ex() function when handling the malformed file, leading to an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: Processing a malformed PKCS#12 file can trigger a  ...",
+                "description": "Issue summary: Processing a malformed PKCS#12 file can trigger a NULL pointer\ndereference in the PKCS12_item_decrypt_d2i_ex() function.\n\nImpact summary: A NULL pointer dereference can trigger a crash which leads to\nDenial of Service for an application processing PKCS#12 files.\n\nThe PKCS12_item_decrypt_d2i_ex() function does not check whether the oct\nparameter is NULL before dereferencing it. When called from\nPKCS12_unpack_p7encdata() with a malformed PKCS#12 file, this parameter can\nbe NULL, causing a crash. The vulnerability is limited to Denial of Service\nand cannot be escalated to achieve code execution or memory disclosure.\n\nExploiting this issue requires an attacker to provide a malformed PKCS#12 file\nto an application that processes it. For that reason the issue was assessed as\nLow severity according to our Security Policy.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -2397,29 +2279,39 @@
             },
             "CVE-2026-22795": {
                 "cve_id": "CVE-2026-22795",
-                "title": "openssl: OpenSSL: Denial of Service due to type confusion in PKCS#12 file processing",
-                "description": "A flaw was found in OpenSSL. This type confusion vulnerability allows a remote attacker to cause a Denial of Service (DoS) by tricking a user or application into processing a maliciously crafted PKCS#12 (Personal Information Exchange Syntax Standard) file. The vulnerability leads to an invalid or NULL pointer dereference, resulting in an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: An invalid or NULL pointer dereference can happen  ...",
+                "description": "Issue summary: An invalid or NULL pointer dereference can happen in\nan application processing a malformed PKCS#12 file.\n\nImpact summary: An application processing a malformed PKCS#12 file can be\ncaused to dereference an invalid or NULL pointer on memory read, resulting\nin a Denial of Service.\n\nA type confusion vulnerability exists in PKCS#12 parsing code where\nan ASN1_TYPE union member is accessed without first validating the type,\ncausing an invalid pointer read.\n\nThe location is constrained to a 1-byte address space, meaning any\nattempted pointer manipulation can only target addresses between 0x00 and 0xFF.\nThis range corresponds to the zero page, which is unmapped on most modern\noperating systems and will reliably result in a crash, leading only to a\nDenial of Service. Exploiting this issue also requires a user or application\nto process a maliciously crafted PKCS#12 file. It is uncommon to accept\nuntrusted PKCS#12 files in applications as they are usually used to store\nprivate keys which are trusted by definition. For these reasons, the issue\nwas assessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2026-22796": {
                 "cve_id": "CVE-2026-22796",
-                "title": "openssl: OpenSSL: Denial of Service via type confusion in PKCS#7 signature verification",
-                "description": "A flaw was found in OpenSSL. This type confusion vulnerability allows a remote attacker to cause a denial of service (DoS) by providing specially crafted PKCS#7 data to an application that performs signature verification. The vulnerability occurs because the application accesses an ASN1_TYPE union member without proper type validation, leading to an invalid or NULL pointer dereference and a crash.",
-                "severity": "LOW",
+                "title": "Issue summary: A type confusion vulnerability exists in the signa ...",
+                "description": "Issue summary: A type confusion vulnerability exists in the signature\nverification of signed PKCS#7 data where an ASN1_TYPE union member is\naccessed without first validating the type, causing an invalid or NULL\npointer dereference when processing malformed PKCS#7 data.\n\nImpact summary: An application performing signature verification of PKCS#7\ndata or calling directly the PKCS7_digest_from_attributes() function can be\ncaused to dereference an invalid or NULL pointer when reading, resulting in\na Denial of Service.\n\nThe function PKCS7_digest_from_attributes() accesses the message digest attribute\nvalue without validating its type. When the type is not V_ASN1_OCTET_STRING,\nthis results in accessing invalid memory through the ASN1_TYPE union, causing\na crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nsigned PKCS#7 to an application that verifies it. The impact of the\nexploit is just a Denial of Service, the PKCS7 API is legacy and applications\nshould be using the CMS API instead. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#7 parsing implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -2760,90 +2652,6 @@
                     {
                         "introduced": "0",
                         "fixed": "3.2.2-20.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2024-0727": {
-                "cve_id": "CVE-2024-0727",
-                "title": "openssl: denial of service via null dereference",
-                "description": "A flaw was found in OpenSSL. The optional ContentInfo fields can be set to null, even if the \"type\" is a valid value, which can lead to a null dereference error that may cause a denial of service.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2024-2511": {
-                "cve_id": "CVE-2024-2511",
-                "title": "openssl: Unbounded memory growth with session handling in TLSv1.3",
-                "description": "A flaw was found in OpenSSL. A malicious client can trigger an uncontrolled memory consumption, resulting in a Denial of Service. This issue occurs due to OpenSSL's TLSv1.3 session cache going into an incorrect state, leading to it failing to flush properly as it fills. OpenSSL must be configured with the non-default SSL_OP_NO_TICKET option enabled to be vulnerable. This issue only affects TLSv1.3 servers, while TLS clients are not affected.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-2650": {
-                "cve_id": "CVE-2023-2650",
-                "title": "openssl: Possible DoS translating ASN.1 object identifiers",
-                "description": "A flaw was found in OpenSSL resulting in a possible denial of service while translating ASN.1 object identifiers. Applications that use OBJ_obj2txt() directly, or use any of the OpenSSL subsystems OCSP, PKCS7/SMIME, CMS, CMP/CRMF or TS with no message size limit may experience long delays when processing messages, which may lead to a denial of service.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0464": {
-                "cve_id": "CVE-2023-0464",
-                "title": "openssl: Denial of service by excessive resource usage in verifying X509 policy constraints",
-                "description": "A security vulnerability has been identified in all supported OpenSSL versions related to verifying X.509 certificate chains that include policy constraints. This flaw allows attackers to exploit this vulnerability by creating a malicious certificate chain that triggers exponential use of computational resources, leading to a denial of service (DoS) attack on affected systems. Policy processing is disabled by default but can be enabled by passing the -policy' argument to the command line utilities or calling the X509_VERIFY_PARAM_set1_policies()' function.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0465": {
-                "cve_id": "CVE-2023-0465",
-                "title": "openssl: Invalid certificate policies in leaf certificates are silently ignored",
-                "description": "A flaw was found in OpenSSL. Applications that use a non-default option when verifying certificates may be vulnerable to an attack from a malicious CA to circumvent certain checks. OpenSSL and other certificate policy checks silently ignore invalid certificate policies in leaf certificates that are skipped for that certificate. A malicious CA could use this to deliberately assert invalid certificate policies to circumvent policy checking on the certificate altogether. Policy processing is disabled by default but can be enabled by passing the `-policy' argument to the command line utilities or by calling the `X509_VERIFY_PARAM_set1_policies()' function.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0466": {
-                "cve_id": "CVE-2023-0466",
-                "title": "openssl: Certificate policy check not enabled",
-                "description": "A flaw was found in OpenSSL. The X509_VERIFY_PARAM_add0_policy() function is documented to enable the certificate policy check when doing certificate verification implicitly. However, implementing the function does not enable the check, allowing certificates with invalid or incorrect policies to pass the certificate verification. Suddenly enabling the policy check could break existing deployments, so it was decided to keep the existing behavior of the X509_VERIFY_PARAM_add0_policy() function. The applications that require OpenSSL to perform certificate policy check need to use X509_VERIFY_PARAM_set1_policies() or explicitly enable the policy check by calling X509_VERIFY_PARAM_set_flags() with the X509_V_FLAG_POLICY_CHECK flag argument. Certificate policy checks are disabled by default in OpenSSL and are not commonly used by applications.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
                         "identifier": "rf"
                     }
                 ]
@@ -2922,20 +2730,15 @@
             },
             "CVE-2024-13176": {
                 "cve_id": "CVE-2024-13176",
-                "title": "openssl: Timing side-channel in ECDSA signature computation",
-                "description": "A timing side-channel vulnerability was found in OpenSSL. This vulnerability allows an attacker to recover the private key. However, measuring the timing would require local access to the signing application or a fast network connection with low latency. There is a timing signal of around 300 nanoseconds when the top word of the inverted ECDSA nonce value is zero. This issue can happen with significant probability only for some of the supported elliptic curves. In particular, the NIST P-521 curve is affected.",
-                "severity": "LOW",
+                "title": "Issue summary: A timing side-channel which could potentially allo ...",
+                "description": "Issue summary: A timing side-channel which could potentially allow recovering\nthe private key exists in the ECDSA signature computation.\n\nImpact summary: A timing side-channel in ECDSA signature computations\ncould allow recovering the private key by an attacker. However, measuring\nthe timing would require either local access to the signing application or\na very fast network connection with low latency.\n\nThere is a timing signal of around 300 nanoseconds when the top word of\nthe inverted ECDSA nonce value is zero. This can happen with significant\nprobability only for some of the supported elliptic curves. In particular\nthe NIST P-521 curve is affected. To be able to measure this leak, the attacker\nprocess must either be located in the same physical computer or must\nhave a very fast network connection with low latency. For that reason\nthe severity of this vulnerability is Low.\n\nThe FIPS modules in 3.4, 3.3, 3.2, 3.1 and 3.0 are affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
                         "introduced": "0",
                         "fixed": "3.2.4-11.rf",
                         "identifier": "rf"
-                    },
-                    {
-                        "introduced": "3.2.2-9.fc41",
-                        "fixed": "3.2.4-1.fc41",
-                        "identifier": "fc41"
                     }
                 ]
             },
@@ -2962,7 +2765,8 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "fixed": "3.5.6"
+                        "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
                     }
                 ]
             },
@@ -2987,29 +2791,39 @@
             },
             "CVE-2025-15468": {
                 "cve_id": "CVE-2025-15468",
-                "title": "openssl: OpenSSL: Denial of Service via NULL pointer dereference in QUIC protocol handling",
-                "description": "A flaw was found in openssl. A remote attacker could trigger a NULL pointer dereference by sending an unknown or unsupported cipher ID during the client hello callback in applications using the QUIC (Quick UDP Internet Connections) protocol. This vulnerability, occurring when the SSL_CIPHER_find() function is called in this specific context, leads to an abnormal termination of the running process, causing a Denial of Service (DoS).",
-                "severity": "LOW",
+                "title": "Issue summary: If an application using the SSL_CIPHER_find() func ...",
+                "description": "Issue summary: If an application using the SSL_CIPHER_find() function in\na QUIC protocol client or server receives an unknown cipher suite from\nthe peer, a NULL dereference occurs.\n\nImpact summary: A NULL pointer dereference leads to abnormal termination of\nthe running process causing Denial of Service.\n\nSome applications call SSL_CIPHER_find() from the client_hello_cb callback\non the cipher ID received from the peer. If this is done with an SSL object\nimplementing the QUIC protocol, NULL pointer dereference will happen if\nthe examined cipher ID is unknown or unsupported.\n\nAs it is not very common to call this function in applications using the QUIC \nprotocol and the worst outcome is Denial of Service, the issue was assessed\nas Low severity.\n\nThe vulnerable code was introduced in the 3.2 version with the addition\nof the QUIC protocol support.\n\nThe FIPS modules in 3.6, 3.5, 3.4 and 3.3 are not affected by this issue,\nas the QUIC implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4 and 3.3 are vulnerable to this issue.\n\nOpenSSL 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-15469": {
                 "cve_id": "CVE-2025-15469",
-                "title": "openssl: OpenSSL: Data integrity bypass in `openssl dgst` command due to silent truncation",
-                "description": "A flaw was found in openssl. When a user signs or verifies files larger than 16MB using the `openssl dgst` command with one-shot algorithms, the tool silently truncates the input to 16MB. This creates an integrity gap, allowing trailing data beyond the initial 16MB to be modified without detection because it remains unauthenticated. This vulnerability primarily impacts workflows that both sign and verify files using the affected `openssl dgst` command.",
-                "severity": "LOW",
+                "title": "Issue summary: The 'openssl dgst' command-line tool silently trun ...",
+                "description": "Issue summary: The 'openssl dgst' command-line tool silently truncates input\ndata to 16MB when using one-shot signing algorithms and reports success instead\nof an error.\n\nImpact summary: A user signing or verifying files larger than 16MB with\none-shot algorithms (such as Ed25519, Ed448, or ML-DSA) may believe the entire\nfile is authenticated while trailing data beyond 16MB remains unauthenticated.\n\nWhen the 'openssl dgst' command is used with algorithms that only support\none-shot signing (Ed25519, Ed448, ML-DSA-44, ML-DSA-65, ML-DSA-87), the input\nis buffered with a 16MB limit. If the input exceeds this limit, the tool\nsilently truncates to the first 16MB and continues without signaling an error,\ncontrary to what the documentation states. This creates an integrity gap where\ntrailing bytes can be modified without detection if both signing and\nverification are performed using the same affected codepath.\n\nThe issue affects only the command-line tool behavior. Verifiers that process\nthe full message using library APIs will reject the signature, so the risk\nprimarily affects workflows that both sign and verify with the affected\n'openssl dgst' command. Streaming digest algorithms for 'openssl dgst' and\nlibrary users are unaffected.\n\nThe FIPS modules in 3.5 and 3.6 are not affected by this issue, as the\ncommand-line tools are outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.5 and 3.6 are vulnerable to this issue.\n\nOpenSSL 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -3034,57 +2848,77 @@
             },
             "CVE-2025-68160": {
                 "cve_id": "CVE-2025-68160",
-                "title": "openssl: OpenSSL: Denial of Service due to out-of-bounds write in BIO filter",
-                "description": "A flaw was found in OpenSSL. This vulnerability involves an out-of-bounds write in the line-buffering BIO filter, which can lead to memory corruption. While exploitation is unlikely to be under direct attacker control, a successful attack could cause an application to crash, resulting in a Denial of Service (DoS).",
-                "severity": "LOW",
+                "title": "Issue summary: Writing large, newline-free data into a BIO chain  ...",
+                "description": "Issue summary: Writing large, newline-free data into a BIO chain using the\nline-buffering filter where the next BIO performs short writes can trigger\na heap-based out-of-bounds write.\n\nImpact summary: This out-of-bounds write can cause memory corruption which\ntypically results in a crash, leading to Denial of Service for an application.\n\nThe line-buffering BIO filter (BIO_f_linebuffer) is not used by default in\nTLS/SSL data paths. In OpenSSL command-line applications, it is typically\nonly pushed onto stdout/stderr on VMS systems. Third-party applications that\nexplicitly use this filter with a BIO chain that can short-write and that\nwrite large, newline-free data influenced by an attacker would be affected.\nHowever, the circumstances where this could happen are unlikely to be under\nattacker control, and BIO_f_linebuffer is unlikely to be handling non-curated\ndata controlled by an attacker. For that reason the issue was assessed as\nLow severity.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the BIO implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69418": {
                 "cve_id": "CVE-2025-69418",
-                "title": "openssl: OpenSSL: Information disclosure and data tampering via specific low-level OCB encryption/decryption calls",
-                "description": "A flaw was found in OpenSSL. When applications directly call the low-level CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions with non-block-aligned lengths in a single call on hardware-accelerated builds, the trailing 1-15 bytes of a message may be exposed in cleartext. These exposed bytes are not covered by the authentication tag, allowing an attacker to read or tamper with them without detection.",
-                "severity": "LOW",
+                "title": "Issue summary: When using the low-level OCB API directly with AES ...",
+                "description": "Issue summary: When using the low-level OCB API directly with AES-NI or<br>other hardware-accelerated code paths, inputs whose length is not a multiple<br>of 16 bytes can leave the final partial block unencrypted and unauthenticated.<br><br>Impact summary: The trailing 1-15 bytes of a message may be exposed in<br>cleartext on encryption and are not covered by the authentication tag,<br>allowing an attacker to read or tamper with those bytes without detection.<br><br>The low-level OCB encrypt and decrypt routines in the hardware-accelerated<br>stream path process full 16-byte blocks but do not advance the input/output<br>pointers. The subsequent tail-handling code then operates on the original<br>base pointers, effectively reprocessing the beginning of the buffer while<br>leaving the actual trailing bytes unprocessed. The authentication checksum<br>also excludes the true tail bytes.<br><br>However, typical OpenSSL consumers using EVP are not affected because the<br>higher-level EVP and provider OCB implementations split inputs so that full<br>blocks and trailing partial blocks are processed in separate calls, avoiding<br>the problematic code path. Additionally, TLS does not use OCB ciphersuites.<br>The vulnerability only affects applications that call the low-level<br>CRYPTO_ocb128_encrypt() or CRYPTO_ocb128_decrypt() functions directly with<br>non-block-aligned lengths in a single call on hardware-accelerated builds.<br>For these reasons the issue was assessed as Low severity.<br><br>The FIPS modules in 3.6, 3.5, 3.4, 3.3, 3.2, 3.1 and 3.0 are not affected<br>by this issue, as OCB mode is not a FIPS-approved algorithm.<br><br>OpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.<br><br>OpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69420": {
                 "cve_id": "CVE-2025-69420",
-                "title": "openssl: OpenSSL: Denial of Service via malformed TimeStamp Response",
-                "description": "A flaw was found in OpenSSL. A type confusion vulnerability exists in the TimeStamp Response verification code, where an ASN1_TYPE union member is accessed without proper type validation. A remote attacker can exploit this by providing a malformed TimeStamp Response to an application that verifies timestamp responses. This can lead to an invalid or NULL pointer dereference, resulting in a Denial of Service (DoS) due to an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: A type confusion vulnerability exists in the TimeS ...",
+                "description": "Issue summary: A type confusion vulnerability exists in the TimeStamp Response\nverification code where an ASN1_TYPE union member is accessed without first\nvalidating the type, causing an invalid or NULL pointer dereference when\nprocessing a malformed TimeStamp Response file.\n\nImpact summary: An application calling TS_RESP_verify_response() with a\nmalformed TimeStamp Response can be caused to dereference an invalid or\nNULL pointer when reading, resulting in a Denial of Service.\n\nThe functions ossl_ess_get_signing_cert() and ossl_ess_get_signing_cert_v2()\naccess the signing cert attribute value without validating its type.\nWhen the type is not V_ASN1_SEQUENCE, this results in accessing invalid memory\nthrough the ASN1_TYPE union, causing a crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nTimeStamp Response to an application that verifies timestamp responses. The\nTimeStamp protocol (RFC 3161) is not widely used and the impact of the\nexploit is just a Denial of Service. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the TimeStamp Response implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2025-69421": {
                 "cve_id": "CVE-2025-69421",
-                "title": "openssl: OpenSSL: Denial of Service via malformed PKCS#12 file processing",
-                "description": "A flaw was found in OpenSSL. This vulnerability allows a remote attacker to trigger a Denial of Service (DoS) by providing a specially crafted, malformed PKCS#12 file to an application that processes it. The flaw occurs due to a NULL pointer dereference in the PKCS12_item_decrypt_d2i_ex() function when handling the malformed file, leading to an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: Processing a malformed PKCS#12 file can trigger a  ...",
+                "description": "Issue summary: Processing a malformed PKCS#12 file can trigger a NULL pointer\ndereference in the PKCS12_item_decrypt_d2i_ex() function.\n\nImpact summary: A NULL pointer dereference can trigger a crash which leads to\nDenial of Service for an application processing PKCS#12 files.\n\nThe PKCS12_item_decrypt_d2i_ex() function does not check whether the oct\nparameter is NULL before dereferencing it. When called from\nPKCS12_unpack_p7encdata() with a malformed PKCS#12 file, this parameter can\nbe NULL, causing a crash. The vulnerability is limited to Denial of Service\nand cannot be escalated to achieve code execution or memory disclosure.\n\nExploiting this issue requires an attacker to provide a malformed PKCS#12 file\nto an application that processes it. For that reason the issue was assessed as\nLow severity according to our Security Policy.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -3109,29 +2943,39 @@
             },
             "CVE-2026-22795": {
                 "cve_id": "CVE-2026-22795",
-                "title": "openssl: OpenSSL: Denial of Service due to type confusion in PKCS#12 file processing",
-                "description": "A flaw was found in OpenSSL. This type confusion vulnerability allows a remote attacker to cause a Denial of Service (DoS) by tricking a user or application into processing a maliciously crafted PKCS#12 (Personal Information Exchange Syntax Standard) file. The vulnerability leads to an invalid or NULL pointer dereference, resulting in an application crash.",
-                "severity": "LOW",
+                "title": "Issue summary: An invalid or NULL pointer dereference can happen  ...",
+                "description": "Issue summary: An invalid or NULL pointer dereference can happen in\nan application processing a malformed PKCS#12 file.\n\nImpact summary: An application processing a malformed PKCS#12 file can be\ncaused to dereference an invalid or NULL pointer on memory read, resulting\nin a Denial of Service.\n\nA type confusion vulnerability exists in PKCS#12 parsing code where\nan ASN1_TYPE union member is accessed without first validating the type,\ncausing an invalid pointer read.\n\nThe location is constrained to a 1-byte address space, meaning any\nattempted pointer manipulation can only target addresses between 0x00 and 0xFF.\nThis range corresponds to the zero page, which is unmapped on most modern\noperating systems and will reliably result in a crash, leading only to a\nDenial of Service. Exploiting this issue also requires a user or application\nto process a maliciously crafted PKCS#12 file. It is uncommon to accept\nuntrusted PKCS#12 files in applications as they are usually used to store\nprivate keys which are trusted by definition. For these reasons, the issue\nwas assessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS12 implementation is outside the OpenSSL FIPS module boundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0 and 1.1.1 are vulnerable to this issue.\n\nOpenSSL 1.0.2 is not affected by this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
             "CVE-2026-22796": {
                 "cve_id": "CVE-2026-22796",
-                "title": "openssl: OpenSSL: Denial of Service via type confusion in PKCS#7 signature verification",
-                "description": "A flaw was found in OpenSSL. This type confusion vulnerability allows a remote attacker to cause a denial of service (DoS) by providing specially crafted PKCS#7 data to an application that performs signature verification. The vulnerability occurs because the application accesses an ASN1_TYPE union member without proper type validation, leading to an invalid or NULL pointer dereference and a crash.",
-                "severity": "LOW",
+                "title": "Issue summary: A type confusion vulnerability exists in the signa ...",
+                "description": "Issue summary: A type confusion vulnerability exists in the signature\nverification of signed PKCS#7 data where an ASN1_TYPE union member is\naccessed without first validating the type, causing an invalid or NULL\npointer dereference when processing malformed PKCS#7 data.\n\nImpact summary: An application performing signature verification of PKCS#7\ndata or calling directly the PKCS7_digest_from_attributes() function can be\ncaused to dereference an invalid or NULL pointer when reading, resulting in\na Denial of Service.\n\nThe function PKCS7_digest_from_attributes() accesses the message digest attribute\nvalue without validating its type. When the type is not V_ASN1_OCTET_STRING,\nthis results in accessing invalid memory through the ASN1_TYPE union, causing\na crash.\n\nExploiting this vulnerability requires an attacker to provide a malformed\nsigned PKCS#7 to an application that verifies it. The impact of the\nexploit is just a Denial of Service, the PKCS7 API is legacy and applications\nshould be using the CMS API instead. For these reasons the issue was\nassessed as Low severity.\n\nThe FIPS modules in 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the PKCS#7 parsing implementation is outside the OpenSSL FIPS module\nboundary.\n\nOpenSSL 3.6, 3.5, 3.4, 3.3, 3.0, 1.1.1 and 1.0.2 are vulnerable to this issue.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
+                        "introduced": "3.5.4-10.rf",
+                        "fixed": "3.5.5-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "3.5.1-3.fc44",
+                        "fixed": "3.5.5-1.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -3472,90 +3316,6 @@
                     {
                         "introduced": "0",
                         "fixed": "3.2.2-20.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2024-0727": {
-                "cve_id": "CVE-2024-0727",
-                "title": "openssl: denial of service via null dereference",
-                "description": "A flaw was found in OpenSSL. The optional ContentInfo fields can be set to null, even if the \"type\" is a valid value, which can lead to a null dereference error that may cause a denial of service.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2024-2511": {
-                "cve_id": "CVE-2024-2511",
-                "title": "openssl: Unbounded memory growth with session handling in TLSv1.3",
-                "description": "A flaw was found in OpenSSL. A malicious client can trigger an uncontrolled memory consumption, resulting in a Denial of Service. This issue occurs due to OpenSSL's TLSv1.3 session cache going into an incorrect state, leading to it failing to flush properly as it fills. OpenSSL must be configured with the non-default SSL_OP_NO_TICKET option enabled to be vulnerable. This issue only affects TLSv1.3 servers, while TLS clients are not affected.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-2650": {
-                "cve_id": "CVE-2023-2650",
-                "title": "openssl: Possible DoS translating ASN.1 object identifiers",
-                "description": "A flaw was found in OpenSSL resulting in a possible denial of service while translating ASN.1 object identifiers. Applications that use OBJ_obj2txt() directly, or use any of the OpenSSL subsystems OCSP, PKCS7/SMIME, CMS, CMP/CRMF or TS with no message size limit may experience long delays when processing messages, which may lead to a denial of service.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0464": {
-                "cve_id": "CVE-2023-0464",
-                "title": "openssl: Denial of service by excessive resource usage in verifying X509 policy constraints",
-                "description": "A security vulnerability has been identified in all supported OpenSSL versions related to verifying X.509 certificate chains that include policy constraints. This flaw allows attackers to exploit this vulnerability by creating a malicious certificate chain that triggers exponential use of computational resources, leading to a denial of service (DoS) attack on affected systems. Policy processing is disabled by default but can be enabled by passing the -policy' argument to the command line utilities or calling the X509_VERIFY_PARAM_set1_policies()' function.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0465": {
-                "cve_id": "CVE-2023-0465",
-                "title": "openssl: Invalid certificate policies in leaf certificates are silently ignored",
-                "description": "A flaw was found in OpenSSL. Applications that use a non-default option when verifying certificates may be vulnerable to an attack from a malicious CA to circumvent certain checks. OpenSSL and other certificate policy checks silently ignore invalid certificate policies in leaf certificates that are skipped for that certificate. A malicious CA could use this to deliberately assert invalid certificate policies to circumvent policy checking on the certificate altogether. Policy processing is disabled by default but can be enabled by passing the `-policy' argument to the command line utilities or by calling the `X509_VERIFY_PARAM_set1_policies()' function.",
-                "severity": "LOW",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
-                        "identifier": "rf"
-                    }
-                ]
-            },
-            "CVE-2023-0466": {
-                "cve_id": "CVE-2023-0466",
-                "title": "openssl: Certificate policy check not enabled",
-                "description": "A flaw was found in OpenSSL. The X509_VERIFY_PARAM_add0_policy() function is documented to enable the certificate policy check when doing certificate verification implicitly. However, implementing the function does not enable the check, allowing certificates with invalid or incorrect policies to pass the certificate verification. Suddenly enabling the policy check could break existing deployments, so it was decided to keep the existing behavior of the X509_VERIFY_PARAM_add0_policy() function. The applications that require OpenSSL to perform certificate policy check need to use X509_VERIFY_PARAM_set1_policies() or explicitly enable the policy check by calling X509_VERIFY_PARAM_set_flags() with the X509_V_FLAG_POLICY_CHECK flag argument. Certificate policy checks are disabled by default in OpenSSL and are not commonly used by applications.",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "3.5.6",
-                        "fixed": "3.5.6-11.rf",
                         "identifier": "rf"
                     }
                 ]
