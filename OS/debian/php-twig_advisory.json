@@ -77,8 +77,8 @@
             },
             "CVE-2026-46628": {
                 "cve_id": "CVE-2026-46628",
-                "title": "Twig: The `spaceless` filter implicitly marks its output as safe",
-                "description": "### Description\n\nThe `spaceless` filter is registered with `is_safe => ['html']`, which means Twig's autoescaper does not escape its output in an HTML context. As a result, applying `spaceless` to attacker-controlled input that contains markup emits the markup unescaped even when the developer never wrote `|raw` and autoescape is enabled.\n\nExample:\n\n```twig\n{% set payload = '<script>alert()</script>' %}\n{{ payload }}          {# escaped #}\n{{ payload|spaceless }} {# not escaped #}\n```\n\nThe filter is deprecated but still functional. With the deprecation, some downstream projects (e.g. Drupal modules) have duplicated the filter and inherited the same `is_safe` flag.\n\n### Resolution\n\nThe `spaceless` filter no longer marks its output as safe. Documentation has been updated to warn that `spaceless` should not be applied to unsanitised user input.\n\n### Credits\n\nTwig would like to thank Pierre Rudloff for reporting the issue.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -94,8 +94,8 @@
             },
             "CVE-2026-46629": {
                 "cve_id": "CVE-2026-46629",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "twig/intl-extra: Unbounded formatter memoisation in keyed on template-controlled arguments",
+                "description": "### Description\n\n`IntlExtension` memoises every `\\IntlDateFormatter` and `\\NumberFormatter` it creates in instance-level arrays keyed on a hash that includes `locale`, `pattern`, `attrs` and other values that are ordinary named arguments of the `format_datetime` / `format_date` / `format_time` / `format_number` / `format_currency` filters. There is no size limit and no eviction.\n\nA template that iterates over many distinct `pattern` (or `locale`, or `grouping_used`, ...) values therefore allocates one ICU formatter object per distinct value and pins it for the entire lifetime of the `Twig\\Environment`. Because ICU allocates its backing buffers outside the Zend memory manager, this growth is not bounded by `memory_limit`. On long-running runtimes (RoadRunner, Swoole, FrankenPHP worker mode, ReactPHP) where the `Environment` outlives a single request, the cache also accumulates across requests.\n\n### Resolution\n\nThe formatter caches are now bounded in size (100 entries each) and evict on a FIFO basis.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -111,8 +111,8 @@
             },
             "CVE-2026-46633": {
                 "cve_id": "CVE-2026-46633",
-                "title": "Twig: PHP code injection via `{% use %}` template name",
-                "description": "### Description\n\n`Compiler::string()` escapes `\"`, `$`, `\\`, NUL and TAB when generating PHP double-quoted string literals, but does not escape single quotes. In `ModuleNode::compileConstructor()`, the template name from a `{% use %}` tag is compiled via `subcompile()` -> `string()` and placed inside a surrounding PHP single-quoted string literal. A template name containing a single quote terminates that surrounding string early, allowing arbitrary PHP expressions to be injected into the compiled cache file.\n\nThe injected code executes within the PHP process when the cache file is first loaded, bypassing the Twig sandbox entirely and achieving remote code execution. `SecurityPolicy` unconditionally allows `{% use %}` regardless of the configured `allowedTags`, so this primitive is reachable from sandboxed templates as well.\n\n### Resolution\n\n`Compiler::string()` now also escapes single quotes so that template names placed inside single-quoted PHP literals can no longer break out of the surrounding context.\n\n### Credits\n\nTwig would like to thank Anvil Secure in collaboration with Claude and Anthropic Research for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -128,8 +128,8 @@
             },
             "CVE-2026-46634": {
                 "cve_id": "CVE-2026-46634",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -158,8 +158,8 @@
             },
             "CVE-2026-46636": {
                 "cve_id": "CVE-2026-46636",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -192,8 +192,8 @@
             },
             "CVE-2026-46638": {
                 "cve_id": "CVE-2026-46638",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: `{% sandbox %}{% include %}` skips checkSecurity() on cached templates (incomplete fix for CVE-2024-45411)",
+                "description": "### Description\n\nThe fix for CVE-2024-45411 / GHSA-6j75-5wfj-gh66 added an explicit `$loaded->unwrap()->checkSecurity()` call in `CoreExtension::include()` so that a template already cached in `Environment::$loadedTemplates` is re-checked when included with `sandboxed = true`.\n\nThe deprecated but still functional `{% sandbox %}{% include ... %}{% endsandbox %}` tag path was not updated: it compiles to `enableSandbox(); yield from $this->load(...)->unwrap()->yield(...); disableSandbox();` with no `checkSecurity()` re-invocation. If the included template was loaded once outside the sandbox in the same `Environment` instance, its constructor (and therefore its compiled `checkSecurity()` call) already ran while `isSandboxed()` was `false`, so the tags/filters/functions allowlist enforced by `SecurityPolicy::checkSecurity()` is never applied.\n\nAn attacker who can author the included template gains access to every filter, function and tag registered in the environment, regardless of the sandbox policy.\n\n### Resolution\n\nThe compiled output of `{% sandbox %}{% include %}` now calls `checkSecurity()` on the loaded template, matching the behaviour of `CoreExtension::include()` with `sandboxed = true`.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -209,8 +209,8 @@
             },
             "CVE-2026-46639": {
                 "cve_id": "CVE-2026-46639",
-                "title": "Twig: Sandbox property and method bypass via object-destructuring assignment",
-                "description": "### Description\n\nThe object-destructuring assignment syntax introduced in Twig 3.24.0 generates a call to `CoreExtension::getAttribute()` with the `$sandboxed` argument hardcoded to `false`, regardless of whether a `SandboxExtension` is active. This permanently disables the sandbox's property and method policy checks for every destructuring expression.\n\n`ObjectDestructuringSetBinary::compile()` emits:\n\n```php\nCoreExtension::getAttribute($this->env, $this->source, ..., \\Twig\\Template::ANY_CALL, false, false, false, ...);\n//                                                                                ^^^^^\n//                                                                       sandbox check never runs\n```\n\nWhereas `GetAttrExpression::compile()` correctly passes `$env->hasExtension(SandboxExtension::class)`.\n\nAn attacker with write access to a sandboxed Twig template can read any public property or invoke any public getter on objects passed to the template engine, bypassing `SecurityPolicy` restrictions. The exploit requires only the `{% do %}` tag to be in `allowedTags`, which is a common configuration.\n\n### Resolution\n\nThe destructuring compiler now forwards the active sandbox flag to `getAttribute()` so property/method allowlists are enforced.\n\n### Credits\n\nTwig would like to thank Anvil Secure in collaboration with Claude and Anthropic Research for reporting and fixing the issue.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -222,8 +222,8 @@
             },
             "CVE-2026-46640": {
                 "cve_id": "CVE-2026-46640",
-                "title": "Twig: Arbitrary PHP code execution via `_self.(<string>)` macro-reference compilation",
-                "description": "### Description\n\nThe `obj.(expr)` dynamic-attribute syntax (added in 3.15.0 as the replacement for the deprecated `attribute()` function) lets the attribute be an arbitrary expression. When the receiver is `_self` (or any `{% import %}` alias) and the parenthesised expression is a string literal, `DotExpressionParser` short-circuits to the macro-call path and concatenates the attacker-controlled string into a `MacroReferenceExpression` name with no identifier validation. `MacroReferenceExpression::compile()` then emits that name raw into the generated PHP source.\n\nAn attacker who can supply template source can inject arbitrary PHP into the compiled template and execute it at template-load time, before `checkSecurity()` is ever called. This is a complete bypass of `SandboxExtension`, including a globally-enabled sandbox with an empty `SecurityPolicy` allowlist.\n\n### Resolution\n\nThe parser now validates that the dynamic attribute resolves to a valid macro identifier before routing through `MacroReferenceExpression`, and the macro-reference compiler emits the name through a properly escaped path.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -235,8 +235,8 @@
             },
             "CVE-2026-47730": {
                 "cve_id": "CVE-2026-47730",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -252,8 +252,8 @@
             },
             "CVE-2026-47732": {
                 "cve_id": "CVE-2026-47732",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -269,8 +269,8 @@
             },
             "CVE-2026-48805": {
                 "cve_id": "CVE-2026-48805",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: Sandbox state regression in deprecated internal wrappers in `src/Resources/core.php`",
+                "description": "### Description\n\nThe 3.26.0 source-policy hardening changed the signature of `CoreExtension::checkArrow()` to take a boolean `$isSandboxed` instead of an `Environment`, and added the same `$isSandboxed` argument to `CoreExtension::arraySome()` and `CoreExtension::arrayEvery()`. Compiled templates were updated to pass the per-source sandbox state computed at the call site.\n\nThe deprecated internal wrappers exposed in `src/Resources/core.php` for legacy third-party code (`twig_check_arrow_in_sandbox()`, `twig_array_some()`, `twig_array_every()`) were not updated:\n\n- `twig_array_some()` and `twig_array_every()` call `CoreExtension::arraySome()` / `arrayEvery()` without forwarding the sandbox state. The underlying methods default `$isSandboxed` to `false`, so the callable-must-be-a-`Closure` restriction is silently bypassed in sandbox mode and a string callable such as `'strcmp'` is accepted.\n- `twig_check_arrow_in_sandbox()` passes the `Environment` object where `CoreExtension::checkArrow()` now expects a `bool`, which throws a `TypeError` on PHP 8+.\n\nCompiled Twig templates are not affected: they call `CoreExtension::*` directly with the correct arguments. Applications are only impacted if they still call the deprecated `twig_*` helpers on top of a sandboxed `Environment`.\n\n### Resolution\n\nThe three wrappers now resolve the current sandbox state via `twig_resolve_is_sandboxed()` (the same helper compiled templates use), and forward it to the corresponding `CoreExtension::*` method. `twig_check_arrow_in_sandbox()` no longer triggers a `TypeError`, and `twig_array_some()` / `twig_array_every()` now enforce the same sandbox restriction as compiled templates.\n\n### Credits\n\nWe would like to thank El Kharoubi Iosif for reporting the issue and Fabien Potencier for providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -286,8 +286,8 @@
             },
             "CVE-2026-48806": {
                 "cve_id": "CVE-2026-48806",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -299,8 +299,8 @@
             },
             "CVE-2026-48807": {
                 "cve_id": "CVE-2026-48807",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: Sandbox `__toString()` policy bypass via `Traversable` in `join` and `replace` filters",
+                "description": "### Description\n\nThis is a residual bypass of CVE-2026-47732 / GHSA-pr2w-4gpj-cpq4 left after the initial fix for unguarded `__toString()` calls. It covers two related coercion points that were not caught by the original patch.\n\n**`Traversable` in `join` and `replace` filters.** `SandboxExtension::ensureToStringAllowed()` recurses into PHP arrays so that a `Stringable` object hidden inside an array argument cannot be string-coerced without consulting the security policy. The recursion stops at PHP arrays: a `Traversable` value passed at the same position is not materialised, so its contents are not policy-checked. `CoreExtension::join()` and `CoreExtension::replace()` later materialise such `Traversable` inputs through `self::toArray()` and feed them to `implode()` / `strtr()`, both of which implicitly call `__toString()` on contained `Stringable` objects. The bypass also reproduces when the container implements both `Stringable` and `Traversable`: the container's own `__toString()` is policy-checked, but the elements yielded by `getIterator()` are not, and the consuming filters still coerce them to string.\n\n**`in` and `not in` operators.** `InBinary` and `NotInBinary` compile to `CoreExtension::inFilter()`, which falls through to PHP's `<=>` operator when comparing a string with a `Stringable` object. PHP coerces the object to string via `__toString()` without the sandbox policy being consulted. Beyond the direct side effect, `in` can also be used as a content-leak oracle: each probe against an attacker-chosen needle leaks one bit of equality, and chained probes can reconstruct the string returned by `__toString()` even when every method is denied. The bypass reproduces with both array and `Traversable` haystacks, and on both operand sides.\n\nA sandboxed template author who is allowed to call `join` / `replace`, or to use the `in` / `not in` operators, can therefore trigger a disallowed `__toString()` method on objects reachable from the render context, even when that method is not on `SecurityPolicy::$allowedMethods`. The bypass reproduces both under global sandbox mode and when sandboxing is enabled through `SourcePolicyInterface`.\n\n### Resolution\n\n`SandboxExtension::ensureToStringAllowed()` now also recurses into `Traversable` operands when sandboxing is active for the current source: each value is materialised once and run through the same array-recursion path, so the policy is consulted before the filter implementation can coerce contained objects to strings. This applies to plain `Traversable` operands as well as to containers that implement both `Stringable` and `Traversable`: the container's own `__toString()` is still policy-checked, and the yielded elements are additionally checked. The materialisation is guarded by `isSandboxed($source)` so that non-sandboxed code paths do not pay the cost or change generator-exhaustion semantics.\n\n`InBinary` and `NotInBinary` now implement `Twig\\Node\\CoercesChildrenToStringInterface` and declare both operands as string-coerced, so `SandboxNodeVisitor` wraps each operand in `CheckToStringNode`. The policy is consulted before `CoreExtension::inFilter()` reaches PHP's `<=>` operator, matching the existing protection on the other comparison binaries (`Equal`, `Less`, `Greater`, `Spaceship`, ...).\n\n### Credits\n\nTwig would like to thank Vincent55 Yang and Fabien Potencier for reporting the issues and Fabien Potencier for providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -312,8 +312,8 @@
             },
             "CVE-2026-48808": {
                 "cve_id": "CVE-2026-48808",
-                "title": "Twig: Sandbox property allowlist bypass via the `column` filter under `SourcePolicyInterface`",
-                "description": "### Description\n\nThis is a residual bypass of CVE-2026-46635 / GHSA-vcc8-phrv-43wj that only affects sandboxing enabled through `SourcePolicyInterface` (and not the regular global sandbox mode).\n\n`CoreExtension::column()` receives the active sandbox state via the `needs_is_sandboxed` channel as a boolean `$isSandboxed`, but then routes the per-element property reads through `SandboxExtension::checkPropertyAllowed()` without forwarding the current `Source`. `SandboxExtension::checkPropertyAllowed()` re-evaluates `isSandboxed($source)` internally; with `$source = null` the `SourcePolicyInterface`-driven decision is lost, the method short-circuits to \"not sandboxed\", and the property allowlist is never consulted.\n\nA template author whose sandbox is gated by a `SourcePolicyInterface` and who has `column` on their `allowedFilters` list can therefore read any public or magic property of any object reachable in the render context, regardless of `SecurityPolicy::$allowedProperties`. Direct attribute access to the same property is blocked, and the same payload is also blocked under global sandbox mode, which makes this a clear policy enforcement gap rather than a configuration issue.\n\n### Resolution\n\n`CoreExtension::column()` no longer goes through the `SandboxExtension` wrapper for the property check. It calls the security policy directly: the per-source decision is already captured by the `$isSandboxed` boolean computed at the call site, so the property allowlist is enforced consistently for both global and source-policy sandboxing.\n\n### Credits\n\nTwig would like to thank Vincent55 Yang for reporting the issue and Fabien Potencier for providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -400,8 +400,8 @@
             },
             "CVE-2026-46628": {
                 "cve_id": "CVE-2026-46628",
-                "title": "Twig: The `spaceless` filter implicitly marks its output as safe",
-                "description": "### Description\n\nThe `spaceless` filter is registered with `is_safe => ['html']`, which means Twig's autoescaper does not escape its output in an HTML context. As a result, applying `spaceless` to attacker-controlled input that contains markup emits the markup unescaped even when the developer never wrote `|raw` and autoescape is enabled.\n\nExample:\n\n```twig\n{% set payload = '<script>alert()</script>' %}\n{{ payload }}          {# escaped #}\n{{ payload|spaceless }} {# not escaped #}\n```\n\nThe filter is deprecated but still functional. With the deprecation, some downstream projects (e.g. Drupal modules) have duplicated the filter and inherited the same `is_safe` flag.\n\n### Resolution\n\nThe `spaceless` filter no longer marks its output as safe. Documentation has been updated to warn that `spaceless` should not be applied to unsanitised user input.\n\n### Credits\n\nTwig would like to thank Pierre Rudloff for reporting the issue.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -417,8 +417,8 @@
             },
             "CVE-2026-46629": {
                 "cve_id": "CVE-2026-46629",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "twig/intl-extra: Unbounded formatter memoisation in keyed on template-controlled arguments",
+                "description": "### Description\n\n`IntlExtension` memoises every `\\IntlDateFormatter` and `\\NumberFormatter` it creates in instance-level arrays keyed on a hash that includes `locale`, `pattern`, `attrs` and other values that are ordinary named arguments of the `format_datetime` / `format_date` / `format_time` / `format_number` / `format_currency` filters. There is no size limit and no eviction.\n\nA template that iterates over many distinct `pattern` (or `locale`, or `grouping_used`, ...) values therefore allocates one ICU formatter object per distinct value and pins it for the entire lifetime of the `Twig\\Environment`. Because ICU allocates its backing buffers outside the Zend memory manager, this growth is not bounded by `memory_limit`. On long-running runtimes (RoadRunner, Swoole, FrankenPHP worker mode, ReactPHP) where the `Environment` outlives a single request, the cache also accumulates across requests.\n\n### Resolution\n\nThe formatter caches are now bounded in size (100 entries each) and evict on a FIFO basis.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -434,8 +434,8 @@
             },
             "CVE-2026-46633": {
                 "cve_id": "CVE-2026-46633",
-                "title": "Twig: PHP code injection via `{% use %}` template name",
-                "description": "### Description\n\n`Compiler::string()` escapes `\"`, `$`, `\\`, NUL and TAB when generating PHP double-quoted string literals, but does not escape single quotes. In `ModuleNode::compileConstructor()`, the template name from a `{% use %}` tag is compiled via `subcompile()` -> `string()` and placed inside a surrounding PHP single-quoted string literal. A template name containing a single quote terminates that surrounding string early, allowing arbitrary PHP expressions to be injected into the compiled cache file.\n\nThe injected code executes within the PHP process when the cache file is first loaded, bypassing the Twig sandbox entirely and achieving remote code execution. `SecurityPolicy` unconditionally allows `{% use %}` regardless of the configured `allowedTags`, so this primitive is reachable from sandboxed templates as well.\n\n### Resolution\n\n`Compiler::string()` now also escapes single quotes so that template names placed inside single-quoted PHP literals can no longer break out of the surrounding context.\n\n### Credits\n\nTwig would like to thank Anvil Secure in collaboration with Claude and Anthropic Research for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -451,8 +451,8 @@
             },
             "CVE-2026-46634": {
                 "cve_id": "CVE-2026-46634",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -481,8 +481,8 @@
             },
             "CVE-2026-46636": {
                 "cve_id": "CVE-2026-46636",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -515,8 +515,8 @@
             },
             "CVE-2026-46638": {
                 "cve_id": "CVE-2026-46638",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: `{% sandbox %}{% include %}` skips checkSecurity() on cached templates (incomplete fix for CVE-2024-45411)",
+                "description": "### Description\n\nThe fix for CVE-2024-45411 / GHSA-6j75-5wfj-gh66 added an explicit `$loaded->unwrap()->checkSecurity()` call in `CoreExtension::include()` so that a template already cached in `Environment::$loadedTemplates` is re-checked when included with `sandboxed = true`.\n\nThe deprecated but still functional `{% sandbox %}{% include ... %}{% endsandbox %}` tag path was not updated: it compiles to `enableSandbox(); yield from $this->load(...)->unwrap()->yield(...); disableSandbox();` with no `checkSecurity()` re-invocation. If the included template was loaded once outside the sandbox in the same `Environment` instance, its constructor (and therefore its compiled `checkSecurity()` call) already ran while `isSandboxed()` was `false`, so the tags/filters/functions allowlist enforced by `SecurityPolicy::checkSecurity()` is never applied.\n\nAn attacker who can author the included template gains access to every filter, function and tag registered in the environment, regardless of the sandbox policy.\n\n### Resolution\n\nThe compiled output of `{% sandbox %}{% include %}` now calls `checkSecurity()` on the loaded template, matching the behaviour of `CoreExtension::include()` with `sandboxed = true`.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -532,8 +532,8 @@
             },
             "CVE-2026-46639": {
                 "cve_id": "CVE-2026-46639",
-                "title": "Twig: Sandbox property and method bypass via object-destructuring assignment",
-                "description": "### Description\n\nThe object-destructuring assignment syntax introduced in Twig 3.24.0 generates a call to `CoreExtension::getAttribute()` with the `$sandboxed` argument hardcoded to `false`, regardless of whether a `SandboxExtension` is active. This permanently disables the sandbox's property and method policy checks for every destructuring expression.\n\n`ObjectDestructuringSetBinary::compile()` emits:\n\n```php\nCoreExtension::getAttribute($this->env, $this->source, ..., \\Twig\\Template::ANY_CALL, false, false, false, ...);\n//                                                                                ^^^^^\n//                                                                       sandbox check never runs\n```\n\nWhereas `GetAttrExpression::compile()` correctly passes `$env->hasExtension(SandboxExtension::class)`.\n\nAn attacker with write access to a sandboxed Twig template can read any public property or invoke any public getter on objects passed to the template engine, bypassing `SecurityPolicy` restrictions. The exploit requires only the `{% do %}` tag to be in `allowedTags`, which is a common configuration.\n\n### Resolution\n\nThe destructuring compiler now forwards the active sandbox flag to `getAttribute()` so property/method allowlists are enforced.\n\n### Credits\n\nTwig would like to thank Anvil Secure in collaboration with Claude and Anthropic Research for reporting and fixing the issue.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -545,8 +545,8 @@
             },
             "CVE-2026-46640": {
                 "cve_id": "CVE-2026-46640",
-                "title": "Twig: Arbitrary PHP code execution via `_self.(<string>)` macro-reference compilation",
-                "description": "### Description\n\nThe `obj.(expr)` dynamic-attribute syntax (added in 3.15.0 as the replacement for the deprecated `attribute()` function) lets the attribute be an arbitrary expression. When the receiver is `_self` (or any `{% import %}` alias) and the parenthesised expression is a string literal, `DotExpressionParser` short-circuits to the macro-call path and concatenates the attacker-controlled string into a `MacroReferenceExpression` name with no identifier validation. `MacroReferenceExpression::compile()` then emits that name raw into the generated PHP source.\n\nAn attacker who can supply template source can inject arbitrary PHP into the compiled template and execute it at template-load time, before `checkSecurity()` is ever called. This is a complete bypass of `SandboxExtension`, including a globally-enabled sandbox with an empty `SecurityPolicy` allowlist.\n\n### Resolution\n\nThe parser now validates that the dynamic attribute resolves to a valid macro identifier before routing through `MacroReferenceExpression`, and the macro-reference compiler emits the name through a properly escaped path.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -558,8 +558,8 @@
             },
             "CVE-2026-47730": {
                 "cve_id": "CVE-2026-47730",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -575,8 +575,8 @@
             },
             "CVE-2026-47732": {
                 "cve_id": "CVE-2026-47732",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -592,8 +592,8 @@
             },
             "CVE-2026-48805": {
                 "cve_id": "CVE-2026-48805",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: Sandbox state regression in deprecated internal wrappers in `src/Resources/core.php`",
+                "description": "### Description\n\nThe 3.26.0 source-policy hardening changed the signature of `CoreExtension::checkArrow()` to take a boolean `$isSandboxed` instead of an `Environment`, and added the same `$isSandboxed` argument to `CoreExtension::arraySome()` and `CoreExtension::arrayEvery()`. Compiled templates were updated to pass the per-source sandbox state computed at the call site.\n\nThe deprecated internal wrappers exposed in `src/Resources/core.php` for legacy third-party code (`twig_check_arrow_in_sandbox()`, `twig_array_some()`, `twig_array_every()`) were not updated:\n\n- `twig_array_some()` and `twig_array_every()` call `CoreExtension::arraySome()` / `arrayEvery()` without forwarding the sandbox state. The underlying methods default `$isSandboxed` to `false`, so the callable-must-be-a-`Closure` restriction is silently bypassed in sandbox mode and a string callable such as `'strcmp'` is accepted.\n- `twig_check_arrow_in_sandbox()` passes the `Environment` object where `CoreExtension::checkArrow()` now expects a `bool`, which throws a `TypeError` on PHP 8+.\n\nCompiled Twig templates are not affected: they call `CoreExtension::*` directly with the correct arguments. Applications are only impacted if they still call the deprecated `twig_*` helpers on top of a sandboxed `Environment`.\n\n### Resolution\n\nThe three wrappers now resolve the current sandbox state via `twig_resolve_is_sandboxed()` (the same helper compiled templates use), and forward it to the corresponding `CoreExtension::*` method. `twig_check_arrow_in_sandbox()` no longer triggers a `TypeError`, and `twig_array_some()` / `twig_array_every()` now enforce the same sandbox restriction as compiled templates.\n\n### Credits\n\nWe would like to thank El Kharoubi Iosif for reporting the issue and Fabien Potencier for providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -609,8 +609,8 @@
             },
             "CVE-2026-48806": {
                 "cve_id": "CVE-2026-48806",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -622,8 +622,8 @@
             },
             "CVE-2026-48807": {
                 "cve_id": "CVE-2026-48807",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: Sandbox `__toString()` policy bypass via `Traversable` in `join` and `replace` filters",
+                "description": "### Description\n\nThis is a residual bypass of CVE-2026-47732 / GHSA-pr2w-4gpj-cpq4 left after the initial fix for unguarded `__toString()` calls. It covers two related coercion points that were not caught by the original patch.\n\n**`Traversable` in `join` and `replace` filters.** `SandboxExtension::ensureToStringAllowed()` recurses into PHP arrays so that a `Stringable` object hidden inside an array argument cannot be string-coerced without consulting the security policy. The recursion stops at PHP arrays: a `Traversable` value passed at the same position is not materialised, so its contents are not policy-checked. `CoreExtension::join()` and `CoreExtension::replace()` later materialise such `Traversable` inputs through `self::toArray()` and feed them to `implode()` / `strtr()`, both of which implicitly call `__toString()` on contained `Stringable` objects. The bypass also reproduces when the container implements both `Stringable` and `Traversable`: the container's own `__toString()` is policy-checked, but the elements yielded by `getIterator()` are not, and the consuming filters still coerce them to string.\n\n**`in` and `not in` operators.** `InBinary` and `NotInBinary` compile to `CoreExtension::inFilter()`, which falls through to PHP's `<=>` operator when comparing a string with a `Stringable` object. PHP coerces the object to string via `__toString()` without the sandbox policy being consulted. Beyond the direct side effect, `in` can also be used as a content-leak oracle: each probe against an attacker-chosen needle leaks one bit of equality, and chained probes can reconstruct the string returned by `__toString()` even when every method is denied. The bypass reproduces with both array and `Traversable` haystacks, and on both operand sides.\n\nA sandboxed template author who is allowed to call `join` / `replace`, or to use the `in` / `not in` operators, can therefore trigger a disallowed `__toString()` method on objects reachable from the render context, even when that method is not on `SecurityPolicy::$allowedMethods`. The bypass reproduces both under global sandbox mode and when sandboxing is enabled through `SourcePolicyInterface`.\n\n### Resolution\n\n`SandboxExtension::ensureToStringAllowed()` now also recurses into `Traversable` operands when sandboxing is active for the current source: each value is materialised once and run through the same array-recursion path, so the policy is consulted before the filter implementation can coerce contained objects to strings. This applies to plain `Traversable` operands as well as to containers that implement both `Stringable` and `Traversable`: the container's own `__toString()` is still policy-checked, and the yielded elements are additionally checked. The materialisation is guarded by `isSandboxed($source)` so that non-sandboxed code paths do not pay the cost or change generator-exhaustion semantics.\n\n`InBinary` and `NotInBinary` now implement `Twig\\Node\\CoercesChildrenToStringInterface` and declare both operands as string-coerced, so `SandboxNodeVisitor` wraps each operand in `CheckToStringNode`. The policy is consulted before `CoreExtension::inFilter()` reaches PHP's `<=>` operator, matching the existing protection on the other comparison binaries (`Equal`, `Less`, `Greater`, `Spaceship`, ...).\n\n### Credits\n\nTwig would like to thank Vincent55 Yang and Fabien Potencier for reporting the issues and Fabien Potencier for providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -635,8 +635,8 @@
             },
             "CVE-2026-48808": {
                 "cve_id": "CVE-2026-48808",
-                "title": "Twig: Sandbox property allowlist bypass via the `column` filter under `SourcePolicyInterface`",
-                "description": "### Description\n\nThis is a residual bypass of CVE-2026-46635 / GHSA-vcc8-phrv-43wj that only affects sandboxing enabled through `SourcePolicyInterface` (and not the regular global sandbox mode).\n\n`CoreExtension::column()` receives the active sandbox state via the `needs_is_sandboxed` channel as a boolean `$isSandboxed`, but then routes the per-element property reads through `SandboxExtension::checkPropertyAllowed()` without forwarding the current `Source`. `SandboxExtension::checkPropertyAllowed()` re-evaluates `isSandboxed($source)` internally; with `$source = null` the `SourcePolicyInterface`-driven decision is lost, the method short-circuits to \"not sandboxed\", and the property allowlist is never consulted.\n\nA template author whose sandbox is gated by a `SourcePolicyInterface` and who has `column` on their `allowedFilters` list can therefore read any public or magic property of any object reachable in the render context, regardless of `SecurityPolicy::$allowedProperties`. Direct attribute access to the same property is blocked, and the same payload is also blocked under global sandbox mode, which makes this a clear policy enforcement gap rather than a configuration issue.\n\n### Resolution\n\n`CoreExtension::column()` no longer goes through the `SandboxExtension` wrapper for the property check. It calls the security policy directly: the per-source decision is already captured by the `$isSandboxed` boolean computed at the call site, so the property allowlist is enforced consistently for both global and source-policy sandboxing.\n\n### Credits\n\nTwig would like to thank Vincent55 Yang for reporting the issue and Fabien Potencier for providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -723,8 +723,8 @@
             },
             "CVE-2026-46628": {
                 "cve_id": "CVE-2026-46628",
-                "title": "Twig: The `spaceless` filter implicitly marks its output as safe",
-                "description": "### Description\n\nThe `spaceless` filter is registered with `is_safe => ['html']`, which means Twig's autoescaper does not escape its output in an HTML context. As a result, applying `spaceless` to attacker-controlled input that contains markup emits the markup unescaped even when the developer never wrote `|raw` and autoescape is enabled.\n\nExample:\n\n```twig\n{% set payload = '<script>alert()</script>' %}\n{{ payload }}          {# escaped #}\n{{ payload|spaceless }} {# not escaped #}\n```\n\nThe filter is deprecated but still functional. With the deprecation, some downstream projects (e.g. Drupal modules) have duplicated the filter and inherited the same `is_safe` flag.\n\n### Resolution\n\nThe `spaceless` filter no longer marks its output as safe. Documentation has been updated to warn that `spaceless` should not be applied to unsanitised user input.\n\n### Credits\n\nTwig would like to thank Pierre Rudloff for reporting the issue.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -740,8 +740,8 @@
             },
             "CVE-2026-46629": {
                 "cve_id": "CVE-2026-46629",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "twig/intl-extra: Unbounded formatter memoisation in keyed on template-controlled arguments",
+                "description": "### Description\n\n`IntlExtension` memoises every `\\IntlDateFormatter` and `\\NumberFormatter` it creates in instance-level arrays keyed on a hash that includes `locale`, `pattern`, `attrs` and other values that are ordinary named arguments of the `format_datetime` / `format_date` / `format_time` / `format_number` / `format_currency` filters. There is no size limit and no eviction.\n\nA template that iterates over many distinct `pattern` (or `locale`, or `grouping_used`, ...) values therefore allocates one ICU formatter object per distinct value and pins it for the entire lifetime of the `Twig\\Environment`. Because ICU allocates its backing buffers outside the Zend memory manager, this growth is not bounded by `memory_limit`. On long-running runtimes (RoadRunner, Swoole, FrankenPHP worker mode, ReactPHP) where the `Environment` outlives a single request, the cache also accumulates across requests.\n\n### Resolution\n\nThe formatter caches are now bounded in size (100 entries each) and evict on a FIFO basis.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -757,8 +757,8 @@
             },
             "CVE-2026-46633": {
                 "cve_id": "CVE-2026-46633",
-                "title": "Twig: PHP code injection via `{% use %}` template name",
-                "description": "### Description\n\n`Compiler::string()` escapes `\"`, `$`, `\\`, NUL and TAB when generating PHP double-quoted string literals, but does not escape single quotes. In `ModuleNode::compileConstructor()`, the template name from a `{% use %}` tag is compiled via `subcompile()` -> `string()` and placed inside a surrounding PHP single-quoted string literal. A template name containing a single quote terminates that surrounding string early, allowing arbitrary PHP expressions to be injected into the compiled cache file.\n\nThe injected code executes within the PHP process when the cache file is first loaded, bypassing the Twig sandbox entirely and achieving remote code execution. `SecurityPolicy` unconditionally allows `{% use %}` regardless of the configured `allowedTags`, so this primitive is reachable from sandboxed templates as well.\n\n### Resolution\n\n`Compiler::string()` now also escapes single quotes so that template names placed inside single-quoted PHP literals can no longer break out of the surrounding context.\n\n### Credits\n\nTwig would like to thank Anvil Secure in collaboration with Claude and Anthropic Research for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -774,8 +774,8 @@
             },
             "CVE-2026-46634": {
                 "cve_id": "CVE-2026-46634",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -804,8 +804,8 @@
             },
             "CVE-2026-46636": {
                 "cve_id": "CVE-2026-46636",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -838,8 +838,8 @@
             },
             "CVE-2026-46638": {
                 "cve_id": "CVE-2026-46638",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: `{% sandbox %}{% include %}` skips checkSecurity() on cached templates (incomplete fix for CVE-2024-45411)",
+                "description": "### Description\n\nThe fix for CVE-2024-45411 / GHSA-6j75-5wfj-gh66 added an explicit `$loaded->unwrap()->checkSecurity()` call in `CoreExtension::include()` so that a template already cached in `Environment::$loadedTemplates` is re-checked when included with `sandboxed = true`.\n\nThe deprecated but still functional `{% sandbox %}{% include ... %}{% endsandbox %}` tag path was not updated: it compiles to `enableSandbox(); yield from $this->load(...)->unwrap()->yield(...); disableSandbox();` with no `checkSecurity()` re-invocation. If the included template was loaded once outside the sandbox in the same `Environment` instance, its constructor (and therefore its compiled `checkSecurity()` call) already ran while `isSandboxed()` was `false`, so the tags/filters/functions allowlist enforced by `SecurityPolicy::checkSecurity()` is never applied.\n\nAn attacker who can author the included template gains access to every filter, function and tag registered in the environment, regardless of the sandbox policy.\n\n### Resolution\n\nThe compiled output of `{% sandbox %}{% include %}` now calls `checkSecurity()` on the loaded template, matching the behaviour of `CoreExtension::include()` with `sandboxed = true`.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -855,8 +855,8 @@
             },
             "CVE-2026-46639": {
                 "cve_id": "CVE-2026-46639",
-                "title": "Twig: Sandbox property and method bypass via object-destructuring assignment",
-                "description": "### Description\n\nThe object-destructuring assignment syntax introduced in Twig 3.24.0 generates a call to `CoreExtension::getAttribute()` with the `$sandboxed` argument hardcoded to `false`, regardless of whether a `SandboxExtension` is active. This permanently disables the sandbox's property and method policy checks for every destructuring expression.\n\n`ObjectDestructuringSetBinary::compile()` emits:\n\n```php\nCoreExtension::getAttribute($this->env, $this->source, ..., \\Twig\\Template::ANY_CALL, false, false, false, ...);\n//                                                                                ^^^^^\n//                                                                       sandbox check never runs\n```\n\nWhereas `GetAttrExpression::compile()` correctly passes `$env->hasExtension(SandboxExtension::class)`.\n\nAn attacker with write access to a sandboxed Twig template can read any public property or invoke any public getter on objects passed to the template engine, bypassing `SecurityPolicy` restrictions. The exploit requires only the `{% do %}` tag to be in `allowedTags`, which is a common configuration.\n\n### Resolution\n\nThe destructuring compiler now forwards the active sandbox flag to `getAttribute()` so property/method allowlists are enforced.\n\n### Credits\n\nTwig would like to thank Anvil Secure in collaboration with Claude and Anthropic Research for reporting and fixing the issue.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -868,8 +868,8 @@
             },
             "CVE-2026-46640": {
                 "cve_id": "CVE-2026-46640",
-                "title": "Twig: Arbitrary PHP code execution via `_self.(<string>)` macro-reference compilation",
-                "description": "### Description\n\nThe `obj.(expr)` dynamic-attribute syntax (added in 3.15.0 as the replacement for the deprecated `attribute()` function) lets the attribute be an arbitrary expression. When the receiver is `_self` (or any `{% import %}` alias) and the parenthesised expression is a string literal, `DotExpressionParser` short-circuits to the macro-call path and concatenates the attacker-controlled string into a `MacroReferenceExpression` name with no identifier validation. `MacroReferenceExpression::compile()` then emits that name raw into the generated PHP source.\n\nAn attacker who can supply template source can inject arbitrary PHP into the compiled template and execute it at template-load time, before `checkSecurity()` is ever called. This is a complete bypass of `SandboxExtension`, including a globally-enabled sandbox with an empty `SecurityPolicy` allowlist.\n\n### Resolution\n\nThe parser now validates that the dynamic attribute resolves to a valid macro identifier before routing through `MacroReferenceExpression`, and the macro-reference compiler emits the name through a properly escaped path.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -881,8 +881,8 @@
             },
             "CVE-2026-47730": {
                 "cve_id": "CVE-2026-47730",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -898,8 +898,8 @@
             },
             "CVE-2026-47732": {
                 "cve_id": "CVE-2026-47732",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -915,8 +915,8 @@
             },
             "CVE-2026-48805": {
                 "cve_id": "CVE-2026-48805",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: Sandbox state regression in deprecated internal wrappers in `src/Resources/core.php`",
+                "description": "### Description\n\nThe 3.26.0 source-policy hardening changed the signature of `CoreExtension::checkArrow()` to take a boolean `$isSandboxed` instead of an `Environment`, and added the same `$isSandboxed` argument to `CoreExtension::arraySome()` and `CoreExtension::arrayEvery()`. Compiled templates were updated to pass the per-source sandbox state computed at the call site.\n\nThe deprecated internal wrappers exposed in `src/Resources/core.php` for legacy third-party code (`twig_check_arrow_in_sandbox()`, `twig_array_some()`, `twig_array_every()`) were not updated:\n\n- `twig_array_some()` and `twig_array_every()` call `CoreExtension::arraySome()` / `arrayEvery()` without forwarding the sandbox state. The underlying methods default `$isSandboxed` to `false`, so the callable-must-be-a-`Closure` restriction is silently bypassed in sandbox mode and a string callable such as `'strcmp'` is accepted.\n- `twig_check_arrow_in_sandbox()` passes the `Environment` object where `CoreExtension::checkArrow()` now expects a `bool`, which throws a `TypeError` on PHP 8+.\n\nCompiled Twig templates are not affected: they call `CoreExtension::*` directly with the correct arguments. Applications are only impacted if they still call the deprecated `twig_*` helpers on top of a sandboxed `Environment`.\n\n### Resolution\n\nThe three wrappers now resolve the current sandbox state via `twig_resolve_is_sandboxed()` (the same helper compiled templates use), and forward it to the corresponding `CoreExtension::*` method. `twig_check_arrow_in_sandbox()` no longer triggers a `TypeError`, and `twig_array_some()` / `twig_array_every()` now enforce the same sandbox restriction as compiled templates.\n\n### Credits\n\nWe would like to thank El Kharoubi Iosif for reporting the issue and Fabien Potencier for providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -932,8 +932,8 @@
             },
             "CVE-2026-48806": {
                 "cve_id": "CVE-2026-48806",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -945,8 +945,8 @@
             },
             "CVE-2026-48807": {
                 "cve_id": "CVE-2026-48807",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: Sandbox `__toString()` policy bypass via `Traversable` in `join` and `replace` filters",
+                "description": "### Description\n\nThis is a residual bypass of CVE-2026-47732 / GHSA-pr2w-4gpj-cpq4 left after the initial fix for unguarded `__toString()` calls. It covers two related coercion points that were not caught by the original patch.\n\n**`Traversable` in `join` and `replace` filters.** `SandboxExtension::ensureToStringAllowed()` recurses into PHP arrays so that a `Stringable` object hidden inside an array argument cannot be string-coerced without consulting the security policy. The recursion stops at PHP arrays: a `Traversable` value passed at the same position is not materialised, so its contents are not policy-checked. `CoreExtension::join()` and `CoreExtension::replace()` later materialise such `Traversable` inputs through `self::toArray()` and feed them to `implode()` / `strtr()`, both of which implicitly call `__toString()` on contained `Stringable` objects. The bypass also reproduces when the container implements both `Stringable` and `Traversable`: the container's own `__toString()` is policy-checked, but the elements yielded by `getIterator()` are not, and the consuming filters still coerce them to string.\n\n**`in` and `not in` operators.** `InBinary` and `NotInBinary` compile to `CoreExtension::inFilter()`, which falls through to PHP's `<=>` operator when comparing a string with a `Stringable` object. PHP coerces the object to string via `__toString()` without the sandbox policy being consulted. Beyond the direct side effect, `in` can also be used as a content-leak oracle: each probe against an attacker-chosen needle leaks one bit of equality, and chained probes can reconstruct the string returned by `__toString()` even when every method is denied. The bypass reproduces with both array and `Traversable` haystacks, and on both operand sides.\n\nA sandboxed template author who is allowed to call `join` / `replace`, or to use the `in` / `not in` operators, can therefore trigger a disallowed `__toString()` method on objects reachable from the render context, even when that method is not on `SecurityPolicy::$allowedMethods`. The bypass reproduces both under global sandbox mode and when sandboxing is enabled through `SourcePolicyInterface`.\n\n### Resolution\n\n`SandboxExtension::ensureToStringAllowed()` now also recurses into `Traversable` operands when sandboxing is active for the current source: each value is materialised once and run through the same array-recursion path, so the policy is consulted before the filter implementation can coerce contained objects to strings. This applies to plain `Traversable` operands as well as to containers that implement both `Stringable` and `Traversable`: the container's own `__toString()` is still policy-checked, and the yielded elements are additionally checked. The materialisation is guarded by `isSandboxed($source)` so that non-sandboxed code paths do not pay the cost or change generator-exhaustion semantics.\n\n`InBinary` and `NotInBinary` now implement `Twig\\Node\\CoercesChildrenToStringInterface` and declare both operands as string-coerced, so `SandboxNodeVisitor` wraps each operand in `CheckToStringNode`. The policy is consulted before `CoreExtension::inFilter()` reaches PHP's `<=>` operator, matching the existing protection on the other comparison binaries (`Equal`, `Less`, `Greater`, `Spaceship`, ...).\n\n### Credits\n\nTwig would like to thank Vincent55 Yang and Fabien Potencier for reporting the issues and Fabien Potencier for providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -958,8 +958,8 @@
             },
             "CVE-2026-48808": {
                 "cve_id": "CVE-2026-48808",
-                "title": "Twig: Sandbox property allowlist bypass via the `column` filter under `SourcePolicyInterface`",
-                "description": "### Description\n\nThis is a residual bypass of CVE-2026-46635 / GHSA-vcc8-phrv-43wj that only affects sandboxing enabled through `SourcePolicyInterface` (and not the regular global sandbox mode).\n\n`CoreExtension::column()` receives the active sandbox state via the `needs_is_sandboxed` channel as a boolean `$isSandboxed`, but then routes the per-element property reads through `SandboxExtension::checkPropertyAllowed()` without forwarding the current `Source`. `SandboxExtension::checkPropertyAllowed()` re-evaluates `isSandboxed($source)` internally; with `$source = null` the `SourcePolicyInterface`-driven decision is lost, the method short-circuits to \"not sandboxed\", and the property allowlist is never consulted.\n\nA template author whose sandbox is gated by a `SourcePolicyInterface` and who has `column` on their `allowedFilters` list can therefore read any public or magic property of any object reachable in the render context, regardless of `SecurityPolicy::$allowedProperties`. Direct attribute access to the same property is blocked, and the same payload is also blocked under global sandbox mode, which makes this a clear policy enforcement gap rather than a configuration issue.\n\n### Resolution\n\n`CoreExtension::column()` no longer goes through the `SandboxExtension` wrapper for the property check. It calls the security policy directly: the per-source decision is already captured by the `$isSandboxed` boolean computed at the call site, so the property allowlist is enforced consistently for both global and source-policy sandboxing.\n\n### Credits\n\nTwig would like to thank Vincent55 Yang for reporting the issue and Fabien Potencier for providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
