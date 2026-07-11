@@ -51,8 +51,8 @@
             },
             "CVE-2026-45063": {
                 "cve_id": "CVE-2026-45063",
-                "title": "Symfony Vulnerable to Identity Spoofing via Unanchored DN Regex in X509Authenticator",
-                "description": "### Description\n\n`X509Authenticator` implements client-certificate (mTLS) authentication: the web server validates the client's certificate against a trusted CA, then passes the certificate's Subject DN (Distinguished Name: a string like `CN=Alice,O=Example,emailAddress=alice@example.com`) to Symfony via `$_SERVER['SSL_CLIENT_S_DN']`. Symfony extracts the user identifier from that string.\n\nThe extraction uses an **unanchored** regex that matches `emailAddress=` anywhere in the DN string: including inside the *value* of a different RDN (Relative Distinguished Name: one `key=value` component of the DN), such as `CN`. An attacker who can obtain a certificate from a trusted CA with a free-text `CN` can smuggle `emailAddress=victim@target` inside the CN value and be authenticated as the victim.\n\n### Resolution\n\nThe `X509Authenticator` now uses a regex that anchors the match to an RDN boundary (start of string, or following a `,` / `/` separator).\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/ccb3f724c7ff55670a6fe3521c7bf1514cceb478) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -81,8 +81,8 @@
             },
             "CVE-2026-45065": {
                 "cve_id": "CVE-2026-45065",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -98,8 +98,8 @@
             },
             "CVE-2026-45066": {
                 "cve_id": "CVE-2026-45066",
-                "title": "Symfony has an HtmlSanitizer allowLinkHosts() / allowMediaHosts() Bypass via URL-Parser Differentials and <area> Misclassification",
-                "description": "### Description\n\n`symfony/html-sanitizer` lets applications sanitise untrusted HTML. The configuration methods `allowLinkHosts([...])` and `allowLinkSchemes([...])` are intended to restrict `<a href>` targets to an allowlist of hosts/schemes; `allowMediaHosts()` / `allowMediaSchemes()` do the same for `<img src>` etc.\n\nThree distinct bypasses allow a content author to smuggle off-allowlist URLs past these checks. First, `UrlSanitizer::parse()` parses the input following RFC-3986, while browsers follow the WHATWG URL Standard which normalises `\\` to `/` before parsing the authority of \"special\" schemes; so an input like `https://evil\\@trusted.com/` parses with host `trusted.com` server-side but navigates to `https://evil/` in the browser. Second, WHATWG collapses any run of `/` after the scheme into `//`, while RFC-3986 does not; so `https:/evil.com/` and `https:///evil.com/` parse as host-less (skipping the host allowlist) but resolve to `evil.com` in the browser. Third, `UrlAttributeSanitizer` checks `'a' === $element` to route to the link policy and falls through to the media policy otherwise, but `<area>` is a navigable hyperlink equivalent to `<a>`; so `<area href>` was sanitised against the media policy (which typically allows `data:` and may have no host allowlist), bypassing `allowLinkHosts()` / `allowLinkSchemes()` entirely.\n\n### Resolution\n\n`UrlSanitizer::sanitize()` now rejects URLs that contain a backslash or that use a special scheme (`http`, `https`, `ftp`, `ws`, `wss`) followed by a single slash or three slashes before parsing, eliminating the parser-differential bypasses. `UrlAttributeSanitizer` now applies the link policy to both `<a>` and `<area>` elements.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/d506b556d3d3906f3e8660ad82257ce87edbaac4) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -111,8 +111,8 @@
             },
             "CVE-2026-45067": {
                 "cve_id": "CVE-2026-45067",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -128,8 +128,8 @@
             },
             "CVE-2026-45068": {
                 "cve_id": "CVE-2026-45068",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -145,8 +145,8 @@
             },
             "CVE-2026-45069": {
                 "cve_id": "CVE-2026-45069",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -158,8 +158,8 @@
             },
             "CVE-2026-45070": {
                 "cve_id": "CVE-2026-45070",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Symfony has Email Header Injection via Non-Token Characters in Mime Parameter Names",
+                "description": "### Description\n\n`Symfony\\Component\\Mime\\Header\\ParameterizedHeader` (and the related parameter handling reachable from `Symfony\\Component\\Mime\\Header\\Headers`) is responsible for serializing structured headers such as `Content-Type` and `Content-Disposition`, which carry `key=value` parameters (e.g. `Content-Disposition: attachment; filename=\"x\"`).\n\nRFC 2045 / RFC 5322 require parameter *names* to be `tokens`: a restricted ASCII subset that excludes whitespace, CR/LF, and the `tspecials` set. Symfony's parameter handling validates and properly encodes parameter *values*, but does not validate parameter *names*: the supplied name is emitted verbatim into the serialized header.\n\nA caller that derives a parameter name from untrusted input, e.g. an application that lets a user influence a `Content-Disposition` parameter name, can include `\\r\\n` or other non-token bytes inside the name, terminating the current header and injecting additional headers in the rendered message. This is the classic CRLF / header-injection primitive applied to the parameter-name slot.\n\n### Resolution\n\n`ParameterizedHeader` now rejects parameter names that contain bytes outside the RFC `token` character class.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/e62ea217f8b4ca8ae922ad0f949e0c4dc1f9b613) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Fabian Fleischer for reporting the issue and Alexandre Daubois for fixing it.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -192,8 +192,8 @@
             },
             "CVE-2026-45072": {
                 "cve_id": "CVE-2026-45072",
-                "title": "Symfony Vulnerable to stored XSS in WebProfiler CodeExtension::fileExcerpt() \u2014 Unescaped Non-PHP File Rendering",
-                "description": "### Description\n\nSymfony's profiler, a development only debug UI, renders source-code excerpts on several pages using Twig's custom `file_excerpt` filter. This filter renders PHP files via `highlight_string()` (which escapes HTML), but renders **non-PHP files** by splitting on `\\n` and interpolating each line directly into `<code>{$line}</code>` with no escaping. \n\nAn attacker who can write arbitrary bytes into any file under the project root (including e.g. `var/log/dev.log`), achieves **stored XSS** against any developer who later opens that file in the profiler.\n\n### Resolution\n\nThe `file_excerpt` filter now properly escapes each line of non-PHP files using `htmlspecialchars()` before concatenating them.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/863aa81c61166f1aa74b7732df316f76113acbdb) for branch 6.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -205,8 +205,8 @@
             },
             "CVE-2026-45073": {
                 "cve_id": "CVE-2026-45073",
-                "title": "Symfony Vulnerable to SQL Injection in PdoAdapter::doClear() via Unsanitized $prefix",
-                "description": "### Description\n\n`Symfony\\Component\\Cache\\Adapter\\PdoAdapter` is the PDO-backed cache adapter. Its `clear($prefix)` method (inherited from `AbstractAdapterTrait`) is documented to delete cache items whose key starts with `$prefix`.\n\nIn the non-versioning code path, the caller-supplied `$prefix` is concatenated into `$namespace = $this->namespace.$prefix` and passed to `PdoAdapter::doClear()`, which builds:\n\n```sql\nDELETE FROM <table> WHERE <id_col> LIKE '<namespace>%'\n```\n\nThe value is interpolated directly into the SQL text and executed with `PDO::exec()`: `$namespace` is not bound. A caller able to influence `$prefix` can break out of the literal and inject SQL, expanding deletion scope from the intended prefix to arbitrary rows, or otherwise reshape query semantics.\n\nMost applications don't expose `clear($prefix)` to untrusted input directly, but the contract of the method is to safely accept any prefix string, so the lack of escaping is a defect of the adapter itself.\n\n### Resolution\n\n`AbstractAdapterTrait::clear()` now rejects any `$prefix` containing characters outside `[-+.A-Za-z0-9]`: when an invalid prefix is supplied, the method logs a warning and returns `false` instead of reaching the SQL layer. This blocks quotes, `%`, null bytes and other characters that would let an attacker break out of the `LIKE` literal.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/ec50b799d79ebe24561f29351c1efcb6da95c9b1) for branch 5.4.\n\n### Credits\nSymfony would like to thank secsys_codex for reporting the issue and Nicolas Grekas for fixing it.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -222,8 +222,8 @@
             },
             "CVE-2026-45074": {
                 "cve_id": "CVE-2026-45074",
-                "title": "Symfony's Cas2Handler Derives CAS service URL from Client Host Header \u2192 Cross-Service Ticket Replay",
-                "description": "`Cas2Handler` builds this `service` parameter from `Request::getSchemeAndHttpHost()`, which reflects the attacker-controlled HTTP `Host` header whenever Symfony's `framework.trusted_hosts` setting is not configured (the default). An attacker who controls any *other* application registered with the same CAS server can replay a victim's ticket against the Symfony application, with a spoofed `Host` header, and be authenticated as that victim.\n\n### Resolution\n\nA new required `service_url` configuration option is introduced on `Cas2Handler`. The CAS `service` parameter sent to the validation endpoint is now built from this configured URL instead of being derived from the request's `Host` header, preventing cross-service ticket replay via Host header spoofing.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/5ba145dba702404801bdf9e7e8d6df170060d541) for branch 7.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and Nicolas Grekas for providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -265,8 +265,8 @@
             },
             "CVE-2026-45133": {
                 "cve_id": "CVE-2026-45133",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Symfony hardened the parser when handling untrusted input",
+                "description": "### Description\n\n`Symfony\\Component\\Yaml\\Parser` is the entry point for parsing YAML strings into PHP values via `Yaml::parse()`. When the parser is exposed to attacker-controlled input, deeply nested mappings or sequences cause both the block-level (`Parser::parseBlock()`) and inline (`Inline::parseSequence()` / `Inline::parseMapping()`) parsers to recurse without a depth limit. A crafted document exhausts the PHP stack and crashes the worker.\n\n### Resolution\n\nThe `Parser` now tracks recursion depth in a shared `ParserState` object across both block-level and inline parsing, with a default limit of **128**. The limit is configurable via a new `$maxNestingLevel` argument on `Parser::__construct()`, `Yaml::parse()` and `Yaml::parseFile()`.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/914f427ed9630ddb3904dafba763e53d9f133fe3) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Pietro Tirenna (Shielder) for reporting the issue and Nicolas Grekas for fixing it.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -282,8 +282,8 @@
             },
             "CVE-2026-45304": {
                 "cve_id": "CVE-2026-45304",
-                "title": "Symfony's YAML Parser Vulnerable to Exponential Memory Allocation via Recursive Collection-Alias Expansion (\"Billion Laughs\")",
-                "description": "### Description\n\n`Symfony\\Component\\Yaml\\Parser` resolves YAML aliases (`*anchor`) during parsing. Aliases that reference *collections* (arrays, `stdClass`, `TaggedValue`-wrapped collections) can themselves point to other collections containing aliases, creating exponential expansion at resolution time. A small input can blow up into a multi-gigabyte structure and exhaust memory: the classic \"Billion Laughs\" denial-of-service against any parser exposed to untrusted YAML.\n\n### Resolution\n\nThe `Parser` now counts collection alias resolutions in a shared `ParserState` object, with a default limit of **128**, following the [SnakeYAML model](https://github.com/snakeyaml/snakeyaml/blob/master/src/main/java/org/yaml/snakeyaml/LoaderOptions.java). Scalar aliases remain unrestricted since they cannot drive exponential growth. The limit is configurable via a new `$maxAliasesForCollections` argument on `Parser::__construct()`, `Yaml::parse()` and `Yaml::parseFile()`. A new `Yaml::PARSE_EXCEPTION_ON_ALIAS` flag also rejects all aliases outright when parsing fully untrusted input.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/e77391b2e4f18821198f010d573674c8ed4a970a) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Pietro Tirenna (Shielder) for reporting the issue and Nicolas Grekas for fixing it.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -329,8 +329,8 @@
             },
             "CVE-2026-45754": {
                 "cve_id": "CVE-2026-45754",
-                "title": "Symfony's Mailjet Mailer Webhook Parser Never Verifies the Configured Secret \u2014 Unauthenticated Webhook Event Injection",
-                "description": "### Description\n\nThe Mailjet mailer bridge and the LOX24 SMS notifier bridge both ship webhook request parsers used to authenticate and decode the event callbacks each provider POSTs to an application's webhook endpoint. Their `doParse(Request $request, #[\\SensitiveParameter] string $secret)` methods receive the configured webhook secret but never read it; they convert and return the payload unconditionally.\n\nAs a result, an application that wires up either webhook endpoint accepts **any** POST to that URL, even when a webhook secret is configured (the recommended setup). An attacker who knows the endpoint exists can submit forged event payloads, fake bounce / blocked / spam / open / click / delivery events, leading to suppression-list corruption, delivery-metrics fraud, etc.\n\n### Resolution\n\n`MailjetRequestParser::doParse()` now rejects the request unless it carries the expected HTTP Basic credentials, Mailjet's webhook authentication mechanism, using a constant-time comparison. The configured webhook secret is matched against the credentials embedded in the Mailjet webhook URL as `user:password` (use `:password` when the URL has no username).\n\n`Lox24RequestParser::doParse()` now rejects the request unless it carries an `X-LOX24-Token` HTTP header whose value matches the configured secret, using a constant-time comparison. The same token must be configured in the LOX24 dashboard under the callback settings.\n\nWhen no secret is configured the behaviour is unchanged: webhook authentication remains opt-in, but it is now actually enforced once opted in.\n\nThe Mailjet patch is available [here](https://github.com/symfony/symfony/commit/3e52bf5ab733ee32e35eeeeb2631d859c941838e) for branch 6.4.\n\nThe LOX24 patch is available [here](https://github.com/symfony/symfony/commit/4aaa45dd054f73445f1ab254968b7e60b546cc77) for branch 7.4 (the LOX24 bridge was introduced in 7.1 and is not present in 6.4).\n\n### Credits\n\nSymfony would like to thank Himanshu Anand for reporting the issue, and Alexandre Daubois and Nicolas Grekas for providing the fixes.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -342,8 +342,8 @@
             },
             "CVE-2026-45755": {
                 "cve_id": "CVE-2026-45755",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -355,8 +355,8 @@
             },
             "CVE-2026-45756": {
                 "cve_id": "CVE-2026-45756",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -385,8 +385,8 @@
             },
             "CVE-2026-47212": {
                 "cve_id": "CVE-2026-47212",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Symfony: Twilio SMS Notifier allows unauthenticated webhook injection due to missing X-Twilio-Signature verification",
+                "description": "### Description\n\nThe Twilio SMS notifier bridge ships a webhook request parser used to authenticate and decode the status callbacks Twilio POSTs to an application's webhook endpoint. Its `doParse(Request $request, #[\\SensitiveParameter] string $secret)` method receives the configured webhook secret but never reads it; it decodes and returns the payload unconditionally, ignoring the `X-Twilio-Signature` HMAC header Twilio sends with each request.\n\nAs a result, an application that wires up the Twilio webhook endpoint accepts **any** POST to that URL, even when a signing secret is configured (the recommended setup). An attacker who knows the endpoint exists can submit forged status payloads, fake delivered / failed / undelivered events, leading to delivery-metrics fraud, downstream automation triggers, etc.\n\n### Resolution\n\n`TwilioRequestParser::doParse()` now requires and verifies the `X-Twilio-Signature` header (HMAC-SHA1 over the full request URL concatenated with the alphabetically-sorted POST parameters, base64-encoded, keyed with the Twilio account auth token) before further processing, using a constant-time comparison.\n\nWhen no secret is configured the behaviour is unchanged: signature verification remains opt-in, but it is now actually enforced once opted in.\n\nApplications behind a TLS-terminating reverse proxy must configure `framework.trusted_proxies` and `framework.trusted_headers` so that `Request::getUri()` returns the public URL Twilio signed.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/8545fb2af6c07dfb5ef0fc8d9bccf86db2c94356) for branch 6.4.\n\n### Credits\n\nSymfony would like to thank Himanshu Anand for reporting the issue and Nicolas Grekas for providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -398,8 +398,8 @@
             },
             "CVE-2026-48489": {
                 "cve_id": "CVE-2026-48489",
-                "title": "Symfony: Security Firewall Bypass via failure_forward Subrequest: Unauthenticated Access to access_control-Protected GET Routes",
-                "description": "### Description\n\nWhen a firewall is configured with `form-login` (or any authenticator using `DefaultAuthenticationFailureHandler`) and the `failure_forward: true` option, the handler reads the `_failure_path` parameter from the failing login request and uses it as the path of an internal subrequest dispatched through `HttpKernelInterface::SUB_REQUEST`.\n\nSymfony's `Firewall::onKernelRequest` listener intentionally skips subrequests under the assumption they are internally generated and trusted, which also means `AccessListener` (the listener that evaluates `access_control`) does not run. Because the attacker controls the target of the subrequest, an unauthenticated POST to the check path with `_failure_path=/admin/whatever` performs a local request forgery that executes the target controller outside the firewall perimeter and returns its response to the caller.\n\nApplications that follow Symfony's recommended best practice of protecting administrative areas with broad `access_control` rules (e.g. `^/admin` requires `ROLE_ADMIN`) and expose read-only GET endpoints under that area (data exports, internal APIs, account views) are fully exposed: any such GET route can be read by an unauthenticated attacker without any developer misconfiguration, debug mode, or state-changing GET handler being required.\n\n### Resolution\n\n`DefaultAuthenticationFailureHandler` no longer honors the request-supplied `_failure_path` parameter when `failure_forward` is enabled. The subrequest is always dispatched to the configured `failure_path` option (defaulting to `login_path`), which is set by the application owner and not by the request. The redirect branch (`failure_forward: false`) is unchanged because redirects re-enter the firewall on the next request and are not subject to this bypass.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/c48a4276309e11aedeeb0ce3a89dfbf0b4fe04ff) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Nguyen Ngoc Toan Thang (@a-tt-om) and Tran Quoc Tri Trung (@teebow1e) for reporting the issue, and Nicolas Grekas for providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -458,8 +458,8 @@
             },
             "CVE-2026-48761": {
                 "cve_id": "CVE-2026-48761",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -537,8 +537,8 @@
             },
             "CVE-2026-45063": {
                 "cve_id": "CVE-2026-45063",
-                "title": "Symfony Vulnerable to Identity Spoofing via Unanchored DN Regex in X509Authenticator",
-                "description": "### Description\n\n`X509Authenticator` implements client-certificate (mTLS) authentication: the web server validates the client's certificate against a trusted CA, then passes the certificate's Subject DN (Distinguished Name: a string like `CN=Alice,O=Example,emailAddress=alice@example.com`) to Symfony via `$_SERVER['SSL_CLIENT_S_DN']`. Symfony extracts the user identifier from that string.\n\nThe extraction uses an **unanchored** regex that matches `emailAddress=` anywhere in the DN string: including inside the *value* of a different RDN (Relative Distinguished Name: one `key=value` component of the DN), such as `CN`. An attacker who can obtain a certificate from a trusted CA with a free-text `CN` can smuggle `emailAddress=victim@target` inside the CN value and be authenticated as the victim.\n\n### Resolution\n\nThe `X509Authenticator` now uses a regex that anchors the match to an RDN boundary (start of string, or following a `,` / `/` separator).\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/ccb3f724c7ff55670a6fe3521c7bf1514cceb478) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -567,8 +567,8 @@
             },
             "CVE-2026-45065": {
                 "cve_id": "CVE-2026-45065",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -584,8 +584,8 @@
             },
             "CVE-2026-45066": {
                 "cve_id": "CVE-2026-45066",
-                "title": "Symfony has an HtmlSanitizer allowLinkHosts() / allowMediaHosts() Bypass via URL-Parser Differentials and <area> Misclassification",
-                "description": "### Description\n\n`symfony/html-sanitizer` lets applications sanitise untrusted HTML. The configuration methods `allowLinkHosts([...])` and `allowLinkSchemes([...])` are intended to restrict `<a href>` targets to an allowlist of hosts/schemes; `allowMediaHosts()` / `allowMediaSchemes()` do the same for `<img src>` etc.\n\nThree distinct bypasses allow a content author to smuggle off-allowlist URLs past these checks. First, `UrlSanitizer::parse()` parses the input following RFC-3986, while browsers follow the WHATWG URL Standard which normalises `\\` to `/` before parsing the authority of \"special\" schemes; so an input like `https://evil\\@trusted.com/` parses with host `trusted.com` server-side but navigates to `https://evil/` in the browser. Second, WHATWG collapses any run of `/` after the scheme into `//`, while RFC-3986 does not; so `https:/evil.com/` and `https:///evil.com/` parse as host-less (skipping the host allowlist) but resolve to `evil.com` in the browser. Third, `UrlAttributeSanitizer` checks `'a' === $element` to route to the link policy and falls through to the media policy otherwise, but `<area>` is a navigable hyperlink equivalent to `<a>`; so `<area href>` was sanitised against the media policy (which typically allows `data:` and may have no host allowlist), bypassing `allowLinkHosts()` / `allowLinkSchemes()` entirely.\n\n### Resolution\n\n`UrlSanitizer::sanitize()` now rejects URLs that contain a backslash or that use a special scheme (`http`, `https`, `ftp`, `ws`, `wss`) followed by a single slash or three slashes before parsing, eliminating the parser-differential bypasses. `UrlAttributeSanitizer` now applies the link policy to both `<a>` and `<area>` elements.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/d506b556d3d3906f3e8660ad82257ce87edbaac4) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -597,8 +597,8 @@
             },
             "CVE-2026-45067": {
                 "cve_id": "CVE-2026-45067",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -614,8 +614,8 @@
             },
             "CVE-2026-45068": {
                 "cve_id": "CVE-2026-45068",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -631,8 +631,8 @@
             },
             "CVE-2026-45069": {
                 "cve_id": "CVE-2026-45069",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -644,8 +644,8 @@
             },
             "CVE-2026-45070": {
                 "cve_id": "CVE-2026-45070",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Symfony has Email Header Injection via Non-Token Characters in Mime Parameter Names",
+                "description": "### Description\n\n`Symfony\\Component\\Mime\\Header\\ParameterizedHeader` (and the related parameter handling reachable from `Symfony\\Component\\Mime\\Header\\Headers`) is responsible for serializing structured headers such as `Content-Type` and `Content-Disposition`, which carry `key=value` parameters (e.g. `Content-Disposition: attachment; filename=\"x\"`).\n\nRFC 2045 / RFC 5322 require parameter *names* to be `tokens`: a restricted ASCII subset that excludes whitespace, CR/LF, and the `tspecials` set. Symfony's parameter handling validates and properly encodes parameter *values*, but does not validate parameter *names*: the supplied name is emitted verbatim into the serialized header.\n\nA caller that derives a parameter name from untrusted input, e.g. an application that lets a user influence a `Content-Disposition` parameter name, can include `\\r\\n` or other non-token bytes inside the name, terminating the current header and injecting additional headers in the rendered message. This is the classic CRLF / header-injection primitive applied to the parameter-name slot.\n\n### Resolution\n\n`ParameterizedHeader` now rejects parameter names that contain bytes outside the RFC `token` character class.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/e62ea217f8b4ca8ae922ad0f949e0c4dc1f9b613) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Fabian Fleischer for reporting the issue and Alexandre Daubois for fixing it.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -678,8 +678,8 @@
             },
             "CVE-2026-45072": {
                 "cve_id": "CVE-2026-45072",
-                "title": "Symfony Vulnerable to stored XSS in WebProfiler CodeExtension::fileExcerpt() \u2014 Unescaped Non-PHP File Rendering",
-                "description": "### Description\n\nSymfony's profiler, a development only debug UI, renders source-code excerpts on several pages using Twig's custom `file_excerpt` filter. This filter renders PHP files via `highlight_string()` (which escapes HTML), but renders **non-PHP files** by splitting on `\\n` and interpolating each line directly into `<code>{$line}</code>` with no escaping. \n\nAn attacker who can write arbitrary bytes into any file under the project root (including e.g. `var/log/dev.log`), achieves **stored XSS** against any developer who later opens that file in the profiler.\n\n### Resolution\n\nThe `file_excerpt` filter now properly escapes each line of non-PHP files using `htmlspecialchars()` before concatenating them.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/863aa81c61166f1aa74b7732df316f76113acbdb) for branch 6.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -691,8 +691,8 @@
             },
             "CVE-2026-45073": {
                 "cve_id": "CVE-2026-45073",
-                "title": "Symfony Vulnerable to SQL Injection in PdoAdapter::doClear() via Unsanitized $prefix",
-                "description": "### Description\n\n`Symfony\\Component\\Cache\\Adapter\\PdoAdapter` is the PDO-backed cache adapter. Its `clear($prefix)` method (inherited from `AbstractAdapterTrait`) is documented to delete cache items whose key starts with `$prefix`.\n\nIn the non-versioning code path, the caller-supplied `$prefix` is concatenated into `$namespace = $this->namespace.$prefix` and passed to `PdoAdapter::doClear()`, which builds:\n\n```sql\nDELETE FROM <table> WHERE <id_col> LIKE '<namespace>%'\n```\n\nThe value is interpolated directly into the SQL text and executed with `PDO::exec()`: `$namespace` is not bound. A caller able to influence `$prefix` can break out of the literal and inject SQL, expanding deletion scope from the intended prefix to arbitrary rows, or otherwise reshape query semantics.\n\nMost applications don't expose `clear($prefix)` to untrusted input directly, but the contract of the method is to safely accept any prefix string, so the lack of escaping is a defect of the adapter itself.\n\n### Resolution\n\n`AbstractAdapterTrait::clear()` now rejects any `$prefix` containing characters outside `[-+.A-Za-z0-9]`: when an invalid prefix is supplied, the method logs a warning and returns `false` instead of reaching the SQL layer. This blocks quotes, `%`, null bytes and other characters that would let an attacker break out of the `LIKE` literal.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/ec50b799d79ebe24561f29351c1efcb6da95c9b1) for branch 5.4.\n\n### Credits\nSymfony would like to thank secsys_codex for reporting the issue and Nicolas Grekas for fixing it.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -708,8 +708,8 @@
             },
             "CVE-2026-45074": {
                 "cve_id": "CVE-2026-45074",
-                "title": "Symfony's Cas2Handler Derives CAS service URL from Client Host Header \u2192 Cross-Service Ticket Replay",
-                "description": "`Cas2Handler` builds this `service` parameter from `Request::getSchemeAndHttpHost()`, which reflects the attacker-controlled HTTP `Host` header whenever Symfony's `framework.trusted_hosts` setting is not configured (the default). An attacker who controls any *other* application registered with the same CAS server can replay a victim's ticket against the Symfony application, with a spoofed `Host` header, and be authenticated as that victim.\n\n### Resolution\n\nA new required `service_url` configuration option is introduced on `Cas2Handler`. The CAS `service` parameter sent to the validation endpoint is now built from this configured URL instead of being derived from the request's `Host` header, preventing cross-service ticket replay via Host header spoofing.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/5ba145dba702404801bdf9e7e8d6df170060d541) for branch 7.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and Nicolas Grekas for providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -751,8 +751,8 @@
             },
             "CVE-2026-45133": {
                 "cve_id": "CVE-2026-45133",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Symfony hardened the parser when handling untrusted input",
+                "description": "### Description\n\n`Symfony\\Component\\Yaml\\Parser` is the entry point for parsing YAML strings into PHP values via `Yaml::parse()`. When the parser is exposed to attacker-controlled input, deeply nested mappings or sequences cause both the block-level (`Parser::parseBlock()`) and inline (`Inline::parseSequence()` / `Inline::parseMapping()`) parsers to recurse without a depth limit. A crafted document exhausts the PHP stack and crashes the worker.\n\n### Resolution\n\nThe `Parser` now tracks recursion depth in a shared `ParserState` object across both block-level and inline parsing, with a default limit of **128**. The limit is configurable via a new `$maxNestingLevel` argument on `Parser::__construct()`, `Yaml::parse()` and `Yaml::parseFile()`.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/914f427ed9630ddb3904dafba763e53d9f133fe3) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Pietro Tirenna (Shielder) for reporting the issue and Nicolas Grekas for fixing it.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -768,8 +768,8 @@
             },
             "CVE-2026-45304": {
                 "cve_id": "CVE-2026-45304",
-                "title": "Symfony's YAML Parser Vulnerable to Exponential Memory Allocation via Recursive Collection-Alias Expansion (\"Billion Laughs\")",
-                "description": "### Description\n\n`Symfony\\Component\\Yaml\\Parser` resolves YAML aliases (`*anchor`) during parsing. Aliases that reference *collections* (arrays, `stdClass`, `TaggedValue`-wrapped collections) can themselves point to other collections containing aliases, creating exponential expansion at resolution time. A small input can blow up into a multi-gigabyte structure and exhaust memory: the classic \"Billion Laughs\" denial-of-service against any parser exposed to untrusted YAML.\n\n### Resolution\n\nThe `Parser` now counts collection alias resolutions in a shared `ParserState` object, with a default limit of **128**, following the [SnakeYAML model](https://github.com/snakeyaml/snakeyaml/blob/master/src/main/java/org/yaml/snakeyaml/LoaderOptions.java). Scalar aliases remain unrestricted since they cannot drive exponential growth. The limit is configurable via a new `$maxAliasesForCollections` argument on `Parser::__construct()`, `Yaml::parse()` and `Yaml::parseFile()`. A new `Yaml::PARSE_EXCEPTION_ON_ALIAS` flag also rejects all aliases outright when parsing fully untrusted input.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/e77391b2e4f18821198f010d573674c8ed4a970a) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Pietro Tirenna (Shielder) for reporting the issue and Nicolas Grekas for fixing it.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -815,8 +815,8 @@
             },
             "CVE-2026-45754": {
                 "cve_id": "CVE-2026-45754",
-                "title": "Symfony's Mailjet Mailer Webhook Parser Never Verifies the Configured Secret \u2014 Unauthenticated Webhook Event Injection",
-                "description": "### Description\n\nThe Mailjet mailer bridge and the LOX24 SMS notifier bridge both ship webhook request parsers used to authenticate and decode the event callbacks each provider POSTs to an application's webhook endpoint. Their `doParse(Request $request, #[\\SensitiveParameter] string $secret)` methods receive the configured webhook secret but never read it; they convert and return the payload unconditionally.\n\nAs a result, an application that wires up either webhook endpoint accepts **any** POST to that URL, even when a webhook secret is configured (the recommended setup). An attacker who knows the endpoint exists can submit forged event payloads, fake bounce / blocked / spam / open / click / delivery events, leading to suppression-list corruption, delivery-metrics fraud, etc.\n\n### Resolution\n\n`MailjetRequestParser::doParse()` now rejects the request unless it carries the expected HTTP Basic credentials, Mailjet's webhook authentication mechanism, using a constant-time comparison. The configured webhook secret is matched against the credentials embedded in the Mailjet webhook URL as `user:password` (use `:password` when the URL has no username).\n\n`Lox24RequestParser::doParse()` now rejects the request unless it carries an `X-LOX24-Token` HTTP header whose value matches the configured secret, using a constant-time comparison. The same token must be configured in the LOX24 dashboard under the callback settings.\n\nWhen no secret is configured the behaviour is unchanged: webhook authentication remains opt-in, but it is now actually enforced once opted in.\n\nThe Mailjet patch is available [here](https://github.com/symfony/symfony/commit/3e52bf5ab733ee32e35eeeeb2631d859c941838e) for branch 6.4.\n\nThe LOX24 patch is available [here](https://github.com/symfony/symfony/commit/4aaa45dd054f73445f1ab254968b7e60b546cc77) for branch 7.4 (the LOX24 bridge was introduced in 7.1 and is not present in 6.4).\n\n### Credits\n\nSymfony would like to thank Himanshu Anand for reporting the issue, and Alexandre Daubois and Nicolas Grekas for providing the fixes.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -828,8 +828,8 @@
             },
             "CVE-2026-45755": {
                 "cve_id": "CVE-2026-45755",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -841,8 +841,8 @@
             },
             "CVE-2026-45756": {
                 "cve_id": "CVE-2026-45756",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -871,8 +871,8 @@
             },
             "CVE-2026-47212": {
                 "cve_id": "CVE-2026-47212",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Symfony: Twilio SMS Notifier allows unauthenticated webhook injection due to missing X-Twilio-Signature verification",
+                "description": "### Description\n\nThe Twilio SMS notifier bridge ships a webhook request parser used to authenticate and decode the status callbacks Twilio POSTs to an application's webhook endpoint. Its `doParse(Request $request, #[\\SensitiveParameter] string $secret)` method receives the configured webhook secret but never reads it; it decodes and returns the payload unconditionally, ignoring the `X-Twilio-Signature` HMAC header Twilio sends with each request.\n\nAs a result, an application that wires up the Twilio webhook endpoint accepts **any** POST to that URL, even when a signing secret is configured (the recommended setup). An attacker who knows the endpoint exists can submit forged status payloads, fake delivered / failed / undelivered events, leading to delivery-metrics fraud, downstream automation triggers, etc.\n\n### Resolution\n\n`TwilioRequestParser::doParse()` now requires and verifies the `X-Twilio-Signature` header (HMAC-SHA1 over the full request URL concatenated with the alphabetically-sorted POST parameters, base64-encoded, keyed with the Twilio account auth token) before further processing, using a constant-time comparison.\n\nWhen no secret is configured the behaviour is unchanged: signature verification remains opt-in, but it is now actually enforced once opted in.\n\nApplications behind a TLS-terminating reverse proxy must configure `framework.trusted_proxies` and `framework.trusted_headers` so that `Request::getUri()` returns the public URL Twilio signed.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/8545fb2af6c07dfb5ef0fc8d9bccf86db2c94356) for branch 6.4.\n\n### Credits\n\nSymfony would like to thank Himanshu Anand for reporting the issue and Nicolas Grekas for providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -884,8 +884,8 @@
             },
             "CVE-2026-48489": {
                 "cve_id": "CVE-2026-48489",
-                "title": "Symfony: Security Firewall Bypass via failure_forward Subrequest: Unauthenticated Access to access_control-Protected GET Routes",
-                "description": "### Description\n\nWhen a firewall is configured with `form-login` (or any authenticator using `DefaultAuthenticationFailureHandler`) and the `failure_forward: true` option, the handler reads the `_failure_path` parameter from the failing login request and uses it as the path of an internal subrequest dispatched through `HttpKernelInterface::SUB_REQUEST`.\n\nSymfony's `Firewall::onKernelRequest` listener intentionally skips subrequests under the assumption they are internally generated and trusted, which also means `AccessListener` (the listener that evaluates `access_control`) does not run. Because the attacker controls the target of the subrequest, an unauthenticated POST to the check path with `_failure_path=/admin/whatever` performs a local request forgery that executes the target controller outside the firewall perimeter and returns its response to the caller.\n\nApplications that follow Symfony's recommended best practice of protecting administrative areas with broad `access_control` rules (e.g. `^/admin` requires `ROLE_ADMIN`) and expose read-only GET endpoints under that area (data exports, internal APIs, account views) are fully exposed: any such GET route can be read by an unauthenticated attacker without any developer misconfiguration, debug mode, or state-changing GET handler being required.\n\n### Resolution\n\n`DefaultAuthenticationFailureHandler` no longer honors the request-supplied `_failure_path` parameter when `failure_forward` is enabled. The subrequest is always dispatched to the configured `failure_path` option (defaulting to `login_path`), which is set by the application owner and not by the request. The redirect branch (`failure_forward: false`) is unchanged because redirects re-enter the firewall on the next request and are not subject to this bypass.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/c48a4276309e11aedeeb0ce3a89dfbf0b4fe04ff) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Nguyen Ngoc Toan Thang (@a-tt-om) and Tran Quoc Tri Trung (@teebow1e) for reporting the issue, and Nicolas Grekas for providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -944,8 +944,8 @@
             },
             "CVE-2026-48761": {
                 "cve_id": "CVE-2026-48761",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1023,8 +1023,8 @@
             },
             "CVE-2026-45063": {
                 "cve_id": "CVE-2026-45063",
-                "title": "Symfony Vulnerable to Identity Spoofing via Unanchored DN Regex in X509Authenticator",
-                "description": "### Description\n\n`X509Authenticator` implements client-certificate (mTLS) authentication: the web server validates the client's certificate against a trusted CA, then passes the certificate's Subject DN (Distinguished Name: a string like `CN=Alice,O=Example,emailAddress=alice@example.com`) to Symfony via `$_SERVER['SSL_CLIENT_S_DN']`. Symfony extracts the user identifier from that string.\n\nThe extraction uses an **unanchored** regex that matches `emailAddress=` anywhere in the DN string: including inside the *value* of a different RDN (Relative Distinguished Name: one `key=value` component of the DN), such as `CN`. An attacker who can obtain a certificate from a trusted CA with a free-text `CN` can smuggle `emailAddress=victim@target` inside the CN value and be authenticated as the victim.\n\n### Resolution\n\nThe `X509Authenticator` now uses a regex that anchors the match to an RDN boundary (start of string, or following a `,` / `/` separator).\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/ccb3f724c7ff55670a6fe3521c7bf1514cceb478) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -1053,8 +1053,8 @@
             },
             "CVE-2026-45065": {
                 "cve_id": "CVE-2026-45065",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1070,8 +1070,8 @@
             },
             "CVE-2026-45066": {
                 "cve_id": "CVE-2026-45066",
-                "title": "Symfony has an HtmlSanitizer allowLinkHosts() / allowMediaHosts() Bypass via URL-Parser Differentials and <area> Misclassification",
-                "description": "### Description\n\n`symfony/html-sanitizer` lets applications sanitise untrusted HTML. The configuration methods `allowLinkHosts([...])` and `allowLinkSchemes([...])` are intended to restrict `<a href>` targets to an allowlist of hosts/schemes; `allowMediaHosts()` / `allowMediaSchemes()` do the same for `<img src>` etc.\n\nThree distinct bypasses allow a content author to smuggle off-allowlist URLs past these checks. First, `UrlSanitizer::parse()` parses the input following RFC-3986, while browsers follow the WHATWG URL Standard which normalises `\\` to `/` before parsing the authority of \"special\" schemes; so an input like `https://evil\\@trusted.com/` parses with host `trusted.com` server-side but navigates to `https://evil/` in the browser. Second, WHATWG collapses any run of `/` after the scheme into `//`, while RFC-3986 does not; so `https:/evil.com/` and `https:///evil.com/` parse as host-less (skipping the host allowlist) but resolve to `evil.com` in the browser. Third, `UrlAttributeSanitizer` checks `'a' === $element` to route to the link policy and falls through to the media policy otherwise, but `<area>` is a navigable hyperlink equivalent to `<a>`; so `<area href>` was sanitised against the media policy (which typically allows `data:` and may have no host allowlist), bypassing `allowLinkHosts()` / `allowLinkSchemes()` entirely.\n\n### Resolution\n\n`UrlSanitizer::sanitize()` now rejects URLs that contain a backslash or that use a special scheme (`http`, `https`, `ftp`, `ws`, `wss`) followed by a single slash or three slashes before parsing, eliminating the parser-differential bypasses. `UrlAttributeSanitizer` now applies the link policy to both `<a>` and `<area>` elements.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/d506b556d3d3906f3e8660ad82257ce87edbaac4) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1083,8 +1083,8 @@
             },
             "CVE-2026-45067": {
                 "cve_id": "CVE-2026-45067",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -1100,8 +1100,8 @@
             },
             "CVE-2026-45068": {
                 "cve_id": "CVE-2026-45068",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1117,8 +1117,8 @@
             },
             "CVE-2026-45069": {
                 "cve_id": "CVE-2026-45069",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1130,8 +1130,8 @@
             },
             "CVE-2026-45070": {
                 "cve_id": "CVE-2026-45070",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Symfony has Email Header Injection via Non-Token Characters in Mime Parameter Names",
+                "description": "### Description\n\n`Symfony\\Component\\Mime\\Header\\ParameterizedHeader` (and the related parameter handling reachable from `Symfony\\Component\\Mime\\Header\\Headers`) is responsible for serializing structured headers such as `Content-Type` and `Content-Disposition`, which carry `key=value` parameters (e.g. `Content-Disposition: attachment; filename=\"x\"`).\n\nRFC 2045 / RFC 5322 require parameter *names* to be `tokens`: a restricted ASCII subset that excludes whitespace, CR/LF, and the `tspecials` set. Symfony's parameter handling validates and properly encodes parameter *values*, but does not validate parameter *names*: the supplied name is emitted verbatim into the serialized header.\n\nA caller that derives a parameter name from untrusted input, e.g. an application that lets a user influence a `Content-Disposition` parameter name, can include `\\r\\n` or other non-token bytes inside the name, terminating the current header and injecting additional headers in the rendered message. This is the classic CRLF / header-injection primitive applied to the parameter-name slot.\n\n### Resolution\n\n`ParameterizedHeader` now rejects parameter names that contain bytes outside the RFC `token` character class.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/e62ea217f8b4ca8ae922ad0f949e0c4dc1f9b613) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Fabian Fleischer for reporting the issue and Alexandre Daubois for fixing it.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1164,8 +1164,8 @@
             },
             "CVE-2026-45072": {
                 "cve_id": "CVE-2026-45072",
-                "title": "Symfony Vulnerable to stored XSS in WebProfiler CodeExtension::fileExcerpt() \u2014 Unescaped Non-PHP File Rendering",
-                "description": "### Description\n\nSymfony's profiler, a development only debug UI, renders source-code excerpts on several pages using Twig's custom `file_excerpt` filter. This filter renders PHP files via `highlight_string()` (which escapes HTML), but renders **non-PHP files** by splitting on `\\n` and interpolating each line directly into `<code>{$line}</code>` with no escaping. \n\nAn attacker who can write arbitrary bytes into any file under the project root (including e.g. `var/log/dev.log`), achieves **stored XSS** against any developer who later opens that file in the profiler.\n\n### Resolution\n\nThe `file_excerpt` filter now properly escapes each line of non-PHP files using `htmlspecialchars()` before concatenating them.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/863aa81c61166f1aa74b7732df316f76113acbdb) for branch 6.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1177,8 +1177,8 @@
             },
             "CVE-2026-45073": {
                 "cve_id": "CVE-2026-45073",
-                "title": "Symfony Vulnerable to SQL Injection in PdoAdapter::doClear() via Unsanitized $prefix",
-                "description": "### Description\n\n`Symfony\\Component\\Cache\\Adapter\\PdoAdapter` is the PDO-backed cache adapter. Its `clear($prefix)` method (inherited from `AbstractAdapterTrait`) is documented to delete cache items whose key starts with `$prefix`.\n\nIn the non-versioning code path, the caller-supplied `$prefix` is concatenated into `$namespace = $this->namespace.$prefix` and passed to `PdoAdapter::doClear()`, which builds:\n\n```sql\nDELETE FROM <table> WHERE <id_col> LIKE '<namespace>%'\n```\n\nThe value is interpolated directly into the SQL text and executed with `PDO::exec()`: `$namespace` is not bound. A caller able to influence `$prefix` can break out of the literal and inject SQL, expanding deletion scope from the intended prefix to arbitrary rows, or otherwise reshape query semantics.\n\nMost applications don't expose `clear($prefix)` to untrusted input directly, but the contract of the method is to safely accept any prefix string, so the lack of escaping is a defect of the adapter itself.\n\n### Resolution\n\n`AbstractAdapterTrait::clear()` now rejects any `$prefix` containing characters outside `[-+.A-Za-z0-9]`: when an invalid prefix is supplied, the method logs a warning and returns `false` instead of reaching the SQL layer. This blocks quotes, `%`, null bytes and other characters that would let an attacker break out of the `LIKE` literal.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/ec50b799d79ebe24561f29351c1efcb6da95c9b1) for branch 5.4.\n\n### Credits\nSymfony would like to thank secsys_codex for reporting the issue and Nicolas Grekas for fixing it.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1194,8 +1194,8 @@
             },
             "CVE-2026-45074": {
                 "cve_id": "CVE-2026-45074",
-                "title": "Symfony's Cas2Handler Derives CAS service URL from Client Host Header \u2192 Cross-Service Ticket Replay",
-                "description": "`Cas2Handler` builds this `service` parameter from `Request::getSchemeAndHttpHost()`, which reflects the attacker-controlled HTTP `Host` header whenever Symfony's `framework.trusted_hosts` setting is not configured (the default). An attacker who controls any *other* application registered with the same CAS server can replay a victim's ticket against the Symfony application, with a spoofed `Host` header, and be authenticated as that victim.\n\n### Resolution\n\nA new required `service_url` configuration option is introduced on `Cas2Handler`. The CAS `service` parameter sent to the validation endpoint is now built from this configured URL instead of being derived from the request's `Host` header, preventing cross-service ticket replay via Host header spoofing.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/5ba145dba702404801bdf9e7e8d6df170060d541) for branch 7.4.\n\n### Credits\n\nSymfony would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and Nicolas Grekas for providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1237,8 +1237,8 @@
             },
             "CVE-2026-45133": {
                 "cve_id": "CVE-2026-45133",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Symfony hardened the parser when handling untrusted input",
+                "description": "### Description\n\n`Symfony\\Component\\Yaml\\Parser` is the entry point for parsing YAML strings into PHP values via `Yaml::parse()`. When the parser is exposed to attacker-controlled input, deeply nested mappings or sequences cause both the block-level (`Parser::parseBlock()`) and inline (`Inline::parseSequence()` / `Inline::parseMapping()`) parsers to recurse without a depth limit. A crafted document exhausts the PHP stack and crashes the worker.\n\n### Resolution\n\nThe `Parser` now tracks recursion depth in a shared `ParserState` object across both block-level and inline parsing, with a default limit of **128**. The limit is configurable via a new `$maxNestingLevel` argument on `Parser::__construct()`, `Yaml::parse()` and `Yaml::parseFile()`.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/914f427ed9630ddb3904dafba763e53d9f133fe3) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Pietro Tirenna (Shielder) for reporting the issue and Nicolas Grekas for fixing it.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1254,8 +1254,8 @@
             },
             "CVE-2026-45304": {
                 "cve_id": "CVE-2026-45304",
-                "title": "Symfony's YAML Parser Vulnerable to Exponential Memory Allocation via Recursive Collection-Alias Expansion (\"Billion Laughs\")",
-                "description": "### Description\n\n`Symfony\\Component\\Yaml\\Parser` resolves YAML aliases (`*anchor`) during parsing. Aliases that reference *collections* (arrays, `stdClass`, `TaggedValue`-wrapped collections) can themselves point to other collections containing aliases, creating exponential expansion at resolution time. A small input can blow up into a multi-gigabyte structure and exhaust memory: the classic \"Billion Laughs\" denial-of-service against any parser exposed to untrusted YAML.\n\n### Resolution\n\nThe `Parser` now counts collection alias resolutions in a shared `ParserState` object, with a default limit of **128**, following the [SnakeYAML model](https://github.com/snakeyaml/snakeyaml/blob/master/src/main/java/org/yaml/snakeyaml/LoaderOptions.java). Scalar aliases remain unrestricted since they cannot drive exponential growth. The limit is configurable via a new `$maxAliasesForCollections` argument on `Parser::__construct()`, `Yaml::parse()` and `Yaml::parseFile()`. A new `Yaml::PARSE_EXCEPTION_ON_ALIAS` flag also rejects all aliases outright when parsing fully untrusted input.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/e77391b2e4f18821198f010d573674c8ed4a970a) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Pietro Tirenna (Shielder) for reporting the issue and Nicolas Grekas for fixing it.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1301,8 +1301,8 @@
             },
             "CVE-2026-45754": {
                 "cve_id": "CVE-2026-45754",
-                "title": "Symfony's Mailjet Mailer Webhook Parser Never Verifies the Configured Secret \u2014 Unauthenticated Webhook Event Injection",
-                "description": "### Description\n\nThe Mailjet mailer bridge and the LOX24 SMS notifier bridge both ship webhook request parsers used to authenticate and decode the event callbacks each provider POSTs to an application's webhook endpoint. Their `doParse(Request $request, #[\\SensitiveParameter] string $secret)` methods receive the configured webhook secret but never read it; they convert and return the payload unconditionally.\n\nAs a result, an application that wires up either webhook endpoint accepts **any** POST to that URL, even when a webhook secret is configured (the recommended setup). An attacker who knows the endpoint exists can submit forged event payloads, fake bounce / blocked / spam / open / click / delivery events, leading to suppression-list corruption, delivery-metrics fraud, etc.\n\n### Resolution\n\n`MailjetRequestParser::doParse()` now rejects the request unless it carries the expected HTTP Basic credentials, Mailjet's webhook authentication mechanism, using a constant-time comparison. The configured webhook secret is matched against the credentials embedded in the Mailjet webhook URL as `user:password` (use `:password` when the URL has no username).\n\n`Lox24RequestParser::doParse()` now rejects the request unless it carries an `X-LOX24-Token` HTTP header whose value matches the configured secret, using a constant-time comparison. The same token must be configured in the LOX24 dashboard under the callback settings.\n\nWhen no secret is configured the behaviour is unchanged: webhook authentication remains opt-in, but it is now actually enforced once opted in.\n\nThe Mailjet patch is available [here](https://github.com/symfony/symfony/commit/3e52bf5ab733ee32e35eeeeb2631d859c941838e) for branch 6.4.\n\nThe LOX24 patch is available [here](https://github.com/symfony/symfony/commit/4aaa45dd054f73445f1ab254968b7e60b546cc77) for branch 7.4 (the LOX24 bridge was introduced in 7.1 and is not present in 6.4).\n\n### Credits\n\nSymfony would like to thank Himanshu Anand for reporting the issue, and Alexandre Daubois and Nicolas Grekas for providing the fixes.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1314,8 +1314,8 @@
             },
             "CVE-2026-45755": {
                 "cve_id": "CVE-2026-45755",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1327,8 +1327,8 @@
             },
             "CVE-2026-45756": {
                 "cve_id": "CVE-2026-45756",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1357,8 +1357,8 @@
             },
             "CVE-2026-47212": {
                 "cve_id": "CVE-2026-47212",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Symfony: Twilio SMS Notifier allows unauthenticated webhook injection due to missing X-Twilio-Signature verification",
+                "description": "### Description\n\nThe Twilio SMS notifier bridge ships a webhook request parser used to authenticate and decode the status callbacks Twilio POSTs to an application's webhook endpoint. Its `doParse(Request $request, #[\\SensitiveParameter] string $secret)` method receives the configured webhook secret but never reads it; it decodes and returns the payload unconditionally, ignoring the `X-Twilio-Signature` HMAC header Twilio sends with each request.\n\nAs a result, an application that wires up the Twilio webhook endpoint accepts **any** POST to that URL, even when a signing secret is configured (the recommended setup). An attacker who knows the endpoint exists can submit forged status payloads, fake delivered / failed / undelivered events, leading to delivery-metrics fraud, downstream automation triggers, etc.\n\n### Resolution\n\n`TwilioRequestParser::doParse()` now requires and verifies the `X-Twilio-Signature` header (HMAC-SHA1 over the full request URL concatenated with the alphabetically-sorted POST parameters, base64-encoded, keyed with the Twilio account auth token) before further processing, using a constant-time comparison.\n\nWhen no secret is configured the behaviour is unchanged: signature verification remains opt-in, but it is now actually enforced once opted in.\n\nApplications behind a TLS-terminating reverse proxy must configure `framework.trusted_proxies` and `framework.trusted_headers` so that `Request::getUri()` returns the public URL Twilio signed.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/8545fb2af6c07dfb5ef0fc8d9bccf86db2c94356) for branch 6.4.\n\n### Credits\n\nSymfony would like to thank Himanshu Anand for reporting the issue and Nicolas Grekas for providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1370,8 +1370,8 @@
             },
             "CVE-2026-48489": {
                 "cve_id": "CVE-2026-48489",
-                "title": "Symfony: Security Firewall Bypass via failure_forward Subrequest: Unauthenticated Access to access_control-Protected GET Routes",
-                "description": "### Description\n\nWhen a firewall is configured with `form-login` (or any authenticator using `DefaultAuthenticationFailureHandler`) and the `failure_forward: true` option, the handler reads the `_failure_path` parameter from the failing login request and uses it as the path of an internal subrequest dispatched through `HttpKernelInterface::SUB_REQUEST`.\n\nSymfony's `Firewall::onKernelRequest` listener intentionally skips subrequests under the assumption they are internally generated and trusted, which also means `AccessListener` (the listener that evaluates `access_control`) does not run. Because the attacker controls the target of the subrequest, an unauthenticated POST to the check path with `_failure_path=/admin/whatever` performs a local request forgery that executes the target controller outside the firewall perimeter and returns its response to the caller.\n\nApplications that follow Symfony's recommended best practice of protecting administrative areas with broad `access_control` rules (e.g. `^/admin` requires `ROLE_ADMIN`) and expose read-only GET endpoints under that area (data exports, internal APIs, account views) are fully exposed: any such GET route can be read by an unauthenticated attacker without any developer misconfiguration, debug mode, or state-changing GET handler being required.\n\n### Resolution\n\n`DefaultAuthenticationFailureHandler` no longer honors the request-supplied `_failure_path` parameter when `failure_forward` is enabled. The subrequest is always dispatched to the configured `failure_path` option (defaulting to `login_path`), which is set by the application owner and not by the request. The redirect branch (`failure_forward: false`) is unchanged because redirects re-enter the firewall on the next request and are not subject to this bypass.\n\nThe patch for this issue is available [here](https://github.com/symfony/symfony/commit/c48a4276309e11aedeeb0ce3a89dfbf0b4fe04ff) for branch 5.4.\n\n### Credits\n\nSymfony would like to thank Nguyen Ngoc Toan Thang (@a-tt-om) and Tran Quoc Tri Trung (@teebow1e) for reporting the issue, and Nicolas Grekas for providing the fix.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -1430,8 +1430,8 @@
             },
             "CVE-2026-48761": {
                 "cve_id": "CVE-2026-48761",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
