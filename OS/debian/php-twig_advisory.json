@@ -77,8 +77,8 @@
             },
             "CVE-2026-46628": {
                 "cve_id": "CVE-2026-46628",
-                "title": "Twig: The `spaceless` filter implicitly marks its output as safe",
-                "description": "### Description\n\nThe `spaceless` filter is registered with `is_safe => ['html']`, which means Twig's autoescaper does not escape its output in an HTML context. As a result, applying `spaceless` to attacker-controlled input that contains markup emits the markup unescaped even when the developer never wrote `|raw` and autoescape is enabled.\n\nExample:\n\n```twig\n{% set payload = '<script>alert()</script>' %}\n{{ payload }}          {# escaped #}\n{{ payload|spaceless }} {# not escaped #}\n```\n\nThe filter is deprecated but still functional. With the deprecation, some downstream projects (e.g. Drupal modules) have duplicated the filter and inherited the same `is_safe` flag.\n\n### Resolution\n\nThe `spaceless` filter no longer marks its output as safe. Documentation has been updated to warn that `spaceless` should not be applied to unsanitised user input.\n\n### Credits\n\nTwig would like to thank Pierre Rudloff for reporting the issue.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -94,8 +94,8 @@
             },
             "CVE-2026-46629": {
                 "cve_id": "CVE-2026-46629",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -141,8 +141,8 @@
             },
             "CVE-2026-46635": {
                 "cve_id": "CVE-2026-46635",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Twig: Sandbox property allowlist bypass via the `column` filter (array_column on objects)",
+                "description": "### Description\n\nThe `column` filter passes its input straight to PHP's native `array_column()`. When the array elements are objects, `array_column()` reads `$obj->$name` (and `$obj->$index`) directly, including invoking `__get`/`__isset`. Because this property read happens entirely in PHP native code and never reaches `CoreExtension::getAttribute()`, `SandboxExtension::checkPropertyAllowed()` is never consulted.\n\nAn untrusted template author with `column` in their `allowedFilters` list can therefore read any public or magic property of any object reachable in the render context, regardless of the `SecurityPolicy` `allowedProperties` list. This is a variant of CVE-2024-51755 / GHSA-jjxq-ff2g-95vh that the `ArrayAccess`-focused fix did not cover.\n\n### Resolution\n\nThe `column` filter now routes object property reads through the sandbox-aware attribute accessor so the property allowlist is enforced.\n\n### Credits\n\nTwig: would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -158,8 +158,8 @@
             },
             "CVE-2026-46636": {
                 "cve_id": "CVE-2026-46636",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -175,8 +175,8 @@
             },
             "CVE-2026-46637": {
                 "cve_id": "CVE-2026-46637",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: HTML-output filters in twig/* extras incorrectly declared `is_safe => ['all']`",
+                "description": "### Description\n\nSeveral filters in the `twig/*` extras packages are registered with `is_safe => ['all']`, which tells Twig's autoescaper to treat their output as safe in every context (`html`, `js`, `css`, `url`, ...). The output of these filters is plain text or HTML markup, neither of which is safe in every escaping context.\n\nAffected filters:\n\n- `html_to_markdown` (`twig/markdown-extra`) emits plain Markdown text. `league/html-to-markdown` decodes HTML entities when producing code spans and fenced blocks, so an attacker-controlled `<code>&lt;img src=x onerror=alert(1)&gt;</code>` becomes `` `<img src=x onerror=alert(1)>` ``, which renders live when interpolated into an HTML page.\n- `markdown_to_html` (`twig/markdown-extra`) emits HTML. Safe in an HTML context but not in JS, CSS or URL contexts (e.g. when interpolated into an inline `<script>` block).\n- `inline_css` (`twig/cssinliner-extra`) emits HTML with inlined styles. Same constraint as `markdown_to_html`.\n\nIn all three cases, `is_safe => ['all']` causes the autoescaper to emit the output verbatim in any context, even when the developer never wrote `|raw`. In a context such as a JS string or a URL parameter, this produces unescaped HTML and is exploitable as XSS.\n\n### Resolution\n\n- `html_to_markdown` no longer claims to be safe in any escaping context; its plain-text output is now autoescaped for the surrounding context.\n- `markdown_to_html` and `inline_css` are now declared `is_safe => ['html']`, asserting only what they actually guarantee.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix for `html_to_markdown` and `markdown_to_html` in `twig/markdown-extra`, and Christophe Coevoet for extending the audit to `inline_css` in `twig/cssinliner-extra`.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -235,8 +235,8 @@
             },
             "CVE-2026-47730": {
                 "cve_id": "CVE-2026-47730",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Twig: XSS in profiler HtmlDumper via unescaped template and profile names",
+                "description": "### Description\n\n`Twig\\Profiler\\Dumper\\HtmlDumper` writes `Profile::getTemplate()` and `Profile::getName()` straight into its HTML output without escaping:\n\n```php\nprotected function formatTemplate(Profile $profile, $prefix): string\n{\n    return \\sprintf('%s\u2514 <span style=\"background-color: %s\">%s</span>', $prefix, self::$colors['template'], $profile->getTemplate());\n}\n```\n\nThe template name comes from the loader (the array key for `ArrayLoader`, a row id for a database-backed loader, etc.). When that name is attacker-controlled, the profiler dump emits arbitrary HTML, and any browser that renders it executes the injected markup. This is an output-encoding bug in profiler/debug tooling, not a sandbox escape.\n\n### Resolution\n\n`HtmlDumper` now runs both `Profile::getTemplate()` and `Profile::getName()` through `htmlspecialchars()` before inserting them into the HTML output.\n\n### Credits\n\nTwig would like to thank El Kharoubi Iosif for reporting the issue and Nicolas Grekas for fixing it.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -252,8 +252,8 @@
             },
             "CVE-2026-47732": {
                 "cve_id": "CVE-2026-47732",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -269,8 +269,8 @@
             },
             "CVE-2026-48805": {
                 "cve_id": "CVE-2026-48805",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -312,8 +312,8 @@
             },
             "CVE-2026-48808": {
                 "cve_id": "CVE-2026-48808",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: Sandbox property allowlist bypass via the `column` filter under `SourcePolicyInterface`",
+                "description": "### Description\n\nThis is a residual bypass of CVE-2026-46635 / GHSA-vcc8-phrv-43wj that only affects sandboxing enabled through `SourcePolicyInterface` (and not the regular global sandbox mode).\n\n`CoreExtension::column()` receives the active sandbox state via the `needs_is_sandboxed` channel as a boolean `$isSandboxed`, but then routes the per-element property reads through `SandboxExtension::checkPropertyAllowed()` without forwarding the current `Source`. `SandboxExtension::checkPropertyAllowed()` re-evaluates `isSandboxed($source)` internally; with `$source = null` the `SourcePolicyInterface`-driven decision is lost, the method short-circuits to \"not sandboxed\", and the property allowlist is never consulted.\n\nA template author whose sandbox is gated by a `SourcePolicyInterface` and who has `column` on their `allowedFilters` list can therefore read any public or magic property of any object reachable in the render context, regardless of `SecurityPolicy::$allowedProperties`. Direct attribute access to the same property is blocked, and the same payload is also blocked under global sandbox mode, which makes this a clear policy enforcement gap rather than a configuration issue.\n\n### Resolution\n\n`CoreExtension::column()` no longer goes through the `SandboxExtension` wrapper for the property check. It calls the security policy directly: the per-source decision is already captured by the `$isSandboxed` boolean computed at the call site, so the property allowlist is enforced consistently for both global and source-policy sandboxing.\n\n### Credits\n\nTwig would like to thank Vincent55 Yang for reporting the issue and Fabien Potencier for providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -400,8 +400,8 @@
             },
             "CVE-2026-46628": {
                 "cve_id": "CVE-2026-46628",
-                "title": "Twig: The `spaceless` filter implicitly marks its output as safe",
-                "description": "### Description\n\nThe `spaceless` filter is registered with `is_safe => ['html']`, which means Twig's autoescaper does not escape its output in an HTML context. As a result, applying `spaceless` to attacker-controlled input that contains markup emits the markup unescaped even when the developer never wrote `|raw` and autoescape is enabled.\n\nExample:\n\n```twig\n{% set payload = '<script>alert()</script>' %}\n{{ payload }}          {# escaped #}\n{{ payload|spaceless }} {# not escaped #}\n```\n\nThe filter is deprecated but still functional. With the deprecation, some downstream projects (e.g. Drupal modules) have duplicated the filter and inherited the same `is_safe` flag.\n\n### Resolution\n\nThe `spaceless` filter no longer marks its output as safe. Documentation has been updated to warn that `spaceless` should not be applied to unsanitised user input.\n\n### Credits\n\nTwig would like to thank Pierre Rudloff for reporting the issue.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -417,8 +417,8 @@
             },
             "CVE-2026-46629": {
                 "cve_id": "CVE-2026-46629",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -464,8 +464,8 @@
             },
             "CVE-2026-46635": {
                 "cve_id": "CVE-2026-46635",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Twig: Sandbox property allowlist bypass via the `column` filter (array_column on objects)",
+                "description": "### Description\n\nThe `column` filter passes its input straight to PHP's native `array_column()`. When the array elements are objects, `array_column()` reads `$obj->$name` (and `$obj->$index`) directly, including invoking `__get`/`__isset`. Because this property read happens entirely in PHP native code and never reaches `CoreExtension::getAttribute()`, `SandboxExtension::checkPropertyAllowed()` is never consulted.\n\nAn untrusted template author with `column` in their `allowedFilters` list can therefore read any public or magic property of any object reachable in the render context, regardless of the `SecurityPolicy` `allowedProperties` list. This is a variant of CVE-2024-51755 / GHSA-jjxq-ff2g-95vh that the `ArrayAccess`-focused fix did not cover.\n\n### Resolution\n\nThe `column` filter now routes object property reads through the sandbox-aware attribute accessor so the property allowlist is enforced.\n\n### Credits\n\nTwig: would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -481,8 +481,8 @@
             },
             "CVE-2026-46636": {
                 "cve_id": "CVE-2026-46636",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -498,8 +498,8 @@
             },
             "CVE-2026-46637": {
                 "cve_id": "CVE-2026-46637",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: HTML-output filters in twig/* extras incorrectly declared `is_safe => ['all']`",
+                "description": "### Description\n\nSeveral filters in the `twig/*` extras packages are registered with `is_safe => ['all']`, which tells Twig's autoescaper to treat their output as safe in every context (`html`, `js`, `css`, `url`, ...). The output of these filters is plain text or HTML markup, neither of which is safe in every escaping context.\n\nAffected filters:\n\n- `html_to_markdown` (`twig/markdown-extra`) emits plain Markdown text. `league/html-to-markdown` decodes HTML entities when producing code spans and fenced blocks, so an attacker-controlled `<code>&lt;img src=x onerror=alert(1)&gt;</code>` becomes `` `<img src=x onerror=alert(1)>` ``, which renders live when interpolated into an HTML page.\n- `markdown_to_html` (`twig/markdown-extra`) emits HTML. Safe in an HTML context but not in JS, CSS or URL contexts (e.g. when interpolated into an inline `<script>` block).\n- `inline_css` (`twig/cssinliner-extra`) emits HTML with inlined styles. Same constraint as `markdown_to_html`.\n\nIn all three cases, `is_safe => ['all']` causes the autoescaper to emit the output verbatim in any context, even when the developer never wrote `|raw`. In a context such as a JS string or a URL parameter, this produces unescaped HTML and is exploitable as XSS.\n\n### Resolution\n\n- `html_to_markdown` no longer claims to be safe in any escaping context; its plain-text output is now autoescaped for the surrounding context.\n- `markdown_to_html` and `inline_css` are now declared `is_safe => ['html']`, asserting only what they actually guarantee.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix for `html_to_markdown` and `markdown_to_html` in `twig/markdown-extra`, and Christophe Coevoet for extending the audit to `inline_css` in `twig/cssinliner-extra`.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -558,8 +558,8 @@
             },
             "CVE-2026-47730": {
                 "cve_id": "CVE-2026-47730",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Twig: XSS in profiler HtmlDumper via unescaped template and profile names",
+                "description": "### Description\n\n`Twig\\Profiler\\Dumper\\HtmlDumper` writes `Profile::getTemplate()` and `Profile::getName()` straight into its HTML output without escaping:\n\n```php\nprotected function formatTemplate(Profile $profile, $prefix): string\n{\n    return \\sprintf('%s\u2514 <span style=\"background-color: %s\">%s</span>', $prefix, self::$colors['template'], $profile->getTemplate());\n}\n```\n\nThe template name comes from the loader (the array key for `ArrayLoader`, a row id for a database-backed loader, etc.). When that name is attacker-controlled, the profiler dump emits arbitrary HTML, and any browser that renders it executes the injected markup. This is an output-encoding bug in profiler/debug tooling, not a sandbox escape.\n\n### Resolution\n\n`HtmlDumper` now runs both `Profile::getTemplate()` and `Profile::getName()` through `htmlspecialchars()` before inserting them into the HTML output.\n\n### Credits\n\nTwig would like to thank El Kharoubi Iosif for reporting the issue and Nicolas Grekas for fixing it.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -575,8 +575,8 @@
             },
             "CVE-2026-47732": {
                 "cve_id": "CVE-2026-47732",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -592,8 +592,8 @@
             },
             "CVE-2026-48805": {
                 "cve_id": "CVE-2026-48805",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -635,8 +635,8 @@
             },
             "CVE-2026-48808": {
                 "cve_id": "CVE-2026-48808",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: Sandbox property allowlist bypass via the `column` filter under `SourcePolicyInterface`",
+                "description": "### Description\n\nThis is a residual bypass of CVE-2026-46635 / GHSA-vcc8-phrv-43wj that only affects sandboxing enabled through `SourcePolicyInterface` (and not the regular global sandbox mode).\n\n`CoreExtension::column()` receives the active sandbox state via the `needs_is_sandboxed` channel as a boolean `$isSandboxed`, but then routes the per-element property reads through `SandboxExtension::checkPropertyAllowed()` without forwarding the current `Source`. `SandboxExtension::checkPropertyAllowed()` re-evaluates `isSandboxed($source)` internally; with `$source = null` the `SourcePolicyInterface`-driven decision is lost, the method short-circuits to \"not sandboxed\", and the property allowlist is never consulted.\n\nA template author whose sandbox is gated by a `SourcePolicyInterface` and who has `column` on their `allowedFilters` list can therefore read any public or magic property of any object reachable in the render context, regardless of `SecurityPolicy::$allowedProperties`. Direct attribute access to the same property is blocked, and the same payload is also blocked under global sandbox mode, which makes this a clear policy enforcement gap rather than a configuration issue.\n\n### Resolution\n\n`CoreExtension::column()` no longer goes through the `SandboxExtension` wrapper for the property check. It calls the security policy directly: the per-source decision is already captured by the `$isSandboxed` boolean computed at the call site, so the property allowlist is enforced consistently for both global and source-policy sandboxing.\n\n### Credits\n\nTwig would like to thank Vincent55 Yang for reporting the issue and Fabien Potencier for providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -723,8 +723,8 @@
             },
             "CVE-2026-46628": {
                 "cve_id": "CVE-2026-46628",
-                "title": "Twig: The `spaceless` filter implicitly marks its output as safe",
-                "description": "### Description\n\nThe `spaceless` filter is registered with `is_safe => ['html']`, which means Twig's autoescaper does not escape its output in an HTML context. As a result, applying `spaceless` to attacker-controlled input that contains markup emits the markup unescaped even when the developer never wrote `|raw` and autoescape is enabled.\n\nExample:\n\n```twig\n{% set payload = '<script>alert()</script>' %}\n{{ payload }}          {# escaped #}\n{{ payload|spaceless }} {# not escaped #}\n```\n\nThe filter is deprecated but still functional. With the deprecation, some downstream projects (e.g. Drupal modules) have duplicated the filter and inherited the same `is_safe` flag.\n\n### Resolution\n\nThe `spaceless` filter no longer marks its output as safe. Documentation has been updated to warn that `spaceless` should not be applied to unsanitised user input.\n\n### Credits\n\nTwig would like to thank Pierre Rudloff for reporting the issue.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -740,8 +740,8 @@
             },
             "CVE-2026-46629": {
                 "cve_id": "CVE-2026-46629",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -787,8 +787,8 @@
             },
             "CVE-2026-46635": {
                 "cve_id": "CVE-2026-46635",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Twig: Sandbox property allowlist bypass via the `column` filter (array_column on objects)",
+                "description": "### Description\n\nThe `column` filter passes its input straight to PHP's native `array_column()`. When the array elements are objects, `array_column()` reads `$obj->$name` (and `$obj->$index`) directly, including invoking `__get`/`__isset`. Because this property read happens entirely in PHP native code and never reaches `CoreExtension::getAttribute()`, `SandboxExtension::checkPropertyAllowed()` is never consulted.\n\nAn untrusted template author with `column` in their `allowedFilters` list can therefore read any public or magic property of any object reachable in the render context, regardless of the `SecurityPolicy` `allowedProperties` list. This is a variant of CVE-2024-51755 / GHSA-jjxq-ff2g-95vh that the `ArrayAccess`-focused fix did not cover.\n\n### Resolution\n\nThe `column` filter now routes object property reads through the sandbox-aware attribute accessor so the property allowlist is enforced.\n\n### Credits\n\nTwig: would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -804,8 +804,8 @@
             },
             "CVE-2026-46636": {
                 "cve_id": "CVE-2026-46636",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -821,8 +821,8 @@
             },
             "CVE-2026-46637": {
                 "cve_id": "CVE-2026-46637",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: HTML-output filters in twig/* extras incorrectly declared `is_safe => ['all']`",
+                "description": "### Description\n\nSeveral filters in the `twig/*` extras packages are registered with `is_safe => ['all']`, which tells Twig's autoescaper to treat their output as safe in every context (`html`, `js`, `css`, `url`, ...). The output of these filters is plain text or HTML markup, neither of which is safe in every escaping context.\n\nAffected filters:\n\n- `html_to_markdown` (`twig/markdown-extra`) emits plain Markdown text. `league/html-to-markdown` decodes HTML entities when producing code spans and fenced blocks, so an attacker-controlled `<code>&lt;img src=x onerror=alert(1)&gt;</code>` becomes `` `<img src=x onerror=alert(1)>` ``, which renders live when interpolated into an HTML page.\n- `markdown_to_html` (`twig/markdown-extra`) emits HTML. Safe in an HTML context but not in JS, CSS or URL contexts (e.g. when interpolated into an inline `<script>` block).\n- `inline_css` (`twig/cssinliner-extra`) emits HTML with inlined styles. Same constraint as `markdown_to_html`.\n\nIn all three cases, `is_safe => ['all']` causes the autoescaper to emit the output verbatim in any context, even when the developer never wrote `|raw`. In a context such as a JS string or a URL parameter, this produces unescaped HTML and is exploitable as XSS.\n\n### Resolution\n\n- `html_to_markdown` no longer claims to be safe in any escaping context; its plain-text output is now autoescaped for the surrounding context.\n- `markdown_to_html` and `inline_css` are now declared `is_safe => ['html']`, asserting only what they actually guarantee.\n\n### Credits\n\nTwig would like to thank Claude Mythos Preview (via Project Glasswing) for reporting the issue and providing the fix for `html_to_markdown` and `markdown_to_html` in `twig/markdown-extra`, and Christophe Coevoet for extending the audit to `inline_css` in `twig/cssinliner-extra`.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -881,8 +881,8 @@
             },
             "CVE-2026-47730": {
                 "cve_id": "CVE-2026-47730",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Twig: XSS in profiler HtmlDumper via unescaped template and profile names",
+                "description": "### Description\n\n`Twig\\Profiler\\Dumper\\HtmlDumper` writes `Profile::getTemplate()` and `Profile::getName()` straight into its HTML output without escaping:\n\n```php\nprotected function formatTemplate(Profile $profile, $prefix): string\n{\n    return \\sprintf('%s\u2514 <span style=\"background-color: %s\">%s</span>', $prefix, self::$colors['template'], $profile->getTemplate());\n}\n```\n\nThe template name comes from the loader (the array key for `ArrayLoader`, a row id for a database-backed loader, etc.). When that name is attacker-controlled, the profiler dump emits arbitrary HTML, and any browser that renders it executes the injected markup. This is an output-encoding bug in profiler/debug tooling, not a sandbox escape.\n\n### Resolution\n\n`HtmlDumper` now runs both `Profile::getTemplate()` and `Profile::getName()` through `htmlspecialchars()` before inserting them into the HTML output.\n\n### Credits\n\nTwig would like to thank El Kharoubi Iosif for reporting the issue and Nicolas Grekas for fixing it.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -898,8 +898,8 @@
             },
             "CVE-2026-47732": {
                 "cve_id": "CVE-2026-47732",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
@@ -915,8 +915,8 @@
             },
             "CVE-2026-48805": {
                 "cve_id": "CVE-2026-48805",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -958,8 +958,8 @@
             },
             "CVE-2026-48808": {
                 "cve_id": "CVE-2026-48808",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Twig: Sandbox property allowlist bypass via the `column` filter under `SourcePolicyInterface`",
+                "description": "### Description\n\nThis is a residual bypass of CVE-2026-46635 / GHSA-vcc8-phrv-43wj that only affects sandboxing enabled through `SourcePolicyInterface` (and not the regular global sandbox mode).\n\n`CoreExtension::column()` receives the active sandbox state via the `needs_is_sandboxed` channel as a boolean `$isSandboxed`, but then routes the per-element property reads through `SandboxExtension::checkPropertyAllowed()` without forwarding the current `Source`. `SandboxExtension::checkPropertyAllowed()` re-evaluates `isSandboxed($source)` internally; with `$source = null` the `SourcePolicyInterface`-driven decision is lost, the method short-circuits to \"not sandboxed\", and the property allowlist is never consulted.\n\nA template author whose sandbox is gated by a `SourcePolicyInterface` and who has `column` on their `allowedFilters` list can therefore read any public or magic property of any object reachable in the render context, regardless of `SecurityPolicy::$allowedProperties`. Direct attribute access to the same property is blocked, and the same payload is also blocked under global sandbox mode, which makes this a clear policy enforcement gap rather than a configuration issue.\n\n### Resolution\n\n`CoreExtension::column()` no longer goes through the `SandboxExtension` wrapper for the property check. It calls the security policy directly: the per-source decision is already captured by the `$isSandboxed` boolean computed at the call site, so the property allowlist is enforced consistently for both global and source-policy sandboxing.\n\n### Credits\n\nTwig would like to thank Vincent55 Yang for reporting the issue and Fabien Potencier for providing the fix.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
