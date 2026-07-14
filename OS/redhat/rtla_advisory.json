@@ -17038,23 +17038,6 @@
                     }
                 ]
             },
-            "CVE-2026-22979": {
-                "cve_id": "CVE-2026-22979",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: fix memory leak in skb_segment_list for GRO packets\n\nWhen skb_segment_list() is called during packet forwarding, it handles\npackets that were aggregated by the GRO engine.\n\nHistorically, the segmentation logic in skb_segment_list assumes that\nindividual segments are split from a parent SKB and may need to carry\ntheir own socket memory accounting. Accordingly, the code transfers\ntruesize from the parent to the newly created segments.\n\nPrior to commit ed4cccef64c1 (\"gro: fix ownership transfer\"), this\ntruesize subtraction in skb_segment_list() was valid because fragments\nstill carry a reference to the original socket.\n\nHowever, commit ed4cccef64c1 (\"gro: fix ownership transfer\") changed\nthis behavior by ensuring that fraglist entries are explicitly\norphaned (skb->sk = NULL) to prevent illegal orphaning later in the\nstack. This change meant that the entire socket memory charge remained\nwith the head SKB, but the corresponding accounting logic in\nskb_segment_list() was never updated.\n\nAs a result, the current code unconditionally adds each fragment's\ntruesize to delta_truesize and subtracts it from the parent SKB. Since\nthe fragments are no longer charged to the socket, this subtraction\nresults in an effective under-count of memory when the head is freed.\nThis causes sk_wmem_alloc to remain non-zero, preventing socket\ndestruction and leading to a persistent memory leak.\n\nThe leak can be observed via KMEMLEAK when tearing down the networking\nenvironment:\n\nunreferenced object 0xffff8881e6eb9100 (size 2048):\n  comm \"ping\", pid 6720, jiffies 4295492526\n  backtrace:\n    kmem_cache_alloc_noprof+0x5c6/0x800\n    sk_prot_alloc+0x5b/0x220\n    sk_alloc+0x35/0xa00\n    inet6_create.part.0+0x303/0x10d0\n    __sock_create+0x248/0x640\n    __sys_socket+0x11b/0x1d0\n\nSince skb_segment_list() is exclusively used for SKB_GSO_FRAGLIST\npackets constructed by GRO, the truesize adjustment is removed.\n\nThe call to skb_release_head_state() must be preserved. As documented in\ncommit cf673ed0e057 (\"net: fix fraglist segmentation reference count\nleak\"), it is still required to correctly drop references to SKB\nextensions that may be overwritten during __copy_skb_header().",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-22980": {
                 "cve_id": "CVE-2026-22980",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -28928,23 +28911,6 @@
                     }
                 ]
             },
-            "CVE-2026-46086": {
-                "cve_id": "CVE-2026-46086",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: bridge: use a stable FDB dst snapshot in RCU readers\n\nLocal FDB entries can be rewritten in place by `fdb_delete_local()`, which\nupdates `f->dst` to another port or to `NULL` while keeping the entry\nalive. Several bridge RCU readers inspect `f->dst`, including\n`br_fdb_fillbuf()` through the `brforward_read()` sysfs path.\n\nThese readers currently load `f->dst` multiple times and can therefore\nobserve inconsistent values across the check and later dereference.\nIn `br_fdb_fillbuf()`, this means a concurrent local-FDB update can change\n`f->dst` after the NULL check and before the `port_no` dereference,\nleading to a NULL-ptr-deref.\n\nFix this by taking a single `READ_ONCE()` snapshot of `f->dst` in each\naffected RCU reader and using that snapshot for the rest of the access\nsequence. Also publish the in-place `f->dst` updates in `fdb_delete_local()`\nwith `WRITE_ONCE()` so the readers and writer use matching access patterns.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-46088": {
                 "cve_id": "CVE-2026-46088",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -31582,23 +31548,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: act_mirred: fix wrong device for mac_header_xmit check in tcf_blockcast_redir\n\nIn tcf_blockcast_redir(), when iterating block ports to redirect\npackets to multiple devices, the mac_header_xmit flag is queried\nfrom the wrong device. The loop sends to dev_prev but queries\ndev_is_mac_header_xmit(dev) \u2014 which is the NEXT device in the\niteration, not the one being sent to.\n\nThis causes tcf_mirred_to_dev() to make incorrect decisions about\nwhether to push or pull the MAC header. When the block contains\nmixed device types (e.g., an ethernet veth and a tunnel device),\nintermediate devices get the wrong mac_header_xmit flag, leading to\nskb header corruption. In the worst case, skb_push_rcsum with an\nincorrect mac_len can exhaust headroom and panic.\n\nThe last device in the loop is handled correctly (line 365-366 uses\ndev_is_mac_header_xmit(dev_prev)), confirming this is a copy-paste\noversight for the intermediate devices.\n\nFix by using dev_prev instead of dev for the mac_header_xmit query,\nconsistent with the device actually being sent to.",
                 "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-53016": {
-                "cve_id": "CVE-2026-53016",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncrypto: ccp - copy IV using skcipher ivsize\n\nAF_ALG rfc3686-ctr-aes-ccp requests pass an 8-byte IV to the driver.\n\nccp_aes_complete() restores AES_BLOCK_SIZE bytes into the caller's IV\nbuffer while RFC3686 skciphers expose an 8-byte IV, so the restore\noverruns the provided buffer.\n\nUse crypto_skcipher_ivsize() to copy only the algorithm's IV length.",
-                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -51565,23 +51514,6 @@
                     }
                 ]
             },
-            "CVE-2026-22979": {
-                "cve_id": "CVE-2026-22979",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: fix memory leak in skb_segment_list for GRO packets\n\nWhen skb_segment_list() is called during packet forwarding, it handles\npackets that were aggregated by the GRO engine.\n\nHistorically, the segmentation logic in skb_segment_list assumes that\nindividual segments are split from a parent SKB and may need to carry\ntheir own socket memory accounting. Accordingly, the code transfers\ntruesize from the parent to the newly created segments.\n\nPrior to commit ed4cccef64c1 (\"gro: fix ownership transfer\"), this\ntruesize subtraction in skb_segment_list() was valid because fragments\nstill carry a reference to the original socket.\n\nHowever, commit ed4cccef64c1 (\"gro: fix ownership transfer\") changed\nthis behavior by ensuring that fraglist entries are explicitly\norphaned (skb->sk = NULL) to prevent illegal orphaning later in the\nstack. This change meant that the entire socket memory charge remained\nwith the head SKB, but the corresponding accounting logic in\nskb_segment_list() was never updated.\n\nAs a result, the current code unconditionally adds each fragment's\ntruesize to delta_truesize and subtracts it from the parent SKB. Since\nthe fragments are no longer charged to the socket, this subtraction\nresults in an effective under-count of memory when the head is freed.\nThis causes sk_wmem_alloc to remain non-zero, preventing socket\ndestruction and leading to a persistent memory leak.\n\nThe leak can be observed via KMEMLEAK when tearing down the networking\nenvironment:\n\nunreferenced object 0xffff8881e6eb9100 (size 2048):\n  comm \"ping\", pid 6720, jiffies 4295492526\n  backtrace:\n    kmem_cache_alloc_noprof+0x5c6/0x800\n    sk_prot_alloc+0x5b/0x220\n    sk_alloc+0x35/0xa00\n    inet6_create.part.0+0x303/0x10d0\n    __sock_create+0x248/0x640\n    __sys_socket+0x11b/0x1d0\n\nSince skb_segment_list() is exclusively used for SKB_GSO_FRAGLIST\npackets constructed by GRO, the truesize adjustment is removed.\n\nThe call to skb_release_head_state() must be preserved. As documented in\ncommit cf673ed0e057 (\"net: fix fraglist segmentation reference count\nleak\"), it is still required to correctly drop references to SKB\nextensions that may be overwritten during __copy_skb_header().",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-22980": {
                 "cve_id": "CVE-2026-22980",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -63455,23 +63387,6 @@
                     }
                 ]
             },
-            "CVE-2026-46086": {
-                "cve_id": "CVE-2026-46086",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: bridge: use a stable FDB dst snapshot in RCU readers\n\nLocal FDB entries can be rewritten in place by `fdb_delete_local()`, which\nupdates `f->dst` to another port or to `NULL` while keeping the entry\nalive. Several bridge RCU readers inspect `f->dst`, including\n`br_fdb_fillbuf()` through the `brforward_read()` sysfs path.\n\nThese readers currently load `f->dst` multiple times and can therefore\nobserve inconsistent values across the check and later dereference.\nIn `br_fdb_fillbuf()`, this means a concurrent local-FDB update can change\n`f->dst` after the NULL check and before the `port_no` dereference,\nleading to a NULL-ptr-deref.\n\nFix this by taking a single `READ_ONCE()` snapshot of `f->dst` in each\naffected RCU reader and using that snapshot for the rest of the access\nsequence. Also publish the in-place `f->dst` updates in `fdb_delete_local()`\nwith `WRITE_ONCE()` so the readers and writer use matching access patterns.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-46088": {
                 "cve_id": "CVE-2026-46088",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -66109,23 +66024,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: act_mirred: fix wrong device for mac_header_xmit check in tcf_blockcast_redir\n\nIn tcf_blockcast_redir(), when iterating block ports to redirect\npackets to multiple devices, the mac_header_xmit flag is queried\nfrom the wrong device. The loop sends to dev_prev but queries\ndev_is_mac_header_xmit(dev) \u2014 which is the NEXT device in the\niteration, not the one being sent to.\n\nThis causes tcf_mirred_to_dev() to make incorrect decisions about\nwhether to push or pull the MAC header. When the block contains\nmixed device types (e.g., an ethernet veth and a tunnel device),\nintermediate devices get the wrong mac_header_xmit flag, leading to\nskb header corruption. In the worst case, skb_push_rcsum with an\nincorrect mac_len can exhaust headroom and panic.\n\nThe last device in the loop is handled correctly (line 365-366 uses\ndev_is_mac_header_xmit(dev_prev)), confirming this is a copy-paste\noversight for the intermediate devices.\n\nFix by using dev_prev instead of dev for the mac_header_xmit query,\nconsistent with the device actually being sent to.",
                 "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-53016": {
-                "cve_id": "CVE-2026-53016",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncrypto: ccp - copy IV using skcipher ivsize\n\nAF_ALG rfc3686-ctr-aes-ccp requests pass an 8-byte IV to the driver.\n\nccp_aes_complete() restores AES_BLOCK_SIZE bytes into the caller's IV\nbuffer while RFC3686 skciphers expose an 8-byte IV, so the restore\noverruns the provided buffer.\n\nUse crypto_skcipher_ivsize() to copy only the algorithm's IV length.",
-                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
