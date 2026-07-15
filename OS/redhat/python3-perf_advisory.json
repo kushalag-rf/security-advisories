@@ -28017,7 +28017,7 @@
                 "cve_id": "CVE-2026-52965",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/ttm: Fix ttm_bo_swapout() infinite LRU walk on swapout failure\n\nWhen ttm_tt_swapout() fails, the current code calls\nttm_resource_add_bulk_move() followed by ttm_resource_move_to_lru_tail()\nto restore the resource's bulk_move membership.\n\nHowever, ttm_resource_move_to_lru_tail() places the resource at the tail\nof the LRU list which, relative to the walk cursor's hitch node (placed\nimmediately after the resource when it was yielded), puts the resource\n*in front of the* the hitch. The next list_for_each_entry_continue() from\nthe hitch finds the same resource again, causing an infinite loop.\n\nFix by deferring del_bulk_move to the success path only.\n\nOn the success path, TTM_TT_FLAG_SWAPPED has just been set by\nttm_tt_swapout() but the resource is still tracked in the bulk_move range,\nso ttm_resource_del_bulk_move()'s !ttm_resource_unevictable() guard would\nincorrectly skip the removal. Introduce\nttm_resource_del_bulk_move_unevictable() which bypasses that guard.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -28060,7 +28060,7 @@
                 "cve_id": "CVE-2026-52968",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: s390: pci: fix GAIT table indexing due to double-scaling pointer arithmetic\n\nkvm_s390_pci_aif_enable(), kvm_s390_pci_aif_disable(), and\naen_host_forward() index the GAIT by manually multiplying the index\nwith sizeof(struct zpci_gaite).\n\nSince aift->gait is already a struct zpci_gaite pointer, this\ndouble-scales the offset, accessing element aisb*16 instead of aisb.\n\nThis causes out-of-bounds accesses when aisb >= 32 (with\nZPCI_NR_DEVICES=512)\n\nFix by removing the erroneous sizeof multiplication.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -28382,7 +28382,7 @@
                 "cve_id": "CVE-2026-53001",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: xtables: restrict several matches to inet family\n\nThis is a partial revert of:\n\n  commit ab4f21e6fb1c (\"netfilter: xtables: use NFPROTO_UNSPEC in more extensions\")\n\nto allow ipv4 and ipv6 only.\n\n- xt_mac\n- xt_owner\n- xt_physdev\n\nThese extensions are not used by ebtables in userspace.\n\nMoreover, xt_realm is only for ipv4, since dst->tclassid is ipv4\nspecific.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -28429,7 +28429,7 @@
                 "cve_id": "CVE-2026-53004",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: fix OOB write to userspace in sctp_getsockopt_peer_auth_chunks\n\nsctp_getsockopt_peer_auth_chunks() checks that the caller's optval\nbuffer is large enough for the peer AUTH chunk list with\n\n    if (len < num_chunks)\n            return -EINVAL;\n\nbut then writes num_chunks bytes to p->gauth_chunks, which lives\nat offset offsetof(struct sctp_authchunks, gauth_chunks) == 8\ninside optval.  The check is missing the sizeof(struct\nsctp_authchunks) = 8-byte header.  When the caller supplies\nlen == num_chunks (for any num_chunks > 0) the test passes but\ncopy_to_user() writes sizeof(struct sctp_authchunks) = 8 bytes\npast the declared buffer.\n\nThe sibling function sctp_getsockopt_local_auth_chunks() at the\nnext line already has the correct check:\n\n    if (len < sizeof(struct sctp_authchunks) + num_chunks)\n            return -EINVAL;\n\nAlign the peer variant with its sibling.\n\nReproducer confirms on v7.0-13-generic: an unprivileged userspace\ncaller that opens a loopback SCTP association with AUTH enabled,\nqueries num_chunks with a short optval, then issues the real\ngetsockopt with len == num_chunks and sentinel bytes painted past\nthe buffer observes those sentinel bytes overwritten with the\npeer's AUTH chunk type.  The bytes written are under the peer's\ncontrol but land in the caller's own userspace; this is not a\nkernel memory corruption, but it is a kernel-side contract\nviolation that can silently corrupt adjacent userspace data.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -28476,7 +28476,7 @@
                 "cve_id": "CVE-2026-53007",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nice: fix potential NULL pointer deref in error path of ice_set_ringparam()\n\nice_set_ringparam nullifies tstamp_ring of temporary tx_rings, without\nclearing ICE_TX_RING_FLAGS_TXTIME bit.\nWhen ICE_TX_RING_FLAGS_TXTIME is set and the subsequent\nice_setup_tx_ring() call fails, a NULL pointer dereference could happen\nin the unwinding sequence:\n\nice_clean_tx_ring()\n-> ice_is_txtime_cfg() == true (ICE_TX_RING_FLAGS_TXTIME is set)\n-> ice_free_tx_tstamp_ring()\n  -> ice_free_tstamp_ring()\n    -> tstamp_ring->desc (NULL deref)\n\nClear ICE_TX_RING_FLAGS_TXTIME bit to avoid the potential issue.\n\nNote that this potential issue is found by manual code review.\nCompile test only since unfortunately I don't have E830 devices.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -28700,7 +28700,7 @@
                 "cve_id": "CVE-2026-53037",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nHID: usbhid: fix deadlock in hid_post_reset()\n\nYou can build a USB device that includes a HID component\nand a storage or UAS component. The components can be reset\nonly together. That means that hid_pre_reset() and hid_post_reset()\nare in the block IO error handling. Hence no memory allocation\nused in them may do block IO because the IO can deadlock\non the mutex held while resetting a device and calling the\ninterface drivers.\nUse GFP_NOIO for all allocations in them.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -62054,7 +62054,7 @@
                 "cve_id": "CVE-2026-52965",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/ttm: Fix ttm_bo_swapout() infinite LRU walk on swapout failure\n\nWhen ttm_tt_swapout() fails, the current code calls\nttm_resource_add_bulk_move() followed by ttm_resource_move_to_lru_tail()\nto restore the resource's bulk_move membership.\n\nHowever, ttm_resource_move_to_lru_tail() places the resource at the tail\nof the LRU list which, relative to the walk cursor's hitch node (placed\nimmediately after the resource when it was yielded), puts the resource\n*in front of the* the hitch. The next list_for_each_entry_continue() from\nthe hitch finds the same resource again, causing an infinite loop.\n\nFix by deferring del_bulk_move to the success path only.\n\nOn the success path, TTM_TT_FLAG_SWAPPED has just been set by\nttm_tt_swapout() but the resource is still tracked in the bulk_move range,\nso ttm_resource_del_bulk_move()'s !ttm_resource_unevictable() guard would\nincorrectly skip the removal. Introduce\nttm_resource_del_bulk_move_unevictable() which bypasses that guard.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -62105,7 +62105,7 @@
                 "cve_id": "CVE-2026-52968",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: s390: pci: fix GAIT table indexing due to double-scaling pointer arithmetic\n\nkvm_s390_pci_aif_enable(), kvm_s390_pci_aif_disable(), and\naen_host_forward() index the GAIT by manually multiplying the index\nwith sizeof(struct zpci_gaite).\n\nSince aift->gait is already a struct zpci_gaite pointer, this\ndouble-scales the offset, accessing element aisb*16 instead of aisb.\n\nThis causes out-of-bounds accesses when aisb >= 32 (with\nZPCI_NR_DEVICES=512)\n\nFix by removing the erroneous sizeof multiplication.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -62479,7 +62479,7 @@
                 "cve_id": "CVE-2026-53001",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: xtables: restrict several matches to inet family\n\nThis is a partial revert of:\n\n  commit ab4f21e6fb1c (\"netfilter: xtables: use NFPROTO_UNSPEC in more extensions\")\n\nto allow ipv4 and ipv6 only.\n\n- xt_mac\n- xt_owner\n- xt_physdev\n\nThese extensions are not used by ebtables in userspace.\n\nMoreover, xt_realm is only for ipv4, since dst->tclassid is ipv4\nspecific.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -62530,7 +62530,7 @@
                 "cve_id": "CVE-2026-53004",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: fix OOB write to userspace in sctp_getsockopt_peer_auth_chunks\n\nsctp_getsockopt_peer_auth_chunks() checks that the caller's optval\nbuffer is large enough for the peer AUTH chunk list with\n\n    if (len < num_chunks)\n            return -EINVAL;\n\nbut then writes num_chunks bytes to p->gauth_chunks, which lives\nat offset offsetof(struct sctp_authchunks, gauth_chunks) == 8\ninside optval.  The check is missing the sizeof(struct\nsctp_authchunks) = 8-byte header.  When the caller supplies\nlen == num_chunks (for any num_chunks > 0) the test passes but\ncopy_to_user() writes sizeof(struct sctp_authchunks) = 8 bytes\npast the declared buffer.\n\nThe sibling function sctp_getsockopt_local_auth_chunks() at the\nnext line already has the correct check:\n\n    if (len < sizeof(struct sctp_authchunks) + num_chunks)\n            return -EINVAL;\n\nAlign the peer variant with its sibling.\n\nReproducer confirms on v7.0-13-generic: an unprivileged userspace\ncaller that opens a loopback SCTP association with AUTH enabled,\nqueries num_chunks with a short optval, then issues the real\ngetsockopt with len == num_chunks and sentinel bytes painted past\nthe buffer observes those sentinel bytes overwritten with the\npeer's AUTH chunk type.  The bytes written are under the peer's\ncontrol but land in the caller's own userspace; this is not a\nkernel memory corruption, but it is a kernel-side contract\nviolation that can silently corrupt adjacent userspace data.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -62581,7 +62581,7 @@
                 "cve_id": "CVE-2026-53007",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nice: fix potential NULL pointer deref in error path of ice_set_ringparam()\n\nice_set_ringparam nullifies tstamp_ring of temporary tx_rings, without\nclearing ICE_TX_RING_FLAGS_TXTIME bit.\nWhen ICE_TX_RING_FLAGS_TXTIME is set and the subsequent\nice_setup_tx_ring() call fails, a NULL pointer dereference could happen\nin the unwinding sequence:\n\nice_clean_tx_ring()\n-> ice_is_txtime_cfg() == true (ICE_TX_RING_FLAGS_TXTIME is set)\n-> ice_free_tx_tstamp_ring()\n  -> ice_free_tstamp_ring()\n    -> tstamp_ring->desc (NULL deref)\n\nClear ICE_TX_RING_FLAGS_TXTIME bit to avoid the potential issue.\n\nNote that this potential issue is found by manual code review.\nCompile test only since unfortunately I don't have E830 devices.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -62853,7 +62853,7 @@
                 "cve_id": "CVE-2026-53037",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nHID: usbhid: fix deadlock in hid_post_reset()\n\nYou can build a USB device that includes a HID component\nand a storage or UAS component. The components can be reset\nonly together. That means that hid_pre_reset() and hid_post_reset()\nare in the block IO error handling. Hence no memory allocation\nused in them may do block IO because the IO can deadlock\non the mutex held while resetting a device and calling the\ninterface drivers.\nUse GFP_NOIO for all allocations in them.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -96479,7 +96479,7 @@
                 "cve_id": "CVE-2026-52965",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/ttm: Fix ttm_bo_swapout() infinite LRU walk on swapout failure\n\nWhen ttm_tt_swapout() fails, the current code calls\nttm_resource_add_bulk_move() followed by ttm_resource_move_to_lru_tail()\nto restore the resource's bulk_move membership.\n\nHowever, ttm_resource_move_to_lru_tail() places the resource at the tail\nof the LRU list which, relative to the walk cursor's hitch node (placed\nimmediately after the resource when it was yielded), puts the resource\n*in front of the* the hitch. The next list_for_each_entry_continue() from\nthe hitch finds the same resource again, causing an infinite loop.\n\nFix by deferring del_bulk_move to the success path only.\n\nOn the success path, TTM_TT_FLAG_SWAPPED has just been set by\nttm_tt_swapout() but the resource is still tracked in the bulk_move range,\nso ttm_resource_del_bulk_move()'s !ttm_resource_unevictable() guard would\nincorrectly skip the removal. Introduce\nttm_resource_del_bulk_move_unevictable() which bypasses that guard.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -96530,7 +96530,7 @@
                 "cve_id": "CVE-2026-52968",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: s390: pci: fix GAIT table indexing due to double-scaling pointer arithmetic\n\nkvm_s390_pci_aif_enable(), kvm_s390_pci_aif_disable(), and\naen_host_forward() index the GAIT by manually multiplying the index\nwith sizeof(struct zpci_gaite).\n\nSince aift->gait is already a struct zpci_gaite pointer, this\ndouble-scales the offset, accessing element aisb*16 instead of aisb.\n\nThis causes out-of-bounds accesses when aisb >= 32 (with\nZPCI_NR_DEVICES=512)\n\nFix by removing the erroneous sizeof multiplication.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -96904,7 +96904,7 @@
                 "cve_id": "CVE-2026-53001",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: xtables: restrict several matches to inet family\n\nThis is a partial revert of:\n\n  commit ab4f21e6fb1c (\"netfilter: xtables: use NFPROTO_UNSPEC in more extensions\")\n\nto allow ipv4 and ipv6 only.\n\n- xt_mac\n- xt_owner\n- xt_physdev\n\nThese extensions are not used by ebtables in userspace.\n\nMoreover, xt_realm is only for ipv4, since dst->tclassid is ipv4\nspecific.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -96955,7 +96955,7 @@
                 "cve_id": "CVE-2026-53004",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: fix OOB write to userspace in sctp_getsockopt_peer_auth_chunks\n\nsctp_getsockopt_peer_auth_chunks() checks that the caller's optval\nbuffer is large enough for the peer AUTH chunk list with\n\n    if (len < num_chunks)\n            return -EINVAL;\n\nbut then writes num_chunks bytes to p->gauth_chunks, which lives\nat offset offsetof(struct sctp_authchunks, gauth_chunks) == 8\ninside optval.  The check is missing the sizeof(struct\nsctp_authchunks) = 8-byte header.  When the caller supplies\nlen == num_chunks (for any num_chunks > 0) the test passes but\ncopy_to_user() writes sizeof(struct sctp_authchunks) = 8 bytes\npast the declared buffer.\n\nThe sibling function sctp_getsockopt_local_auth_chunks() at the\nnext line already has the correct check:\n\n    if (len < sizeof(struct sctp_authchunks) + num_chunks)\n            return -EINVAL;\n\nAlign the peer variant with its sibling.\n\nReproducer confirms on v7.0-13-generic: an unprivileged userspace\ncaller that opens a loopback SCTP association with AUTH enabled,\nqueries num_chunks with a short optval, then issues the real\ngetsockopt with len == num_chunks and sentinel bytes painted past\nthe buffer observes those sentinel bytes overwritten with the\npeer's AUTH chunk type.  The bytes written are under the peer's\ncontrol but land in the caller's own userspace; this is not a\nkernel memory corruption, but it is a kernel-side contract\nviolation that can silently corrupt adjacent userspace data.",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -97006,7 +97006,7 @@
                 "cve_id": "CVE-2026-53007",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nice: fix potential NULL pointer deref in error path of ice_set_ringparam()\n\nice_set_ringparam nullifies tstamp_ring of temporary tx_rings, without\nclearing ICE_TX_RING_FLAGS_TXTIME bit.\nWhen ICE_TX_RING_FLAGS_TXTIME is set and the subsequent\nice_setup_tx_ring() call fails, a NULL pointer dereference could happen\nin the unwinding sequence:\n\nice_clean_tx_ring()\n-> ice_is_txtime_cfg() == true (ICE_TX_RING_FLAGS_TXTIME is set)\n-> ice_free_tx_tstamp_ring()\n  -> ice_free_tstamp_ring()\n    -> tstamp_ring->desc (NULL deref)\n\nClear ICE_TX_RING_FLAGS_TXTIME bit to avoid the potential issue.\n\nNote that this potential issue is found by manual code review.\nCompile test only since unfortunately I don't have E830 devices.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -97278,7 +97278,7 @@
                 "cve_id": "CVE-2026-53037",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nHID: usbhid: fix deadlock in hid_post_reset()\n\nYou can build a USB device that includes a HID component\nand a storage or UAS component. The components can be reset\nonly together. That means that hid_pre_reset() and hid_post_reset()\nare in the block IO error handling. Hence no memory allocation\nused in them may do block IO because the IO can deadlock\non the mutex held while resetting a device and calling the\ninterface drivers.\nUse GFP_NOIO for all allocations in them.",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
