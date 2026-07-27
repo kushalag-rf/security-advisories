@@ -37193,7 +37193,7 @@
                 "cve_id": "CVE-2026-64189",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: ipset: fix race between dump and ip_set_list resize\n\nThe release path of ip_set_dump_do() and ip_set_dump_done() read\ninst->ip_set_list via ip_set_ref_netlink(), a plain rcu_dereference_raw()\nof the array pointer. These run from netlink_recvmsg() without the nfnl\nmutex and without an RCU read-side critical section.\n\nA concurrent ip_set_create() can grow the array: it publishes the new\narray, calls synchronize_net() and then kvfree()s the old one. Since the\ndump paths read the array outside any RCU reader, synchronize_net() does\nnot wait for them and the old array can be freed while they still index\ninto it, causing a use-after-free.\n\nThe dumped set itself stays pinned via set->ref_netlink, so only the\narray load needs protecting. Take rcu_read_lock() around it, matching\nip_set_get_byname() and __ip_set_put_byindex().\n\n  BUG: KASAN: slab-use-after-free in ip_set_dump_do (net/netfilter/ipset/ip_set_core.c:1697)\n  Read of size 8 at addr ffff88800b5c4018 by task exploit/150\n  Call Trace:\n   ...\n   kasan_report (mm/kasan/report.c:595)\n   ip_set_dump_do (net/netfilter/ipset/ip_set_core.c:1697)\n   netlink_dump (net/netlink/af_netlink.c:2325)\n   netlink_recvmsg (net/netlink/af_netlink.c:1976)\n   sock_recvmsg (net/socket.c:1159)\n   __sys_recvfrom (net/socket.c:2315)\n   ...\n  Oops: general protection fault, probably for non-canonical address ... KASAN NOPTI\n  KASAN: maybe wild-memory-access in range [0x02d6...d0-0x02d6...d7]\n  RIP: 0010:ip_set_dump_do (net/netfilter/ipset/ip_set_core.c:1698)\n  Kernel panic - not syncing: Fatal exception",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -37261,7 +37261,228 @@
                 "cve_id": "CVE-2026-64206",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: L2CAP: cancel pending_rx_work before taking conn->lock\n\nl2cap_conn_del() takes conn->lock and then calls cancel_work_sync() for\npending_rx_work.  process_pending_rx() takes the same mutex, so teardown\ncan deadlock against the worker it is flushing.\n\nThis issue was found by our static analysis tool and then manually\nreviewed against the current tree.\n\nThe grounded PoC kept the l2cap_conn_ready() -> queue_work(...,\n&conn->pending_rx_work) submit path, the l2cap_conn_del() ->\ncancel_work_sync(&conn->pending_rx_work) teardown path, and the\nprocess_pending_rx() -> mutex_lock(&conn->lock) worker edge.  Lockdep\n\n  WARNING: possible circular locking dependency detected\n  process_pending_rx+0x21/0x2a [vuln_msv]\n  l2cap_conn_del.constprop.0+0x3f/0x4e [vuln_msv]\n  *** DEADLOCK ***\n\nCancel pending_rx_work before taking conn->lock, matching the existing\nlock-before-drain ordering used for the two delayed works in the same\nteardown path.  The pending_rx queue is still purged after the work has\nbeen cancelled and conn->lock has been acquired.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64276": {
+                "cve_id": "CVE-2026-64276",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nInput: synaptics-rmi4 - bound the F30 keymap to the GPIO/LED count\n\nrmi_f30_map_gpios() allocates gpioled_key_map with\nmin(gpioled_count, TRACKSTICK_RANGE_END) == at most 6 entries, but\nrmi_f30_attention() iterates the full f30->gpioled_count (device query\nregister, range 0..31) and dereferences gpioled_key_map[i], and\ninput->keycodemax is set to the full gpioled_count while input->keycode\npoints at the 6-entry allocation.\n\nA device that reports gpioled_count > 6 with GPIO support enabled\ntherefore causes an out-of-bounds read on the attention interrupt and\nout-of-bounds read/write through the EVIOCGKEYCODE/EVIOCSKEYCODE ioctls,\nwhich bound the index only against keycodemax. This is the same defect\nas the F3A handler, which was copied from F30.\n\nSize the keymap for the full gpioled_count; the mapping loop still\nassigns only the first min(gpioled_count, TRACKSTICK_RANGE_END) entries.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64296": {
+                "cve_id": "CVE-2026-64296",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nexfat: bound uniname advance in exfat_find_dir_entry()\n\nIn exfat_find_dir_entry(), each TYPE_EXTEND (file name) entry advances the\noutput pointer by a fixed amount while the loop guard only tracks the\naccumulated name length:\n\n\tif (++order == 2)\n\t\tuniname = p_uniname->name;\n\telse\n\t\tuniname += EXFAT_FILE_NAME_LEN;\n\tlen = exfat_extract_uni_name(ep, entry_uniname);\n\tname_len += len;\n\tunichar = *(uniname+len);\n\t*(uniname+len) = 0x0;\n\nuniname grows by EXFAT_FILE_NAME_LEN (15) per name entry, but name_len\ngrows only by the actual extracted length, which is shorter when a name\nfragment contains an early NUL.  The only guard is\n`name_len >= MAX_NAME_LENGTH`, so a crafted directory with many short\nname fragments lets uniname run far past the\np_uniname->name[MAX_NAME_LENGTH + 3] buffer while name_len stays small,\ncausing an out-of-bounds read and write at *(uniname+len).\n\nThe sibling extractor exfat_get_uniname_from_ext_entry() already stops\non a short fragment (the lockstep `len != EXFAT_FILE_NAME_LEN` guard\nadded in commit d42334578eba (\"exfat: check if filename entries exceeds\nmax filename length\")); exfat_find_dir_entry() never got the\nequivalent.  Track the per-entry write offset as a count and reject a\nfragment once the offset, or the offset plus the extracted length, would\nexceed MAX_NAME_LENGTH, before forming the output pointer.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64321": {
+                "cve_id": "CVE-2026-64321",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnvme: target: rdma: fix ndev refcount leak on queue connect\n\nnvmet_rdma_queue_connect() calls nvmet_rdma_find_get_device() which\nacquires a reference on the returned ndev via kref_get(). On the path\nwhere the host queue backlog is exceeded and the function returns\nNVME_SC_CONNECT_CTRL_BUSY, reference of ndev is not released, leaking\nthe kref.\n\nFix this by adding a goto to the existing put_device label before the\nearly return.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64325": {
+                "cve_id": "CVE-2026-64325",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: mt76: mt7921/mt7925: fix NULL dereference in CSA beacon\n\nThis patch is based on a BUG as reported by Bongani Hlope at\nhttps://lore.kernel.org/all/20260502125824.425d7159@bongani-mini.home.org.za/\n\nWhen a channel-switch announcement (CSA) beacon is received,\ncfg80211 queues a wiphy work item that eventually calls\nmt7921_channel_switch_rx_beacon(). If the station disconnects\n(or the channel context is otherwise torn down) between the\ntime the work is queued and the time it runs, the driver's\ndev->new_ctx pointer can already have been cleared to NULL.\nmt7921_channel_switch_rx_beacon() then dereferences new_ctx\nunconditionally, triggering a NULL pointer dereference at\naddress 0x0:\n\n  BUG: kernel NULL pointer dereference, address: 0000000000000000\n  RIP: 0010:mt7921_channel_switch_rx_beacon+0x1f/0x100 [mt7921_common]\n\nThe same missing guard exists in mt7925_channel_switch_rx_beacon(),\nwhich shares the same code pattern introduced by the same commit.\n\nAdd an early-return NULL check for dev->new_ctx in both\nmt7921_channel_switch_rx_beacon() and\nmt7925_channel_switch_rx_beacon(). When new_ctx is NULL there is\nno pending channel switch to process, so returning immediately is\nthe correct and safe action.\n\nOops-Analysis: http://oops.fenrus.org/reports/lkml/20260502125824.425d7159@bongani-mini.home.org.za/report.html",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64346": {
+                "cve_id": "CVE-2026-64346",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: gadget: udc: Fix use-after-free in gadget_match_driver\n\nThe udc structure acts as the management structure for the gadget,\nbut their lifecycles are decoupled. A race condition exists where\nusb_del_gadget() frees the udc memory (e.g., via mode-switch work)\nwhile gadget_match_driver() concurrently accesses the freed udc memory\n(e.g., via configfs), causing a Use-After-Free (UAF) that triggers a\nNULL pointer dereference when the freed memory is zeroed:\n\n[39430.908615][ T1171] Unable to handle kernel NULL pointer dereference at virtual address 0000000000000000\n[39430.911397][ T1171] pc : __pi_strcmp+0x20/0x140\n[39430.911441][ T1171] lr : gadget_match_driver+0x34/0x60\n...\n[39430.911890][ T1171]  usb_gadget_register_driver_owner+0x50/0xf8\n[39430.911910][ T1171]  gadget_dev_desc_UDC_store+0xf4/0x140\n[39430.931308][ T1171]  configfs_write_iter+0xec/0x134\n\n[39430.957058][ T1171] Workqueue: events_freezable __dwc3_set_mode\n[39430.957287][ T1171]  dwc3_gadget_exit+0x34/0x8c\n[39430.957304][ T1171]  __dwc3_set_mode+0xc0/0x664\n\nFix this by ensuring the udc structure remains allocated until the\ngadget is released. To achieve this, introduce a new\nusb_gadget_release() routine to the core. When the gadget is added,\nusb_add_gadget() stores the gadget's release routine in the udc\nstructure and takes a reference to the udc. When the gadget is\nreleased, usb_gadget_release() drops the reference to the udc and\nthen calls the gadget's release routine.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64351": {
+                "cve_id": "CVE-2026-64351",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: usb: kalmia: bound RX frame length in kalmia_rx_fixup()\n\nkalmia_rx_fixup() computes usb_packet_length = skb->len - (2 *\nKALMIA_HEADER_LENGTH) as a u16, guarded only by a pre-loop check that\nskb->len is at least KALMIA_HEADER_LENGTH, which is 6. A device can\ndeliver a short bulk-IN frame with skb->len in the 6 to 11 range, or\nleave a short trailing remainder on a later loop iteration. Either case\nunderflows usb_packet_length to about 65530.\n\nThat bypasses the usb_packet_length < ether_packet_length truncation path.\nThe device-supplied ether_packet_length, a le16 up to 65535 read from\nheader_start[2], then drives a memcmp() and the following skb_trim() and\nskb_pull() past the end of the rx buffer. The rx buffer is hard_mtu * 10,\nwhich is 14000 bytes. That is an out of bounds read.\n\nRequire both the start and end framing headers to be present before\nsubtracting them, on every loop iteration.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64362": {
+                "cve_id": "CVE-2026-64362",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nHID: lg-g15: cancel pending work on remove to fix a use-after-free\n\nlg_g15_data is allocated with devm and holds a work item. The report\nhandlers schedule that work straight from device input.\nlg_g15_event() and lg_g15_v2_event() do it on the backlight cycle key,\nand lg_g510_leds_event() does it too. The worker dereferences the\nlg_g15_data back through container_of.\n\nThe driver had no remove callback and never cancelled the work. So if a\nreport scheduled the work and the keyboard was then unplugged, devres\nfreed lg_g15_data while the work was still pending or running, and the\nworker touched freed memory. This is a use-after-free. It is reachable\nas a race on device unplug.\n\nAdd a remove callback that cancels the work before devres frees the\nstate. g15->work is only initialized for the models that schedule it\n(G15, G15 v2, G510). The G13 and Z-10 leave it zeroed, so guard the\ncancel on g15->work.func to avoid cancelling a work that was never set\nup. The g15 NULL test mirrors the one already in lg_g15_raw_event().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64373": {
+                "cve_id": "CVE-2026-64373",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncpufreq: Fix hotplug-suspend race during reboot\n\nDuring system reboot, cpufreq_suspend() is called via the\nkernel_restart() -> device_shutdown() path. Unlike the normal system\nsuspend path, the reboot path does not call freeze_processes(), so\nuserspace processes and kernel threads remain active.\n\nThis allows CPU hotplug operations to run concurrently with\ncpufreq_suspend(). The original code has no synchronization with CPU\nhotplug, leading to a race condition where governor_data can be freed\nby the hotplug path while cpufreq_suspend() is still accessing it,\nresulting in a null pointer dereference:\n\n  Unable to handle kernel NULL pointer dereference\n  Call Trace:\n   do_kernel_fault+0x28/0x3c\n   cpufreq_suspend+0xdc/0x160\n   device_shutdown+0x18/0x200\n   kernel_restart+0x40/0x80\n   arm64_sys_reboot+0x1b0/0x200\n\nFix this by adding cpus_read_lock()/cpus_read_unlock() to\ncpufreq_suspend() to block CPU hotplug operations while suspend is in\nprogress.\n\n[ rjw: Changelog edits ]",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64378": {
+                "cve_id": "CVE-2026-64378",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwriteback: fix race between cgroup_writeback_umount() and inode_switch_wbs()\n\nWhen a container exits, the following BUG_ON() is occasionally triggered:\n\n==================================================================\n VFS: Busy inodes after unmount of sdb (ext4)\n ------------[ cut here ]------------\n kernel BUG at fs/super.c:695!\n CPU: 3 PID: 6 Comm: containerd-shim Tainted: G OE K 6.6 #1\n pstate: 63400009 (nZCv daif +PAN -UAO +TCO +DIT -SSBS BTYPE=--)\n pc : generic_shutdown_super+0xf0/0x100\n lr : generic_shutdown_super+0xf0/0x100\n Call trace:\n  generic_shutdown_super+0xf0/0x100\n  kill_block_super+0x20/0x48\n  ext4_kill_sb+0x28/0x60\n  deactivate_locked_super+0x54/0x130\n  deactivate_super+0x84/0xa0\n  cleanup_mnt+0xa4/0x140\n  __cleanup_mnt+0x18/0x28\n  task_work_run+0x78/0xe0\n  do_notify_resume+0x204/0x240\n==================================================================\n\nThe root cause is a race between cgroup_writeback_umount() and\ninode_switch_wbs()/cleanup_offline_cgwb(). There is a window between\ninode_prepare_wbs_switch() returning true and the subsequent\nwb_queue_isw() call. Following is the process that triggers the issue:\n\n      CPU A (umount)           |          CPU B (writeback)\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n                                 inode_switch_wbs/cleanup_offline_cgwb\n                                  atomic_inc(&isw_nr_in_flight)\n                                  inode_prepare_wbs_switch\n                                   -> passes SB_ACTIVE check\n                                   __iget(inode)\n generic_shutdown_super\n  sb->s_flags &= ~SB_ACTIVE\n  cgroup_writeback_umount(sb)\n   smp_mb()\n   atomic_read(&isw_nr_in_flight)\n   rcu_barrier()\n    -> no pending RCU callbacks\n   flush_workqueue(isw_wq)\n    -> nothing queued, returns\n  evict_inodes(sb)\n   -> Inode skipped as isw still holds a ref.\n  sop->put_super(sb)\n   /* destroys percpu counters */\n  -> VFS: Busy inodes after unmount!\n                                  wb_queue_isw()\n                                   queue_work(isw_wq, ...)\n                                  /* later in work function */\n                                  inode_switch_wbs_work_fn\n                                   process_inode_switch_wbs\n                                    iput() -> evict\n                                     percpu_counter_dec() // UAF!\n\nFix this by extending the RCU read-side critical section in\ninode_switch_wbs() and cleanup_offline_cgwb() to cover from\ninode_prepare_wbs_switch() through wb_queue_isw().  Since there is\nno sleep in this window, rcu_read_lock() can be used.  Then add a\nsynchronize_rcu() in cgroup_writeback_umount() before the existing\nrcu_barrier(), so that all in-flight switchers that have passed the\nSB_ACTIVE check have completed queue_work() before flush_workqueue()\nis called.\n\nThe existing rcu_barrier() is intentionally retained so this fix can\nbe backported unchanged to stable kernels (5.10.y, 6.6.y, ...) that\nstill queue switches via queue_rcu_work(). It is a no-op on current\nmainline (since commit e1b849cfa6b6 (\"writeback: Avoid contention on\nwb->list_lock when switching inodes\")) and is removed in a follow-up\npatch.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64479": {
+                "cve_id": "CVE-2026-64479",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: seq: Fix uninitialised heap leak in snd_seq_event_dup()\n\nsnd_seq_event_dup() copies an incoming event into a pool cell and, in\nthe UMP-enabled build, clears the trailing cell->ump.raw.extra word that\nthe memcpy() did not cover.  The guard deciding whether to clear it\ncompares the copied size against sizeof(cell->event):\n\n\tmemcpy(&cell->ump, event, size);\n\tif (size < sizeof(cell->event))\n\t\tcell->ump.raw.extra = 0;\n\nFor a legacy (non-UMP) event, size == sizeof(struct snd_seq_event) ==\nsizeof(cell->event), so the condition is false and the extra word keeps\nstale data.  The cell pool is allocated with kvmalloc() (not zeroed) and\ncells are reused via a free list, so that word holds uninitialised heap\nor leftover event data.\n\nWhen such a cell is delivered to a UMP client (client->midi_version > 0)\nthat set SNDRV_SEQ_FILTER_NO_CONVERT -- so the legacy event reaches it\nunconverted -- snd_seq_read() reads it out as the larger struct\nsnd_seq_ump_event and copies the stale word to user space, a 4-byte\nkernel heap infoleak to an unprivileged /dev/snd/seq client.\n\nCompare against sizeof(cell->ump) instead, so the trailing word is zeroed\nfor every event shorter than the UMP cell.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64485": {
+                "cve_id": "CVE-2026-64485",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: compress: Fix task creation error unwind\n\nsnd_compr_task_new() allocates the driver task before validating the\nreturned DMA buffers and reserving file descriptors. When either of\nthose later steps fails, the core frees its task wrapper and DMA-buffer\nreferences without calling the driver's task_free() callback. Any\ndriver resources allocated by task_create() are therefore leaked.\n\nThe dual-fd allocation path also jumps to cleanup without storing the\nnegative get_unused_fd_flags() result in retval. Since retval still\ncontains the successful task_create() return value, TASK_CREATE can\nincorrectly report success although the task was discarded.\n\nPreserve the fd allocation errors and call task_free() when failure\noccurs after a successful task_create() callback.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64490": {
+                "cve_id": "CVE-2026-64490",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: virtio: Validate control metadata from the device\n\nvirtio-snd control handling trusts the device-provided control type and\nvalue count returned by the device.\n\nThat metadata is then used directly to index g_v2a_type_map[] in\nvirtsnd_kctl_info(), and to size loops and memcpy() operations in\nvirtsnd_kctl_get() and virtsnd_kctl_put() against fixed-size\nvirtio_snd_ctl_value and snd_ctl_elem_value arrays.\n\nA buggy or malicious device can therefore trigger out-of-bounds access by\nadvertising an invalid control type or an oversized value count.\n\nValidate control type and count once in virtsnd_kctl_parse_cfg(), before\nquerying enumerated items or exposing the control to ALSA.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64530": {
+                "cve_id": "CVE-2026-64530",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: cls_api: Handle TC_ACT_CONSUMED in tcf_qevent_handle\n\ntcf_classify() can return TC_ACT_CONSUMED while the skb is held by the\ndefragmentation engine (e.g. act_ct on out-of-order fragments). When\nthat happens the skb is no longer owned by the caller and must not be\ntouched again.\n\ntcf_qevent_handle() did not handle TC_ACT_CONSUMED: it fell through the\nswitch and returned the skb to the caller as if classification had\npassed. The only qdisc that wires up qevents today is RED, via three call sites\n(qe_mark on RED_PROB_MARK/HARD_MARK, qe_early_drop on congestion_drop)\nred_enqueue() was continuing to operate on an skb it no longer owns  in this\ncase -- enqueueing it, dropping it, or updating statistics. Resulting in a UAF.\n\n  tc qdisc add dev eth0 root handle 1: red ... qevent early_drop block 10\n  tc filter add block 10 ... action ct\n\n  (with ct defrag enabled and traffic that produces out-of-order\n  fragments, e.g. a fragmented UDP stream)\n\nHandle TC_ACT_CONSUMED in tcf_qevent_handle() the same way the ingress\nand egress fast paths do: treat it as stolen and return NULL without\ntouching the skb. Unlike the TC_ACT_STOLEN case, the skb must not be\ndropped/freed here, as it is no longer owned by us.",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -74491,7 +74712,7 @@
                 "cve_id": "CVE-2026-64189",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: ipset: fix race between dump and ip_set_list resize\n\nThe release path of ip_set_dump_do() and ip_set_dump_done() read\ninst->ip_set_list via ip_set_ref_netlink(), a plain rcu_dereference_raw()\nof the array pointer. These run from netlink_recvmsg() without the nfnl\nmutex and without an RCU read-side critical section.\n\nA concurrent ip_set_create() can grow the array: it publishes the new\narray, calls synchronize_net() and then kvfree()s the old one. Since the\ndump paths read the array outside any RCU reader, synchronize_net() does\nnot wait for them and the old array can be freed while they still index\ninto it, causing a use-after-free.\n\nThe dumped set itself stays pinned via set->ref_netlink, so only the\narray load needs protecting. Take rcu_read_lock() around it, matching\nip_set_get_byname() and __ip_set_put_byindex().\n\n  BUG: KASAN: slab-use-after-free in ip_set_dump_do (net/netfilter/ipset/ip_set_core.c:1697)\n  Read of size 8 at addr ffff88800b5c4018 by task exploit/150\n  Call Trace:\n   ...\n   kasan_report (mm/kasan/report.c:595)\n   ip_set_dump_do (net/netfilter/ipset/ip_set_core.c:1697)\n   netlink_dump (net/netlink/af_netlink.c:2325)\n   netlink_recvmsg (net/netlink/af_netlink.c:1976)\n   sock_recvmsg (net/socket.c:1159)\n   __sys_recvfrom (net/socket.c:2315)\n   ...\n  Oops: general protection fault, probably for non-canonical address ... KASAN NOPTI\n  KASAN: maybe wild-memory-access in range [0x02d6...d0-0x02d6...d7]\n  RIP: 0010:ip_set_dump_do (net/netfilter/ipset/ip_set_core.c:1698)\n  Kernel panic - not syncing: Fatal exception",
-                "severity": "MEDIUM",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -74559,7 +74780,228 @@
                 "cve_id": "CVE-2026-64206",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: L2CAP: cancel pending_rx_work before taking conn->lock\n\nl2cap_conn_del() takes conn->lock and then calls cancel_work_sync() for\npending_rx_work.  process_pending_rx() takes the same mutex, so teardown\ncan deadlock against the worker it is flushing.\n\nThis issue was found by our static analysis tool and then manually\nreviewed against the current tree.\n\nThe grounded PoC kept the l2cap_conn_ready() -> queue_work(...,\n&conn->pending_rx_work) submit path, the l2cap_conn_del() ->\ncancel_work_sync(&conn->pending_rx_work) teardown path, and the\nprocess_pending_rx() -> mutex_lock(&conn->lock) worker edge.  Lockdep\n\n  WARNING: possible circular locking dependency detected\n  process_pending_rx+0x21/0x2a [vuln_msv]\n  l2cap_conn_del.constprop.0+0x3f/0x4e [vuln_msv]\n  *** DEADLOCK ***\n\nCancel pending_rx_work before taking conn->lock, matching the existing\nlock-before-drain ordering used for the two delayed works in the same\nteardown path.  The pending_rx queue is still purged after the work has\nbeen cancelled and conn->lock has been acquired.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64276": {
+                "cve_id": "CVE-2026-64276",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nInput: synaptics-rmi4 - bound the F30 keymap to the GPIO/LED count\n\nrmi_f30_map_gpios() allocates gpioled_key_map with\nmin(gpioled_count, TRACKSTICK_RANGE_END) == at most 6 entries, but\nrmi_f30_attention() iterates the full f30->gpioled_count (device query\nregister, range 0..31) and dereferences gpioled_key_map[i], and\ninput->keycodemax is set to the full gpioled_count while input->keycode\npoints at the 6-entry allocation.\n\nA device that reports gpioled_count > 6 with GPIO support enabled\ntherefore causes an out-of-bounds read on the attention interrupt and\nout-of-bounds read/write through the EVIOCGKEYCODE/EVIOCSKEYCODE ioctls,\nwhich bound the index only against keycodemax. This is the same defect\nas the F3A handler, which was copied from F30.\n\nSize the keymap for the full gpioled_count; the mapping loop still\nassigns only the first min(gpioled_count, TRACKSTICK_RANGE_END) entries.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64296": {
+                "cve_id": "CVE-2026-64296",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nexfat: bound uniname advance in exfat_find_dir_entry()\n\nIn exfat_find_dir_entry(), each TYPE_EXTEND (file name) entry advances the\noutput pointer by a fixed amount while the loop guard only tracks the\naccumulated name length:\n\n\tif (++order == 2)\n\t\tuniname = p_uniname->name;\n\telse\n\t\tuniname += EXFAT_FILE_NAME_LEN;\n\tlen = exfat_extract_uni_name(ep, entry_uniname);\n\tname_len += len;\n\tunichar = *(uniname+len);\n\t*(uniname+len) = 0x0;\n\nuniname grows by EXFAT_FILE_NAME_LEN (15) per name entry, but name_len\ngrows only by the actual extracted length, which is shorter when a name\nfragment contains an early NUL.  The only guard is\n`name_len >= MAX_NAME_LENGTH`, so a crafted directory with many short\nname fragments lets uniname run far past the\np_uniname->name[MAX_NAME_LENGTH + 3] buffer while name_len stays small,\ncausing an out-of-bounds read and write at *(uniname+len).\n\nThe sibling extractor exfat_get_uniname_from_ext_entry() already stops\non a short fragment (the lockstep `len != EXFAT_FILE_NAME_LEN` guard\nadded in commit d42334578eba (\"exfat: check if filename entries exceeds\nmax filename length\")); exfat_find_dir_entry() never got the\nequivalent.  Track the per-entry write offset as a count and reject a\nfragment once the offset, or the offset plus the extracted length, would\nexceed MAX_NAME_LENGTH, before forming the output pointer.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64321": {
+                "cve_id": "CVE-2026-64321",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnvme: target: rdma: fix ndev refcount leak on queue connect\n\nnvmet_rdma_queue_connect() calls nvmet_rdma_find_get_device() which\nacquires a reference on the returned ndev via kref_get(). On the path\nwhere the host queue backlog is exceeded and the function returns\nNVME_SC_CONNECT_CTRL_BUSY, reference of ndev is not released, leaking\nthe kref.\n\nFix this by adding a goto to the existing put_device label before the\nearly return.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64325": {
+                "cve_id": "CVE-2026-64325",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: mt76: mt7921/mt7925: fix NULL dereference in CSA beacon\n\nThis patch is based on a BUG as reported by Bongani Hlope at\nhttps://lore.kernel.org/all/20260502125824.425d7159@bongani-mini.home.org.za/\n\nWhen a channel-switch announcement (CSA) beacon is received,\ncfg80211 queues a wiphy work item that eventually calls\nmt7921_channel_switch_rx_beacon(). If the station disconnects\n(or the channel context is otherwise torn down) between the\ntime the work is queued and the time it runs, the driver's\ndev->new_ctx pointer can already have been cleared to NULL.\nmt7921_channel_switch_rx_beacon() then dereferences new_ctx\nunconditionally, triggering a NULL pointer dereference at\naddress 0x0:\n\n  BUG: kernel NULL pointer dereference, address: 0000000000000000\n  RIP: 0010:mt7921_channel_switch_rx_beacon+0x1f/0x100 [mt7921_common]\n\nThe same missing guard exists in mt7925_channel_switch_rx_beacon(),\nwhich shares the same code pattern introduced by the same commit.\n\nAdd an early-return NULL check for dev->new_ctx in both\nmt7921_channel_switch_rx_beacon() and\nmt7925_channel_switch_rx_beacon(). When new_ctx is NULL there is\nno pending channel switch to process, so returning immediately is\nthe correct and safe action.\n\nOops-Analysis: http://oops.fenrus.org/reports/lkml/20260502125824.425d7159@bongani-mini.home.org.za/report.html",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64346": {
+                "cve_id": "CVE-2026-64346",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: gadget: udc: Fix use-after-free in gadget_match_driver\n\nThe udc structure acts as the management structure for the gadget,\nbut their lifecycles are decoupled. A race condition exists where\nusb_del_gadget() frees the udc memory (e.g., via mode-switch work)\nwhile gadget_match_driver() concurrently accesses the freed udc memory\n(e.g., via configfs), causing a Use-After-Free (UAF) that triggers a\nNULL pointer dereference when the freed memory is zeroed:\n\n[39430.908615][ T1171] Unable to handle kernel NULL pointer dereference at virtual address 0000000000000000\n[39430.911397][ T1171] pc : __pi_strcmp+0x20/0x140\n[39430.911441][ T1171] lr : gadget_match_driver+0x34/0x60\n...\n[39430.911890][ T1171]  usb_gadget_register_driver_owner+0x50/0xf8\n[39430.911910][ T1171]  gadget_dev_desc_UDC_store+0xf4/0x140\n[39430.931308][ T1171]  configfs_write_iter+0xec/0x134\n\n[39430.957058][ T1171] Workqueue: events_freezable __dwc3_set_mode\n[39430.957287][ T1171]  dwc3_gadget_exit+0x34/0x8c\n[39430.957304][ T1171]  __dwc3_set_mode+0xc0/0x664\n\nFix this by ensuring the udc structure remains allocated until the\ngadget is released. To achieve this, introduce a new\nusb_gadget_release() routine to the core. When the gadget is added,\nusb_add_gadget() stores the gadget's release routine in the udc\nstructure and takes a reference to the udc. When the gadget is\nreleased, usb_gadget_release() drops the reference to the udc and\nthen calls the gadget's release routine.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64351": {
+                "cve_id": "CVE-2026-64351",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: usb: kalmia: bound RX frame length in kalmia_rx_fixup()\n\nkalmia_rx_fixup() computes usb_packet_length = skb->len - (2 *\nKALMIA_HEADER_LENGTH) as a u16, guarded only by a pre-loop check that\nskb->len is at least KALMIA_HEADER_LENGTH, which is 6. A device can\ndeliver a short bulk-IN frame with skb->len in the 6 to 11 range, or\nleave a short trailing remainder on a later loop iteration. Either case\nunderflows usb_packet_length to about 65530.\n\nThat bypasses the usb_packet_length < ether_packet_length truncation path.\nThe device-supplied ether_packet_length, a le16 up to 65535 read from\nheader_start[2], then drives a memcmp() and the following skb_trim() and\nskb_pull() past the end of the rx buffer. The rx buffer is hard_mtu * 10,\nwhich is 14000 bytes. That is an out of bounds read.\n\nRequire both the start and end framing headers to be present before\nsubtracting them, on every loop iteration.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64362": {
+                "cve_id": "CVE-2026-64362",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nHID: lg-g15: cancel pending work on remove to fix a use-after-free\n\nlg_g15_data is allocated with devm and holds a work item. The report\nhandlers schedule that work straight from device input.\nlg_g15_event() and lg_g15_v2_event() do it on the backlight cycle key,\nand lg_g510_leds_event() does it too. The worker dereferences the\nlg_g15_data back through container_of.\n\nThe driver had no remove callback and never cancelled the work. So if a\nreport scheduled the work and the keyboard was then unplugged, devres\nfreed lg_g15_data while the work was still pending or running, and the\nworker touched freed memory. This is a use-after-free. It is reachable\nas a race on device unplug.\n\nAdd a remove callback that cancels the work before devres frees the\nstate. g15->work is only initialized for the models that schedule it\n(G15, G15 v2, G510). The G13 and Z-10 leave it zeroed, so guard the\ncancel on g15->work.func to avoid cancelling a work that was never set\nup. The g15 NULL test mirrors the one already in lg_g15_raw_event().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64373": {
+                "cve_id": "CVE-2026-64373",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncpufreq: Fix hotplug-suspend race during reboot\n\nDuring system reboot, cpufreq_suspend() is called via the\nkernel_restart() -> device_shutdown() path. Unlike the normal system\nsuspend path, the reboot path does not call freeze_processes(), so\nuserspace processes and kernel threads remain active.\n\nThis allows CPU hotplug operations to run concurrently with\ncpufreq_suspend(). The original code has no synchronization with CPU\nhotplug, leading to a race condition where governor_data can be freed\nby the hotplug path while cpufreq_suspend() is still accessing it,\nresulting in a null pointer dereference:\n\n  Unable to handle kernel NULL pointer dereference\n  Call Trace:\n   do_kernel_fault+0x28/0x3c\n   cpufreq_suspend+0xdc/0x160\n   device_shutdown+0x18/0x200\n   kernel_restart+0x40/0x80\n   arm64_sys_reboot+0x1b0/0x200\n\nFix this by adding cpus_read_lock()/cpus_read_unlock() to\ncpufreq_suspend() to block CPU hotplug operations while suspend is in\nprogress.\n\n[ rjw: Changelog edits ]",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64378": {
+                "cve_id": "CVE-2026-64378",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwriteback: fix race between cgroup_writeback_umount() and inode_switch_wbs()\n\nWhen a container exits, the following BUG_ON() is occasionally triggered:\n\n==================================================================\n VFS: Busy inodes after unmount of sdb (ext4)\n ------------[ cut here ]------------\n kernel BUG at fs/super.c:695!\n CPU: 3 PID: 6 Comm: containerd-shim Tainted: G OE K 6.6 #1\n pstate: 63400009 (nZCv daif +PAN -UAO +TCO +DIT -SSBS BTYPE=--)\n pc : generic_shutdown_super+0xf0/0x100\n lr : generic_shutdown_super+0xf0/0x100\n Call trace:\n  generic_shutdown_super+0xf0/0x100\n  kill_block_super+0x20/0x48\n  ext4_kill_sb+0x28/0x60\n  deactivate_locked_super+0x54/0x130\n  deactivate_super+0x84/0xa0\n  cleanup_mnt+0xa4/0x140\n  __cleanup_mnt+0x18/0x28\n  task_work_run+0x78/0xe0\n  do_notify_resume+0x204/0x240\n==================================================================\n\nThe root cause is a race between cgroup_writeback_umount() and\ninode_switch_wbs()/cleanup_offline_cgwb(). There is a window between\ninode_prepare_wbs_switch() returning true and the subsequent\nwb_queue_isw() call. Following is the process that triggers the issue:\n\n      CPU A (umount)           |          CPU B (writeback)\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n                                 inode_switch_wbs/cleanup_offline_cgwb\n                                  atomic_inc(&isw_nr_in_flight)\n                                  inode_prepare_wbs_switch\n                                   -> passes SB_ACTIVE check\n                                   __iget(inode)\n generic_shutdown_super\n  sb->s_flags &= ~SB_ACTIVE\n  cgroup_writeback_umount(sb)\n   smp_mb()\n   atomic_read(&isw_nr_in_flight)\n   rcu_barrier()\n    -> no pending RCU callbacks\n   flush_workqueue(isw_wq)\n    -> nothing queued, returns\n  evict_inodes(sb)\n   -> Inode skipped as isw still holds a ref.\n  sop->put_super(sb)\n   /* destroys percpu counters */\n  -> VFS: Busy inodes after unmount!\n                                  wb_queue_isw()\n                                   queue_work(isw_wq, ...)\n                                  /* later in work function */\n                                  inode_switch_wbs_work_fn\n                                   process_inode_switch_wbs\n                                    iput() -> evict\n                                     percpu_counter_dec() // UAF!\n\nFix this by extending the RCU read-side critical section in\ninode_switch_wbs() and cleanup_offline_cgwb() to cover from\ninode_prepare_wbs_switch() through wb_queue_isw().  Since there is\nno sleep in this window, rcu_read_lock() can be used.  Then add a\nsynchronize_rcu() in cgroup_writeback_umount() before the existing\nrcu_barrier(), so that all in-flight switchers that have passed the\nSB_ACTIVE check have completed queue_work() before flush_workqueue()\nis called.\n\nThe existing rcu_barrier() is intentionally retained so this fix can\nbe backported unchanged to stable kernels (5.10.y, 6.6.y, ...) that\nstill queue switches via queue_rcu_work(). It is a no-op on current\nmainline (since commit e1b849cfa6b6 (\"writeback: Avoid contention on\nwb->list_lock when switching inodes\")) and is removed in a follow-up\npatch.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64479": {
+                "cve_id": "CVE-2026-64479",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: seq: Fix uninitialised heap leak in snd_seq_event_dup()\n\nsnd_seq_event_dup() copies an incoming event into a pool cell and, in\nthe UMP-enabled build, clears the trailing cell->ump.raw.extra word that\nthe memcpy() did not cover.  The guard deciding whether to clear it\ncompares the copied size against sizeof(cell->event):\n\n\tmemcpy(&cell->ump, event, size);\n\tif (size < sizeof(cell->event))\n\t\tcell->ump.raw.extra = 0;\n\nFor a legacy (non-UMP) event, size == sizeof(struct snd_seq_event) ==\nsizeof(cell->event), so the condition is false and the extra word keeps\nstale data.  The cell pool is allocated with kvmalloc() (not zeroed) and\ncells are reused via a free list, so that word holds uninitialised heap\nor leftover event data.\n\nWhen such a cell is delivered to a UMP client (client->midi_version > 0)\nthat set SNDRV_SEQ_FILTER_NO_CONVERT -- so the legacy event reaches it\nunconverted -- snd_seq_read() reads it out as the larger struct\nsnd_seq_ump_event and copies the stale word to user space, a 4-byte\nkernel heap infoleak to an unprivileged /dev/snd/seq client.\n\nCompare against sizeof(cell->ump) instead, so the trailing word is zeroed\nfor every event shorter than the UMP cell.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64485": {
+                "cve_id": "CVE-2026-64485",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: compress: Fix task creation error unwind\n\nsnd_compr_task_new() allocates the driver task before validating the\nreturned DMA buffers and reserving file descriptors. When either of\nthose later steps fails, the core frees its task wrapper and DMA-buffer\nreferences without calling the driver's task_free() callback. Any\ndriver resources allocated by task_create() are therefore leaked.\n\nThe dual-fd allocation path also jumps to cleanup without storing the\nnegative get_unused_fd_flags() result in retval. Since retval still\ncontains the successful task_create() return value, TASK_CREATE can\nincorrectly report success although the task was discarded.\n\nPreserve the fd allocation errors and call task_free() when failure\noccurs after a successful task_create() callback.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64490": {
+                "cve_id": "CVE-2026-64490",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: virtio: Validate control metadata from the device\n\nvirtio-snd control handling trusts the device-provided control type and\nvalue count returned by the device.\n\nThat metadata is then used directly to index g_v2a_type_map[] in\nvirtsnd_kctl_info(), and to size loops and memcpy() operations in\nvirtsnd_kctl_get() and virtsnd_kctl_put() against fixed-size\nvirtio_snd_ctl_value and snd_ctl_elem_value arrays.\n\nA buggy or malicious device can therefore trigger out-of-bounds access by\nadvertising an invalid control type or an oversized value count.\n\nValidate control type and count once in virtsnd_kctl_parse_cfg(), before\nquerying enumerated items or exposing the control to ALSA.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64530": {
+                "cve_id": "CVE-2026-64530",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: cls_api: Handle TC_ACT_CONSUMED in tcf_qevent_handle\n\ntcf_classify() can return TC_ACT_CONSUMED while the skb is held by the\ndefragmentation engine (e.g. act_ct on out-of-order fragments). When\nthat happens the skb is no longer owned by the caller and must not be\ntouched again.\n\ntcf_qevent_handle() did not handle TC_ACT_CONSUMED: it fell through the\nswitch and returned the skb to the caller as if classification had\npassed. The only qdisc that wires up qevents today is RED, via three call sites\n(qe_mark on RED_PROB_MARK/HARD_MARK, qe_early_drop on congestion_drop)\nred_enqueue() was continuing to operate on an skb it no longer owns  in this\ncase -- enqueueing it, dropping it, or updating statistics. Resulting in a UAF.\n\n  tc qdisc add dev eth0 root handle 1: red ... qevent early_drop block 10\n  tc filter add block 10 ... action ct\n\n  (with ct defrag enabled and traffic that produces out-of-order\n  fragments, e.g. a fragmented UDP stream)\n\nHandle TC_ACT_CONSUMED in tcf_qevent_handle() the same way the ingress\nand egress fast paths do: treat it as stolen and return NULL without\ntouching the skb. Unlike the TC_ACT_STOLEN case, the skb must not be\ndropped/freed here, as it is no longer owned by us.",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
