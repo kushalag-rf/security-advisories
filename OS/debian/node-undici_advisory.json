@@ -131,10 +131,49 @@
                 "title": "undici's cache interceptor mishandles malformed Cache-Control pri ...",
                 "description": "undici's cache interceptor mishandles malformed Cache-Control private directives. In undici 7.0.0 up to before 7.29.0 and 8.0.0 up to before 8.9.0, a response carrying a degenerate qualified private directive, such as private set to an empty value, can be stored in the default shared cache and later served to a different caller with the same cache key, disclosing private response bodies and headers including Set-Cookie. Separately, a Cache-Control header that combines an unqualified private directive with a qualified one triggers an uncaught TypeError in the cache-control parser, which rejects the request and, depending on the consumer's error handling, can terminate the process. Both issues affect applications using the cache interceptor in shared mode, including the default configuration. The issues are fixed in undici 7.29.0 and 8.9.0.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3"
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    }
+                ]
+            },
+            "CVE-2026-14643": {
+                "cve_id": "CVE-2026-14643",
+                "title": "undici's cache interceptor mishandles optional whitespace placed  ...",
+                "description": "undici's cache interceptor mishandles optional whitespace placed around the equals sign of a qualified no-cache or private Cache-Control directive. In undici from 7.0.0 up to before 7.29.0 and from 8.0.0 up to before 8.9.0, the parser either drops the directive or stores a field name with literal quote characters, so the cache decision fails to recognize the qualification and the response is stored. In shared-cache mode, this lets a response containing one user's authenticated data be served from cache to a later caller, including an unauthenticated one, when both requests resolve to the same cache key. It affects applications that enable the cache interceptor in shared mode, forward Authorization headers upstream, and receive cacheable responses with qualified directives padded with whitespace around the equals sign. This is the whitespace-around-equals variant that the fix for CVE-2026-9678 did not normalize, and it is fixed in undici 7.29.0 and 8.9.0.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    }
+                ]
+            },
+            "CVE-2026-15157": {
+                "cve_id": "CVE-2026-15157",
+                "title": "undici does not validate the type property of a duck-typed blob-l ...",
+                "description": "undici does not validate the type property of a duck-typed blob-like request body before using it as the Content-Type header on the HTTP/1.1 dispatcher. In undici before 6.28.0, from 7.0.0 up to before 7.29.0, and from 8.0.0 up to before 8.9.0, an application that passes a hand-rolled blob-like body (via request, stream, pipeline, or dispatch) whose type is derived from untrusted input allows an attacker to inject CRLF sequences and append arbitrary HTTP headers, potentially smuggling a second request past the upstream. Native Blob objects are safe because their constructor strips CRLF from the type, and fetch is unaffected because it validates headers, but ecosystem libraries that build duck-typed blob shapes from user input can reach the vulnerable path. This is the same defect class as CVE-2022-35948 and CVE-2026-1527, on a header sink that the earlier fixes did not cover. The issue is fixed in undici 6.28.0, 7.29.0, and 8.9.0.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
                     }
                 ]
             },
@@ -190,15 +229,37 @@
                     }
                 ]
             },
+            "CVE-2026-16728": {
+                "cve_id": "CVE-2026-16728",
+                "title": "undici's retry interceptor can deliver a response whose body leng ...",
+                "description": "undici's retry interceptor can deliver a response whose body length does not match the Content-Length header exposed to the application after a retry or resume of a partial response. In undici before 6.28.0, from 7.0.0 up to before 7.29.0, and from 8.0.0 up to before 8.9.0, a malicious or faulty upstream can return a partial response with a mismatched framing header, close the socket early, and have the retry interceptor assemble a body of a different length while the original Content-Length stays attached. Applications that use the retry interceptor and forward upstream headers and bodies downstream, such as proxies or gateways, may then emit an invalid HTTP response with a stale Content-Length, leading to downstream response desynchronization, connection hangs, or response corruption. Exploitation requires the retry interceptor enabled, an upstream returning a mismatched partial response, and a downstream forwarder that does not remove or recalculate Content-Length. The issue is fixed in undici 6.28.0, 7.29.0, and 8.9.0.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    }
+                ]
+            },
             "CVE-2026-16729": {
                 "cve_id": "CVE-2026-16729",
                 "title": "undici's setCookie function does not fully sanitize cookie attrib ...",
                 "description": "undici's setCookie function does not fully sanitize cookie attributes. In undici before 6.28.0, from 7.0.0 up to before 7.29.0, and from 8.0.0 up to before 8.9.0, a domain value is not checked for semicolons and entries in the unparsed array are not sanitized, so attacker-influenced input can inject additional cookie attributes. For example, a domain value containing a semicolon can append attributes such as SameSite, and an unparsed entry can inject attributes such as HttpOnly, without the caller setting them. Applications that pass user-controlled input to these fields, such as multi-tenant or reverse-proxy servers that scope session cookies to a tenant-supplied domain, can have SameSite CSRF protections bypassed, or the Secure, HttpOnly, and SameSite attributes forced, stripped, or overridden. The issue is fixed in undici 6.28.0, 7.29.0, and 8.9.0.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3"
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
                     }
                 ]
             },
@@ -449,10 +510,49 @@
                 "title": "undici's cache interceptor mishandles malformed Cache-Control pri ...",
                 "description": "undici's cache interceptor mishandles malformed Cache-Control private directives. In undici 7.0.0 up to before 7.29.0 and 8.0.0 up to before 8.9.0, a response carrying a degenerate qualified private directive, such as private set to an empty value, can be stored in the default shared cache and later served to a different caller with the same cache key, disclosing private response bodies and headers including Set-Cookie. Separately, a Cache-Control header that combines an unqualified private directive with a qualified one triggers an uncaught TypeError in the cache-control parser, which rejects the request and, depending on the consumer's error handling, can terminate the process. Both issues affect applications using the cache interceptor in shared mode, including the default configuration. The issues are fixed in undici 7.29.0 and 8.9.0.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3"
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    }
+                ]
+            },
+            "CVE-2026-14643": {
+                "cve_id": "CVE-2026-14643",
+                "title": "undici's cache interceptor mishandles optional whitespace placed  ...",
+                "description": "undici's cache interceptor mishandles optional whitespace placed around the equals sign of a qualified no-cache or private Cache-Control directive. In undici from 7.0.0 up to before 7.29.0 and from 8.0.0 up to before 8.9.0, the parser either drops the directive or stores a field name with literal quote characters, so the cache decision fails to recognize the qualification and the response is stored. In shared-cache mode, this lets a response containing one user's authenticated data be served from cache to a later caller, including an unauthenticated one, when both requests resolve to the same cache key. It affects applications that enable the cache interceptor in shared mode, forward Authorization headers upstream, and receive cacheable responses with qualified directives padded with whitespace around the equals sign. This is the whitespace-around-equals variant that the fix for CVE-2026-9678 did not normalize, and it is fixed in undici 7.29.0 and 8.9.0.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    }
+                ]
+            },
+            "CVE-2026-15157": {
+                "cve_id": "CVE-2026-15157",
+                "title": "undici does not validate the type property of a duck-typed blob-l ...",
+                "description": "undici does not validate the type property of a duck-typed blob-like request body before using it as the Content-Type header on the HTTP/1.1 dispatcher. In undici before 6.28.0, from 7.0.0 up to before 7.29.0, and from 8.0.0 up to before 8.9.0, an application that passes a hand-rolled blob-like body (via request, stream, pipeline, or dispatch) whose type is derived from untrusted input allows an attacker to inject CRLF sequences and append arbitrary HTTP headers, potentially smuggling a second request past the upstream. Native Blob objects are safe because their constructor strips CRLF from the type, and fetch is unaffected because it validates headers, but ecosystem libraries that build duck-typed blob shapes from user input can reach the vulnerable path. This is the same defect class as CVE-2022-35948 and CVE-2026-1527, on a header sink that the earlier fixes did not cover. The issue is fixed in undici 6.28.0, 7.29.0, and 8.9.0.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
                     }
                 ]
             },
@@ -508,15 +608,37 @@
                     }
                 ]
             },
+            "CVE-2026-16728": {
+                "cve_id": "CVE-2026-16728",
+                "title": "undici's retry interceptor can deliver a response whose body leng ...",
+                "description": "undici's retry interceptor can deliver a response whose body length does not match the Content-Length header exposed to the application after a retry or resume of a partial response. In undici before 6.28.0, from 7.0.0 up to before 7.29.0, and from 8.0.0 up to before 8.9.0, a malicious or faulty upstream can return a partial response with a mismatched framing header, close the socket early, and have the retry interceptor assemble a body of a different length while the original Content-Length stays attached. Applications that use the retry interceptor and forward upstream headers and bodies downstream, such as proxies or gateways, may then emit an invalid HTTP response with a stale Content-Length, leading to downstream response desynchronization, connection hangs, or response corruption. Exploitation requires the retry interceptor enabled, an upstream returning a mismatched partial response, and a downstream forwarder that does not remove or recalculate Content-Length. The issue is fixed in undici 6.28.0, 7.29.0, and 8.9.0.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    }
+                ]
+            },
             "CVE-2026-16729": {
                 "cve_id": "CVE-2026-16729",
                 "title": "undici's setCookie function does not fully sanitize cookie attrib ...",
                 "description": "undici's setCookie function does not fully sanitize cookie attributes. In undici before 6.28.0, from 7.0.0 up to before 7.29.0, and from 8.0.0 up to before 8.9.0, a domain value is not checked for semicolons and entries in the unparsed array are not sanitized, so attacker-influenced input can inject additional cookie attributes. For example, a domain value containing a semicolon can append attributes such as SameSite, and an unparsed entry can inject attributes such as HttpOnly, without the caller setting them. Applications that pass user-controlled input to these fields, such as multi-tenant or reverse-proxy servers that scope session cookies to a tenant-supplied domain, can have SameSite CSRF protections bypassed, or the Secure, HttpOnly, and SameSite attributes forced, stripped, or overridden. The issue is fixed in undici 6.28.0, 7.29.0, and 8.9.0.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3"
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
                     }
                 ]
             },
@@ -767,10 +889,49 @@
                 "title": "undici's cache interceptor mishandles malformed Cache-Control pri ...",
                 "description": "undici's cache interceptor mishandles malformed Cache-Control private directives. In undici 7.0.0 up to before 7.29.0 and 8.0.0 up to before 8.9.0, a response carrying a degenerate qualified private directive, such as private set to an empty value, can be stored in the default shared cache and later served to a different caller with the same cache key, disclosing private response bodies and headers including Set-Cookie. Separately, a Cache-Control header that combines an unqualified private directive with a qualified one triggers an uncaught TypeError in the cache-control parser, which rejects the request and, depending on the consumer's error handling, can terminate the process. Both issues affect applications using the cache interceptor in shared mode, including the default configuration. The issues are fixed in undici 7.29.0 and 8.9.0.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3"
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    }
+                ]
+            },
+            "CVE-2026-14643": {
+                "cve_id": "CVE-2026-14643",
+                "title": "undici's cache interceptor mishandles optional whitespace placed  ...",
+                "description": "undici's cache interceptor mishandles optional whitespace placed around the equals sign of a qualified no-cache or private Cache-Control directive. In undici from 7.0.0 up to before 7.29.0 and from 8.0.0 up to before 8.9.0, the parser either drops the directive or stores a field name with literal quote characters, so the cache decision fails to recognize the qualification and the response is stored. In shared-cache mode, this lets a response containing one user's authenticated data be served from cache to a later caller, including an unauthenticated one, when both requests resolve to the same cache key. It affects applications that enable the cache interceptor in shared mode, forward Authorization headers upstream, and receive cacheable responses with qualified directives padded with whitespace around the equals sign. This is the whitespace-around-equals variant that the fix for CVE-2026-9678 did not normalize, and it is fixed in undici 7.29.0 and 8.9.0.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    }
+                ]
+            },
+            "CVE-2026-15157": {
+                "cve_id": "CVE-2026-15157",
+                "title": "undici does not validate the type property of a duck-typed blob-l ...",
+                "description": "undici does not validate the type property of a duck-typed blob-like request body before using it as the Content-Type header on the HTTP/1.1 dispatcher. In undici before 6.28.0, from 7.0.0 up to before 7.29.0, and from 8.0.0 up to before 8.9.0, an application that passes a hand-rolled blob-like body (via request, stream, pipeline, or dispatch) whose type is derived from untrusted input allows an attacker to inject CRLF sequences and append arbitrary HTTP headers, potentially smuggling a second request past the upstream. Native Blob objects are safe because their constructor strips CRLF from the type, and fetch is unaffected because it validates headers, but ecosystem libraries that build duck-typed blob shapes from user input can reach the vulnerable path. This is the same defect class as CVE-2022-35948 and CVE-2026-1527, on a header sink that the earlier fixes did not cover. The issue is fixed in undici 6.28.0, 7.29.0, and 8.9.0.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
                     }
                 ]
             },
@@ -826,15 +987,37 @@
                     }
                 ]
             },
+            "CVE-2026-16728": {
+                "cve_id": "CVE-2026-16728",
+                "title": "undici's retry interceptor can deliver a response whose body leng ...",
+                "description": "undici's retry interceptor can deliver a response whose body length does not match the Content-Length header exposed to the application after a retry or resume of a partial response. In undici before 6.28.0, from 7.0.0 up to before 7.29.0, and from 8.0.0 up to before 8.9.0, a malicious or faulty upstream can return a partial response with a mismatched framing header, close the socket early, and have the retry interceptor assemble a body of a different length while the original Content-Length stays attached. Applications that use the retry interceptor and forward upstream headers and bodies downstream, such as proxies or gateways, may then emit an invalid HTTP response with a stale Content-Length, leading to downstream response desynchronization, connection hangs, or response corruption. Exploitation requires the retry interceptor enabled, an upstream returning a mismatched partial response, and a downstream forwarder that does not remove or recalculate Content-Length. The issue is fixed in undici 6.28.0, 7.29.0, and 8.9.0.",
+                "severity": "MEDIUM",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    }
+                ]
+            },
             "CVE-2026-16729": {
                 "cve_id": "CVE-2026-16729",
                 "title": "undici's setCookie function does not fully sanitize cookie attrib ...",
                 "description": "undici's setCookie function does not fully sanitize cookie attributes. In undici before 6.28.0, from 7.0.0 up to before 7.29.0, and from 8.0.0 up to before 8.9.0, a domain value is not checked for semicolons and entries in the unparsed array are not sanitized, so attacker-influenced input can inject additional cookie attributes. For example, a domain value containing a semicolon can append attributes such as SameSite, and an unparsed entry can inject attributes such as HttpOnly, without the caller setting them. Applications that pass user-controlled input to these fields, such as multi-tenant or reverse-proxy servers that scope session cookies to a tenant-supplied domain, can have SameSite CSRF protections bypassed, or the Secure, HttpOnly, and SameSite attributes forced, stripped, or overridden. The issue is fixed in undici 6.28.0, 7.29.0, and 8.9.0.",
                 "severity": "MEDIUM",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3"
+                        "introduced": "0:5.15.0+dfsg1+~cs20.10.9.3-1+deb12u3",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
+                    },
+                    {
+                        "introduced": "0:5.28.4+dfsg1+~cs23.12.11-2",
+                        "fixed": "0:8.9.0+dfsg+~cs3.2.0-1"
                     }
                 ]
             },
