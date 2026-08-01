@@ -20302,23 +20302,6 @@
                     }
                 ]
             },
-            "CVE-2026-23467": {
-                "cve_id": "CVE-2026-23467",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/dmc: Fix an unlikely NULL pointer deference at probe\n\nintel_dmc_update_dc6_allowed_count() oopses when DMC hasn't been\ninitialized, and dmc is thus NULL.\n\nThat would be the case when the call path is\nintel_power_domains_init_hw() -> {skl,bxt,icl}_display_core_init() ->\ngen9_set_dc_state() -> intel_dmc_update_dc6_allowed_count(), as\nintel_power_domains_init_hw() is called *before* intel_dmc_init().\n\nHowever, gen9_set_dc_state() calls intel_dmc_update_dc6_allowed_count()\nconditionally, depending on the current and target DC states. At probe,\nthe target is disabled, but if DC6 is enabled, the function is called,\nand an oops follows. Apparently it's quite unlikely that DC6 is enabled\nat probe, as we haven't seen this failure mode before.\n\nIt is also strange to have DC6 enabled at boot, since that would require\nthe DMC firmware (loaded by BIOS); the BIOS loading the DMC firmware and\nthe driver stopping / reprogramming the firmware is a poorly specified\nsequence and as such unlikely an intentional BIOS behaviour. It's more\nlikely that BIOS is leaving an unintentionally enabled DC6 HW state\nbehind (without actually loading the required DMC firmware for this).\n\nThe tracking of the DC6 allowed counter only works if starting /\nstopping the counter depends on the _SW_ DC6 state vs. the current _HW_\nDC6 state (since stopping the counter requires the DC5 counter captured\nwhen the counter was started). Thus, using the HW DC6 state is incorrect\nand it also leads to the above oops. Fix both issues by using the SW DC6\nstate for the tracking.\n\nThis is v2 of the fix originally sent by Jani, updated based on the\nfirst Link: discussion below.\n\n(cherry picked from commit 2344b93af8eb5da5d496b4e0529d35f0f559eaf0)",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-23471": {
                 "cve_id": "CVE-2026-23471",
                 "title": "Rejected reason: This CVE ID has been rejected or withdrawn by it ...",
@@ -22138,23 +22121,6 @@
                     }
                 ]
             },
-            "CVE-2026-31571": {
-                "cve_id": "CVE-2026-31571",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915: Unlink NV12 planes earlier\n\nunlink_nv12_plane() will clobber parts of the plane state\npotentially already set up by plane_atomic_check(), so we\nmust make sure not to call the two in the wrong order.\nThe problem happens when a plane previously selected as\na Y plane is now configured as a normal plane by user space.\nplane_atomic_check() will first compute the proper plane\nstate based on the userspace request, and unlink_nv12_plane()\nlater clears some of the state.\n\nThis used to work on account of unlink_nv12_plane() skipping\nthe state clearing based on the plane visibility. But I removed\nthat check, thinking it was an impossible situation. Now when\nthat situation happens unlink_nv12_plane() will just WARN\nand proceed to clobber the state.\n\nRather than reverting to the old way of doing things, I think\nit's more clear if we unlink the NV12 planes before we even\ncompute the new plane state.\n\n(cherry picked from commit 017ecd04985573eeeb0745fa2c23896fb22ee0cc)",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-31572": {
                 "cve_id": "CVE-2026-31572",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -23418,23 +23384,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: ulpi: fix double free in ulpi_register_interface() error path\n\nWhen device_register() fails, ulpi_register() calls put_device() on\nulpi->dev.\n\nThe device release callback ulpi_dev_release() drops the OF node\nreference and frees ulpi, but the current error path in\nulpi_register_interface() then calls kfree(ulpi) again, causing a\ndouble free.\n\nLet put_device() handle the cleanup through ulpi_dev_release() and\navoid freeing ulpi again in ulpi_register_interface().",
                 "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-31767": {
-                "cve_id": "CVE-2026-31767",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/dsi: Don't do DSC horizontal timing adjustments in command mode\n\nStop adjusting the horizontal timing values based on the\ncompression ratio in command mode. Bspec seems to be telling\nus to do this only in video mode, and this is also how the\nWindows driver does things.\n\nThis should also fix a div-by-zero on some machines because\nthe adjusted htotal ends up being so small that we end up with\nline_time_us==0 when trying to determine the vtotal value in\ncommand mode.\n\nNote that this doesn't actually make the display on the\nHuawei Matebook E work, but at least the kernel no longer\nexplodes when the driver loads.\n\n(cherry picked from commit 0b475e91ecc2313207196c6d7fd5c53e1a878525)",
-                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -26905,23 +26854,6 @@
                     }
                 ]
             },
-            "CVE-2026-43477": {
-                "cve_id": "CVE-2026-43477",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/vrr: Configure VRR timings after enabling TRANS_DDI_FUNC_CTL\n\nApparently ICL may hang with an MCE if we write TRANS_VRR_VMAX/FLIPLINE\nbefore enabling TRANS_DDI_FUNC_CTL.\n\nPersonally I was only able to reproduce a hang (on an Dell XPS 7390\n2-in-1) with an external display connected via a dock using a dodgy\ntype-C cable that made the link training fail. After the failed\nlink training the machine would hang. TGL seemed immune to the\nproblem for whatever reason.\n\nBSpec does tell us to configure VRR after enabling TRANS_DDI_FUNC_CTL\nas well. The DMC firmware also does the VRR restore in two stages:\n- first stage seems to be unconditional and includes TRANS_VRR_CTL\n  and a few other VRR registers, among other things\n- second stage is conditional on the DDI being enabled,\n  and includes TRANS_DDI_FUNC_CTL and TRANS_VRR_VMAX/VMIN/FLIPLINE,\n  among other things\n\nSo let's reorder the steps to match to avoid the hang, and\ntoss in an extra WARN to make sure we don't screw this up later.\n\nBSpec: 22243\n(cherry picked from commit 93f3a267c3dd4d811b224bb9e179a10d81456a74)",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-43478": {
                 "cve_id": "CVE-2026-43478",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -30256,23 +30188,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: ipset: stop hash:* range iteration at end\n\nThe following hash set variants:\n\nhash:ip,mark\nhash:ip,port\nhash:ip,port,ip\nhash:ip,port,net\n\niterate IPv4 ranges with a 32-bit iterator.\n\nThe iterator must stop once the last address in the requested range has\nbeen processed. Advancing it once more can move the traversal state past\nthe end of the request, so a later retry may continue from an unintended\nposition.\n\nHandle the iterator increment explicitly at the end of the loop and stop\nonce the upper bound has been processed. This keeps the existing retry\nbehaviour intact for valid ranges while preventing traversal from\ncontinuing past the original boundary.",
                 "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-52923": {
-                "cve_id": "CVE-2026-52923",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipc: limit next_id allocation to the valid ID range\n\nThe checkpoint/restore sysctl path can request the next SysV IPC id\nthrough ids->next_id.  ipc_idr_alloc() currently forwards that request to\nidr_alloc() with an open-ended upper bound.\n\nIf the valid tail of the SysV IPC id space is full, the allocation can\nspill beyond ipc_mni.  The returned SysV IPC id still uses the normal\nindex encoding, so later lookup and removal can target the wrong slot. \nThis leaves the real IDR entry behind and breaks the IDR state for the\nobject.\n\nThe bug is in ipc_idr_alloc() in the checkpoint/restore path.\n\n1. ids->next_id is passed to:\n\n       idr_alloc(&ids->ipcs_idr, new, ipcid_to_idx(next_id), 0, ...)\n\n2. The zero upper bound makes the allocation effectively open-ended.\n   Once the valid SysV IPC tail is occupied, idr_alloc() can spill past\n   ipc_mni and allocate an entry beyond the valid IPC id range.\n\n3. The new object id is still encoded with the narrower SysV IPC index\n   width:\n\n       new->id = (new->seq << ipcmni_seq_shift()) + idx\n\n4. Later removal goes through ipc_rmid(), which uses:\n\n       ipcid_to_idx(ipcp->id)\n\n   That truncates the real IDR index. An object actually stored at a\n   high index can then be removed as if it lived at a low in-range\n   index.\n\n5. For shared memory, shm_destroy() frees the current object anyway, but\n   the real high IDR slot is left behind as a dangling pointer.\n\n6. A subsequent walk of /proc/sysvipc/shm reaches the stale IDR entry\n   and dereferences freed memory.\n\nPrevent this by bounding the requested allocation to ipc_mni so the\ncheckpoint/restore path fails once the valid range is exhausted.",
-                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -34571,23 +34486,6 @@
                     }
                 ]
             },
-            "CVE-2026-63807": {
-                "cve_id": "CVE-2026-63807",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: x86/mmu: Ensure hugepage is in by slot before checking max mapping level\n\nWhen recovering hugepages in the shadow MMU, verify that the base gfn of\nthe shadow page is actually contained within the target memslot, *before*\nquerying the max mapping level given the shadow page's gfn.  Failure to\npre-check the validity of the gfn can lead to an out-of-bounds access to\nthe slot's lpage_info (which typically manifests as a host #PF because the\nlpage_info is vmalloc'd) if the guest creates a hugepage mapping (in its\nPTEs) that extends \"below\" the bounds of a memslot.\n\nWhen faulting in memory for a guest, and the size of the guest mapping is\ngreater than KVM's (current) max mapping, then KVM will create a \"direct\"\nshadow page (direct in that there are no gPTEs to shadow, and so the target\ngfn is a direct calculation given the base gfn of the shadow page).  The\nhugepage recovery flow looks for such direct shadow pages, as forcing 4KiB\nmappings when dirty logging generates the guest > host mapping size case.\nWhen the 4KiB restriction is lifted, then KVM can replace the shadow page\nwith a hugepage.\n\nBut if KVM originally used a smaller mapping than the guest because the\nrange of memory covered by the guest hugepage exceeds the bounds of a\nmemslot, then KVM will link a direct shadow page with a gfn that is outside\nthe bounds of the memslot being used to fault in memory.  The rmap entry\nadded for the leaf mapping is correct and within bounds, but the gfn of the\nleaf SPTE's parent shadow page will be out of bounds.\n\n  BUG: unable to handle page fault for address: ffffc90000806ffc\n  #PF: supervisor read access in kernel mode\n  #PF: error_code(0x0000) - not-present page\n  PGD 100000067 P4D 100000067 PUD 1002a7067 PMD 10612f067 PTE 0\n  Oops: Oops: 0000 [#1] SMP\n  CPU: 13 UID: 1000 PID: 757 Comm: mmu_stress_test Not tainted 7.1.0-rc1-48ce1e26eace-x86_pir_to_irr_comments-vm #341 PREEMPT\n  Hardware name: QEMU Standard PC (Q35 + ICH9, 2009), BIOS 0.0.0 02/06/2015\n  RIP: 0010:kvm_mmu_max_mapping_level+0x79/0x2b0 [kvm]\n  Call Trace:\n   <TASK>\n   kvm_mmu_recover_huge_pages+0x21b/0x320 [kvm]\n   kvm_set_memslot+0x1ee/0x590 [kvm]\n   kvm_set_memory_region.part.0+0x3a1/0x4d0 [kvm]\n   kvm_vm_ioctl+0x9bf/0x15d0 [kvm]\n   __x64_sys_ioctl+0x8a/0xd0\n   do_syscall_64+0xb7/0xbb0\n   entry_SYSCALL_64_after_hwframe+0x4b/0x53\n  RIP: 0033:0x7f21c0f1a9bf\n   </TASK>\n\nDon't bother pre-checking the bounds of the potential hugepage, i.e. don't\ncheck that e.g. sp->gfn + KVM_PAGES_PER_HPAGE(sp->role.level + 1) is also\nwithin the memslot, as the checks performed by kvm_mmu_max_mapping_level()\nare a superset of the basic bounds checks.  I.e. pre-checking the full\nrange would be a dubious micro-optimization.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-63808": {
                 "cve_id": "CVE-2026-63808",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -34809,6 +34707,40 @@
                     }
                 ]
             },
+            "CVE-2026-63855": {
+                "cve_id": "CVE-2026-63855",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vcn: set no_user_fence for VCN v2.5 enc/dec rings\n\nVCN encoder and decoder rings do not support 64-bit user fence writes,\nreject CS submissions with user fences.\n\n(cherry picked from commit efc9dd5590894109bce9a0bfe1fa5592dd6b20b1)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63856": {
+                "cve_id": "CVE-2026-63856",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vcn: set no_user_fence for VCN v2.0 enc/dec rings\n\nVCN encoder and decoder rings do not support 64-bit user fence writes,\nreject CS submissions with user fences.\n\n(cherry picked from commit e2b5499fca55f1a32960a311bbb62e35891eaf73)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63858": {
                 "cve_id": "CVE-2026-63858",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -34933,6 +34865,91 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mctp: usb: fix race between urb completion and rx_retry cancellation\n\nIt's possible that sequencing between setting ->stopped and cancelling\nthe rx_retry work (in ndo_stop) could leave us with an urb queued:\n\n    T1: ndo_stop                  T2: rx_retry_work\n    ------------                  ----------------\n                                  LD: ->stopped => false\n    ST: ->stopped <= true\n    usb_kill_urb()\n                                  mctp_usb_rx_queue()\n                                    usb_submit_urb()\n    cancel_delayed_work_sync()\n\nThat urb completion can then re-schedule rx_retry_work.\n\nStrenghen the sequencing between the stop (preventing another requeue)\nand the cancel by updating both atomically under a new rx lock. After\nsetting ->rx_stopped, and cancelling pending work, we know that the\nrequeue cannot occur, so all that's left is killing any pending urb.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63878": {
+                "cve_id": "CVE-2026-63878",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: check num_entries in GEM_OP GET_MAPPING_INFO\n\nkvcalloc(args->num_entries, sizeof(*vm_entries), GFP_KERNEL) at\namdgpu_gem.c:1050 uses the user-supplied num_entries directly without\nany upper bounds check. Since num_entries is a __u32 and\nsizeof(drm_amdgpu_gem_vm_entry) is 32 bytes, a large num_entries\nproduces an allocation exceeding INT_MAX, triggering\nWARNING in __kvmalloc_node_noprof(), causing a kernel WARNING,\nTAINT_WARN, and panic on CONFIG_PANIC_ON_WARN=y systems.\n\nAdd a size bounds check before we invoke the kvzalloc() to\nreject oversized num_entries early with -EINVAL.\n\n(cherry picked from commit 1fe7bf5457f6efd7be60b17e23163ba54341d73d)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63879": {
+                "cve_id": "CVE-2026-63879",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix amdgpu_hmm_range_get_pages\n\nThe notifier sequence must only be read once or otherwise we could work\nwith invalid pages.\n\nWhile at it also fix the coding style, e.g. drop the pre-initialized\nreturn value and use the common define for 2G range.\n\n(cherry picked from commit c08972f555945cda57b0adb72272a37910153390)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63880": {
+                "cve_id": "CVE-2026-63880",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix lock leak on ENOMEM in AMDGPU_GEM_OP_GET_MAPPING_INFO\n\nThe AMDGPU_GEM_OP_GET_MAPPING_INFO branch of amdgpu_gem_op_ioctl()\nholds three cleanup-tracked resources before calling kvcalloc():\nthe drm_gem_object reference from drm_gem_object_lookup(), the\ndrm_exec lock on the looked-up GEM via drm_exec_lock_obj(), and\nthe drm_exec lock on the per-process VM root page directory via\namdgpu_vm_lock_pd().  All three are released by the out_exec\nlabel that every other error path in this function jumps to.\nThe kvcalloc() failure path returns -ENOMEM directly, skipping\nout_exec and leaking all three.\n\nThe leaked per-process VM root PD dma_resv lock is the\nload-bearing leak: any subsequent operation on the same VM\n(further GEM ops, command-submission, eviction, TTM shrinker\ncallbacks) blocks on the held lock.  DRM_IOCTL_AMDGPU_GEM_OP is\nDRM_AUTH | DRM_RENDER_ALLOW, so this is an unprivileged-local\ndenial of service against the caller's GPU context, reachable\nby any process with /dev/dri/renderD* access.\n\nRoute the failure through out_exec so drm_exec_fini() and\ndrm_gem_object_put() run.\n\nReproduced on stock 7.0.0-10, Ryzen 7 5700U / Radeon Vega\n(Lucienne): the failing ioctl returns -ENOMEM and a second\nGET_MAPPING_INFO on the same fd then blocks in\ndrm_exec_lock_obj() on the leaked dma_resv.  SIGKILL on the\ncaller does not reap the task; the fd-release path during\nprocess exit goes through amdgpu_gem_object_close() ->\ndrm_exec_prepare_obj() on the same lock, leaving the task in D\nstate until the box is rebooted.  The patched kernel was not\nrebuilt and re-tested on this hardware; the fix is mechanical.\nTested on a single Lucienne / Vega box only.\n\nZiyi Guo posted an independent INT_MAX-bound check for\nargs->num_entries in the same branch [1]; the two patches are\ncomplementary and can land in either order.\n\n(cherry picked from commit b69d3256d79de15f54c322986ff4da68f1d65b0a)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63881": {
+                "cve_id": "CVE-2026-63881",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdkfd: fix a vulnerability of integer overflow in kfd debugger\n\nget_queue_ids() computes array_size = num_queues * sizeof(uint32_t),\nwhich could overflow on 32-bit size_t build. using array_size()\ninstead, it saturates to SIZE_MAX on overflow.\n\n(cherry picked from commit 2d57a0475f085c08b49312dfd8edcb461845f285)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63882": {
+                "cve_id": "CVE-2026-63882",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdkfd: fix NULL pointer bug in svm_range_set_attr\n\nThe process_info could be NULL if user doesn't call kfd_ioctl_acquire_vm\nbefore calling kfd_ioctl_svm.\n\n(cherry picked from commit 83a26c812e0529eb040d31a76f73e33e637243d4)",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -36101,6 +36118,23 @@
                     }
                 ]
             },
+            "CVE-2026-64024": {
+                "cve_id": "CVE-2026-64024",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntcp: fix stale per-CPU tcp_tw_isn leak enabling ISN prediction\n\nBlamed commit moved the TIME_WAIT-derived ISN from the skb control\nblock to a per-CPU variable, assuming the value would always be consumed\nby tcp_conn_request() for the same packet that wrote it. That assumption\nis violated by multiple drop paths between the producer\n(__this_cpu_write(tcp_tw_isn, isn) in tcp_v{4,6}_rcv()) and the consumer\n(tcp_conn_request()):\n\n - min_ttl / min_hopcount check\n - xfrm policy check\n - tcp_inbound_hash() MD5/AO mismatch\n - tcp_filter() eBPF/SO_ATTACH_FILTER drop\n - th->syn && th->fin discard in tcp_rcv_state_process() TCP_LISTEN\n - psp_sk_rx_policy_check() in tcp_v{4,6}_do_rcv()\n - tcp_checksum_complete() in tcp_v{4,6}_do_rcv()\n - tcp_v{4,6}_cookie_check() returning NULL\n\nWhen a packet is dropped on any of these paths, tcp_tw_isn is left set.\n\nThe next SYN processed on the same CPU then consumes the non zero value in\ntcp_conn_request(), receiving a potentially predictable ISN.\n\nThis patch moves back tcp_tw_isn to skb->cb[], getting rid of the per-cpu\nvariable.\n\nNote that tcp_v{4,6}_fill_cb() do not set it.\n\nVery litle impact on overall code size/complexity:\n\n$ scripts/bloat-o-meter -t vmlinux.old vmlinux.new\nadd/remove: 0/0 grow/shrink: 2/1 up/down: 8/-15 (-7)\nFunction                                     old     new   delta\ntcp_v6_rcv                                  3038    3042      +4\ntcp_v4_rcv                                  3035    3039      +4\ntcp_conn_request                            2938    2923     -15\nTotal: Before=24436060, After=24436053, chg -0.00%",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-64025": {
                 "cve_id": "CVE-2026-64025",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -36530,6 +36564,23 @@
                 "cve_id": "CVE-2026-64088",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbatman-adv: tt: fix negative tt_buff_len\n\nbatadv_orig_node::tt_buff_len was declared as s16, but the field is never\nintended to hold a negative value. When a value greater than 32767 is\nassigned, it wraps to a negative signed integer.\n\nIn batadv_send_other_tt_response(), tt_buff_len is temporarily widened to\ns32. The incorrectly negative s16 value propagates into the s32, causing\nbatadv_tt_prepare_tvlv_global_data() to allocate a full sized buffer but\npopulates only a small portion of it with the collected changeset. All\nremaining bits are kept uninitialized.\n\nUsing an u16 avoids this type confusion and ensures that no (negative) sign\nextension is performed in batadv_send_other_tt_response().",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64097": {
+                "cve_id": "CVE-2026-64097",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Validate GPIO pin LUT table size before iterating\n\n[Why&How]\nThe GPIO pin table parsers in get_gpio_i2c_info() and\nbios_parser_get_gpio_pin_info() derive an element count from the VBIOS\ntable_header.structuresize field, then iterate over gpio_pin[] entries.\nHowever, GET_IMAGE() only validates that the table header itself fits\nwithin the BIOS image. If the VBIOS reports a structuresize larger than\nthe actual mapped data, the loop reads past the end of the BIOS image,\ncausing an out-of-bounds read.\n\nFix this by calling bios_get_image() to validate that the full claimed\nstructuresize is accessible within the BIOS image before entering the\nloop in both functions.\n\n(cherry picked from commit ba5e95b43b773ae1bf1f66ee6b31eb774e65afe3)",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -37364,6 +37415,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (lm90) Add lock protection to lm90_alert\n\nSashiko reports:\n\nlm90_alert() executes in the smbus alert context and calls\nlm90_update_confreg() to disable the hardware alert line, without\nacquiring hwmon_lock.\n\nConcurrently, sysfs write operations (such as lm90_write_convrate) hold\nthe hwmon_lock, temporarily modify data->config, and then restore it.\n\nIf an alert interrupt occurs concurrently with a sysfs write, the sysfs\npath will overwrite the alert handler's modifications to data->config\nand the hardware register.\n\nThis unintentionally re-enables the hardware alert line while the alarm is\nstill active, causing an interrupt storm.\n\nAdd the missing lock to lm90_alert() to solve the problem.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64219": {
+                "cve_id": "CVE-2026-64219",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Validate payload length and link_index in dc_process_dmub_aux_transfer_async\n\n[Why&How]\ndc_process_dmub_aux_transfer_async() copies payload->length bytes into a\n16-byte stack buffer (dpaux.data[16]) guarded only by an ASSERT(), which\nis a no-op in release builds. If a caller ever passes length > 16 this\nresults in a stack buffer overflow via memcpy.\n\nAdditionally, link_index is used to dereference dc->links[] without\nbounds checking against dc->link_count, risking an out-of-bounds access.\n\nReplace the ASSERT with a hard runtime check that returns false when\npayload->length exceeds the destination buffer size, and add a bounds\ncheck for link_index before it is used.\n\n(cherry picked from commit ba4caa9fecdf7a38f98c878ad05a8a64148b6881)",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -39624,6 +39692,23 @@
                 "cve_id": "CVE-2026-64515",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: mac80211: fix MLE defragmentation\n\nIf either reconf or EPCS multi-link element (MLE) is contained in\na non-transmitted profile, the defragmentation routine is called\nwith a pointer to the defragmented copy, but the original elements.\n\nThis is incorrect for two reasons:\n - if the original defragmentation was needed, it will not find the\n   correct data\n - if the original frame is at a higher address, the parsing will\n   potentially overrun the heap data (though given the layout of\n   the buffers, only into the new defragmentation buffer, and then\n   it has to stop and fail once that's filled with copied data.\n\nFix it by tracking the container along with the pointer and in\ndoing so also unify the two almost identical defragmentation\nroutines.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64516": {
+                "cve_id": "CVE-2026-64516",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vce1: Fix VCE 1 firmware size and offsets\n\nThe VCPU BO contains the actual FW at an offset, but\nit was not calculated into the VCPU BO size.\nSubtract this from the FW size to make sure there is\nno out of bounds access.\n\nMake sure the stack and data offsets are aligned to\nthe 32K TLB size.\n\nCheck that the FW microcode actually fits in the\nspace that is reserved for it.\n\n(cherry picked from commit c16fe59f622a080fc457a57b3e8f14c780699449)",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -60456,23 +60541,6 @@
                     }
                 ]
             },
-            "CVE-2026-23467": {
-                "cve_id": "CVE-2026-23467",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/dmc: Fix an unlikely NULL pointer deference at probe\n\nintel_dmc_update_dc6_allowed_count() oopses when DMC hasn't been\ninitialized, and dmc is thus NULL.\n\nThat would be the case when the call path is\nintel_power_domains_init_hw() -> {skl,bxt,icl}_display_core_init() ->\ngen9_set_dc_state() -> intel_dmc_update_dc6_allowed_count(), as\nintel_power_domains_init_hw() is called *before* intel_dmc_init().\n\nHowever, gen9_set_dc_state() calls intel_dmc_update_dc6_allowed_count()\nconditionally, depending on the current and target DC states. At probe,\nthe target is disabled, but if DC6 is enabled, the function is called,\nand an oops follows. Apparently it's quite unlikely that DC6 is enabled\nat probe, as we haven't seen this failure mode before.\n\nIt is also strange to have DC6 enabled at boot, since that would require\nthe DMC firmware (loaded by BIOS); the BIOS loading the DMC firmware and\nthe driver stopping / reprogramming the firmware is a poorly specified\nsequence and as such unlikely an intentional BIOS behaviour. It's more\nlikely that BIOS is leaving an unintentionally enabled DC6 HW state\nbehind (without actually loading the required DMC firmware for this).\n\nThe tracking of the DC6 allowed counter only works if starting /\nstopping the counter depends on the _SW_ DC6 state vs. the current _HW_\nDC6 state (since stopping the counter requires the DC5 counter captured\nwhen the counter was started). Thus, using the HW DC6 state is incorrect\nand it also leads to the above oops. Fix both issues by using the SW DC6\nstate for the tracking.\n\nThis is v2 of the fix originally sent by Jani, updated based on the\nfirst Link: discussion below.\n\n(cherry picked from commit 2344b93af8eb5da5d496b4e0529d35f0f559eaf0)",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-23471": {
                 "cve_id": "CVE-2026-23471",
                 "title": "Rejected reason: This CVE ID has been rejected or withdrawn by it ...",
@@ -62292,23 +62360,6 @@
                     }
                 ]
             },
-            "CVE-2026-31571": {
-                "cve_id": "CVE-2026-31571",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915: Unlink NV12 planes earlier\n\nunlink_nv12_plane() will clobber parts of the plane state\npotentially already set up by plane_atomic_check(), so we\nmust make sure not to call the two in the wrong order.\nThe problem happens when a plane previously selected as\na Y plane is now configured as a normal plane by user space.\nplane_atomic_check() will first compute the proper plane\nstate based on the userspace request, and unlink_nv12_plane()\nlater clears some of the state.\n\nThis used to work on account of unlink_nv12_plane() skipping\nthe state clearing based on the plane visibility. But I removed\nthat check, thinking it was an impossible situation. Now when\nthat situation happens unlink_nv12_plane() will just WARN\nand proceed to clobber the state.\n\nRather than reverting to the old way of doing things, I think\nit's more clear if we unlink the NV12 planes before we even\ncompute the new plane state.\n\n(cherry picked from commit 017ecd04985573eeeb0745fa2c23896fb22ee0cc)",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-31572": {
                 "cve_id": "CVE-2026-31572",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -63572,23 +63623,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: ulpi: fix double free in ulpi_register_interface() error path\n\nWhen device_register() fails, ulpi_register() calls put_device() on\nulpi->dev.\n\nThe device release callback ulpi_dev_release() drops the OF node\nreference and frees ulpi, but the current error path in\nulpi_register_interface() then calls kfree(ulpi) again, causing a\ndouble free.\n\nLet put_device() handle the cleanup through ulpi_dev_release() and\navoid freeing ulpi again in ulpi_register_interface().",
                 "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-31767": {
-                "cve_id": "CVE-2026-31767",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/dsi: Don't do DSC horizontal timing adjustments in command mode\n\nStop adjusting the horizontal timing values based on the\ncompression ratio in command mode. Bspec seems to be telling\nus to do this only in video mode, and this is also how the\nWindows driver does things.\n\nThis should also fix a div-by-zero on some machines because\nthe adjusted htotal ends up being so small that we end up with\nline_time_us==0 when trying to determine the vtotal value in\ncommand mode.\n\nNote that this doesn't actually make the display on the\nHuawei Matebook E work, but at least the kernel no longer\nexplodes when the driver loads.\n\n(cherry picked from commit 0b475e91ecc2313207196c6d7fd5c53e1a878525)",
-                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -67059,23 +67093,6 @@
                     }
                 ]
             },
-            "CVE-2026-43477": {
-                "cve_id": "CVE-2026-43477",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/vrr: Configure VRR timings after enabling TRANS_DDI_FUNC_CTL\n\nApparently ICL may hang with an MCE if we write TRANS_VRR_VMAX/FLIPLINE\nbefore enabling TRANS_DDI_FUNC_CTL.\n\nPersonally I was only able to reproduce a hang (on an Dell XPS 7390\n2-in-1) with an external display connected via a dock using a dodgy\ntype-C cable that made the link training fail. After the failed\nlink training the machine would hang. TGL seemed immune to the\nproblem for whatever reason.\n\nBSpec does tell us to configure VRR after enabling TRANS_DDI_FUNC_CTL\nas well. The DMC firmware also does the VRR restore in two stages:\n- first stage seems to be unconditional and includes TRANS_VRR_CTL\n  and a few other VRR registers, among other things\n- second stage is conditional on the DDI being enabled,\n  and includes TRANS_DDI_FUNC_CTL and TRANS_VRR_VMAX/VMIN/FLIPLINE,\n  among other things\n\nSo let's reorder the steps to match to avoid the hang, and\ntoss in an extra WARN to make sure we don't screw this up later.\n\nBSpec: 22243\n(cherry picked from commit 93f3a267c3dd4d811b224bb9e179a10d81456a74)",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-43478": {
                 "cve_id": "CVE-2026-43478",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -70410,23 +70427,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: ipset: stop hash:* range iteration at end\n\nThe following hash set variants:\n\nhash:ip,mark\nhash:ip,port\nhash:ip,port,ip\nhash:ip,port,net\n\niterate IPv4 ranges with a 32-bit iterator.\n\nThe iterator must stop once the last address in the requested range has\nbeen processed. Advancing it once more can move the traversal state past\nthe end of the request, so a later retry may continue from an unintended\nposition.\n\nHandle the iterator increment explicitly at the end of the loop and stop\nonce the upper bound has been processed. This keeps the existing retry\nbehaviour intact for valid ranges while preventing traversal from\ncontinuing past the original boundary.",
                 "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-52923": {
-                "cve_id": "CVE-2026-52923",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipc: limit next_id allocation to the valid ID range\n\nThe checkpoint/restore sysctl path can request the next SysV IPC id\nthrough ids->next_id.  ipc_idr_alloc() currently forwards that request to\nidr_alloc() with an open-ended upper bound.\n\nIf the valid tail of the SysV IPC id space is full, the allocation can\nspill beyond ipc_mni.  The returned SysV IPC id still uses the normal\nindex encoding, so later lookup and removal can target the wrong slot. \nThis leaves the real IDR entry behind and breaks the IDR state for the\nobject.\n\nThe bug is in ipc_idr_alloc() in the checkpoint/restore path.\n\n1. ids->next_id is passed to:\n\n       idr_alloc(&ids->ipcs_idr, new, ipcid_to_idx(next_id), 0, ...)\n\n2. The zero upper bound makes the allocation effectively open-ended.\n   Once the valid SysV IPC tail is occupied, idr_alloc() can spill past\n   ipc_mni and allocate an entry beyond the valid IPC id range.\n\n3. The new object id is still encoded with the narrower SysV IPC index\n   width:\n\n       new->id = (new->seq << ipcmni_seq_shift()) + idx\n\n4. Later removal goes through ipc_rmid(), which uses:\n\n       ipcid_to_idx(ipcp->id)\n\n   That truncates the real IDR index. An object actually stored at a\n   high index can then be removed as if it lived at a low in-range\n   index.\n\n5. For shared memory, shm_destroy() frees the current object anyway, but\n   the real high IDR slot is left behind as a dangling pointer.\n\n6. A subsequent walk of /proc/sysvipc/shm reaches the stale IDR entry\n   and dereferences freed memory.\n\nPrevent this by bounding the requested allocation to ipc_mni so the\ncheckpoint/restore path fails once the valid range is exhausted.",
-                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -74725,23 +74725,6 @@
                     }
                 ]
             },
-            "CVE-2026-63807": {
-                "cve_id": "CVE-2026-63807",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: x86/mmu: Ensure hugepage is in by slot before checking max mapping level\n\nWhen recovering hugepages in the shadow MMU, verify that the base gfn of\nthe shadow page is actually contained within the target memslot, *before*\nquerying the max mapping level given the shadow page's gfn.  Failure to\npre-check the validity of the gfn can lead to an out-of-bounds access to\nthe slot's lpage_info (which typically manifests as a host #PF because the\nlpage_info is vmalloc'd) if the guest creates a hugepage mapping (in its\nPTEs) that extends \"below\" the bounds of a memslot.\n\nWhen faulting in memory for a guest, and the size of the guest mapping is\ngreater than KVM's (current) max mapping, then KVM will create a \"direct\"\nshadow page (direct in that there are no gPTEs to shadow, and so the target\ngfn is a direct calculation given the base gfn of the shadow page).  The\nhugepage recovery flow looks for such direct shadow pages, as forcing 4KiB\nmappings when dirty logging generates the guest > host mapping size case.\nWhen the 4KiB restriction is lifted, then KVM can replace the shadow page\nwith a hugepage.\n\nBut if KVM originally used a smaller mapping than the guest because the\nrange of memory covered by the guest hugepage exceeds the bounds of a\nmemslot, then KVM will link a direct shadow page with a gfn that is outside\nthe bounds of the memslot being used to fault in memory.  The rmap entry\nadded for the leaf mapping is correct and within bounds, but the gfn of the\nleaf SPTE's parent shadow page will be out of bounds.\n\n  BUG: unable to handle page fault for address: ffffc90000806ffc\n  #PF: supervisor read access in kernel mode\n  #PF: error_code(0x0000) - not-present page\n  PGD 100000067 P4D 100000067 PUD 1002a7067 PMD 10612f067 PTE 0\n  Oops: Oops: 0000 [#1] SMP\n  CPU: 13 UID: 1000 PID: 757 Comm: mmu_stress_test Not tainted 7.1.0-rc1-48ce1e26eace-x86_pir_to_irr_comments-vm #341 PREEMPT\n  Hardware name: QEMU Standard PC (Q35 + ICH9, 2009), BIOS 0.0.0 02/06/2015\n  RIP: 0010:kvm_mmu_max_mapping_level+0x79/0x2b0 [kvm]\n  Call Trace:\n   <TASK>\n   kvm_mmu_recover_huge_pages+0x21b/0x320 [kvm]\n   kvm_set_memslot+0x1ee/0x590 [kvm]\n   kvm_set_memory_region.part.0+0x3a1/0x4d0 [kvm]\n   kvm_vm_ioctl+0x9bf/0x15d0 [kvm]\n   __x64_sys_ioctl+0x8a/0xd0\n   do_syscall_64+0xb7/0xbb0\n   entry_SYSCALL_64_after_hwframe+0x4b/0x53\n  RIP: 0033:0x7f21c0f1a9bf\n   </TASK>\n\nDon't bother pre-checking the bounds of the potential hugepage, i.e. don't\ncheck that e.g. sp->gfn + KVM_PAGES_PER_HPAGE(sp->role.level + 1) is also\nwithin the memslot, as the checks performed by kvm_mmu_max_mapping_level()\nare a superset of the basic bounds checks.  I.e. pre-checking the full\nrange would be a dubious micro-optimization.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-63808": {
                 "cve_id": "CVE-2026-63808",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -74963,6 +74946,40 @@
                     }
                 ]
             },
+            "CVE-2026-63855": {
+                "cve_id": "CVE-2026-63855",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vcn: set no_user_fence for VCN v2.5 enc/dec rings\n\nVCN encoder and decoder rings do not support 64-bit user fence writes,\nreject CS submissions with user fences.\n\n(cherry picked from commit efc9dd5590894109bce9a0bfe1fa5592dd6b20b1)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63856": {
+                "cve_id": "CVE-2026-63856",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vcn: set no_user_fence for VCN v2.0 enc/dec rings\n\nVCN encoder and decoder rings do not support 64-bit user fence writes,\nreject CS submissions with user fences.\n\n(cherry picked from commit e2b5499fca55f1a32960a311bbb62e35891eaf73)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63858": {
                 "cve_id": "CVE-2026-63858",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -75087,6 +75104,91 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mctp: usb: fix race between urb completion and rx_retry cancellation\n\nIt's possible that sequencing between setting ->stopped and cancelling\nthe rx_retry work (in ndo_stop) could leave us with an urb queued:\n\n    T1: ndo_stop                  T2: rx_retry_work\n    ------------                  ----------------\n                                  LD: ->stopped => false\n    ST: ->stopped <= true\n    usb_kill_urb()\n                                  mctp_usb_rx_queue()\n                                    usb_submit_urb()\n    cancel_delayed_work_sync()\n\nThat urb completion can then re-schedule rx_retry_work.\n\nStrenghen the sequencing between the stop (preventing another requeue)\nand the cancel by updating both atomically under a new rx lock. After\nsetting ->rx_stopped, and cancelling pending work, we know that the\nrequeue cannot occur, so all that's left is killing any pending urb.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63878": {
+                "cve_id": "CVE-2026-63878",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: check num_entries in GEM_OP GET_MAPPING_INFO\n\nkvcalloc(args->num_entries, sizeof(*vm_entries), GFP_KERNEL) at\namdgpu_gem.c:1050 uses the user-supplied num_entries directly without\nany upper bounds check. Since num_entries is a __u32 and\nsizeof(drm_amdgpu_gem_vm_entry) is 32 bytes, a large num_entries\nproduces an allocation exceeding INT_MAX, triggering\nWARNING in __kvmalloc_node_noprof(), causing a kernel WARNING,\nTAINT_WARN, and panic on CONFIG_PANIC_ON_WARN=y systems.\n\nAdd a size bounds check before we invoke the kvzalloc() to\nreject oversized num_entries early with -EINVAL.\n\n(cherry picked from commit 1fe7bf5457f6efd7be60b17e23163ba54341d73d)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63879": {
+                "cve_id": "CVE-2026-63879",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix amdgpu_hmm_range_get_pages\n\nThe notifier sequence must only be read once or otherwise we could work\nwith invalid pages.\n\nWhile at it also fix the coding style, e.g. drop the pre-initialized\nreturn value and use the common define for 2G range.\n\n(cherry picked from commit c08972f555945cda57b0adb72272a37910153390)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63880": {
+                "cve_id": "CVE-2026-63880",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix lock leak on ENOMEM in AMDGPU_GEM_OP_GET_MAPPING_INFO\n\nThe AMDGPU_GEM_OP_GET_MAPPING_INFO branch of amdgpu_gem_op_ioctl()\nholds three cleanup-tracked resources before calling kvcalloc():\nthe drm_gem_object reference from drm_gem_object_lookup(), the\ndrm_exec lock on the looked-up GEM via drm_exec_lock_obj(), and\nthe drm_exec lock on the per-process VM root page directory via\namdgpu_vm_lock_pd().  All three are released by the out_exec\nlabel that every other error path in this function jumps to.\nThe kvcalloc() failure path returns -ENOMEM directly, skipping\nout_exec and leaking all three.\n\nThe leaked per-process VM root PD dma_resv lock is the\nload-bearing leak: any subsequent operation on the same VM\n(further GEM ops, command-submission, eviction, TTM shrinker\ncallbacks) blocks on the held lock.  DRM_IOCTL_AMDGPU_GEM_OP is\nDRM_AUTH | DRM_RENDER_ALLOW, so this is an unprivileged-local\ndenial of service against the caller's GPU context, reachable\nby any process with /dev/dri/renderD* access.\n\nRoute the failure through out_exec so drm_exec_fini() and\ndrm_gem_object_put() run.\n\nReproduced on stock 7.0.0-10, Ryzen 7 5700U / Radeon Vega\n(Lucienne): the failing ioctl returns -ENOMEM and a second\nGET_MAPPING_INFO on the same fd then blocks in\ndrm_exec_lock_obj() on the leaked dma_resv.  SIGKILL on the\ncaller does not reap the task; the fd-release path during\nprocess exit goes through amdgpu_gem_object_close() ->\ndrm_exec_prepare_obj() on the same lock, leaving the task in D\nstate until the box is rebooted.  The patched kernel was not\nrebuilt and re-tested on this hardware; the fix is mechanical.\nTested on a single Lucienne / Vega box only.\n\nZiyi Guo posted an independent INT_MAX-bound check for\nargs->num_entries in the same branch [1]; the two patches are\ncomplementary and can land in either order.\n\n(cherry picked from commit b69d3256d79de15f54c322986ff4da68f1d65b0a)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63881": {
+                "cve_id": "CVE-2026-63881",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdkfd: fix a vulnerability of integer overflow in kfd debugger\n\nget_queue_ids() computes array_size = num_queues * sizeof(uint32_t),\nwhich could overflow on 32-bit size_t build. using array_size()\ninstead, it saturates to SIZE_MAX on overflow.\n\n(cherry picked from commit 2d57a0475f085c08b49312dfd8edcb461845f285)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63882": {
+                "cve_id": "CVE-2026-63882",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdkfd: fix NULL pointer bug in svm_range_set_attr\n\nThe process_info could be NULL if user doesn't call kfd_ioctl_acquire_vm\nbefore calling kfd_ioctl_svm.\n\n(cherry picked from commit 83a26c812e0529eb040d31a76f73e33e637243d4)",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -76255,6 +76357,23 @@
                     }
                 ]
             },
+            "CVE-2026-64024": {
+                "cve_id": "CVE-2026-64024",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntcp: fix stale per-CPU tcp_tw_isn leak enabling ISN prediction\n\nBlamed commit moved the TIME_WAIT-derived ISN from the skb control\nblock to a per-CPU variable, assuming the value would always be consumed\nby tcp_conn_request() for the same packet that wrote it. That assumption\nis violated by multiple drop paths between the producer\n(__this_cpu_write(tcp_tw_isn, isn) in tcp_v{4,6}_rcv()) and the consumer\n(tcp_conn_request()):\n\n - min_ttl / min_hopcount check\n - xfrm policy check\n - tcp_inbound_hash() MD5/AO mismatch\n - tcp_filter() eBPF/SO_ATTACH_FILTER drop\n - th->syn && th->fin discard in tcp_rcv_state_process() TCP_LISTEN\n - psp_sk_rx_policy_check() in tcp_v{4,6}_do_rcv()\n - tcp_checksum_complete() in tcp_v{4,6}_do_rcv()\n - tcp_v{4,6}_cookie_check() returning NULL\n\nWhen a packet is dropped on any of these paths, tcp_tw_isn is left set.\n\nThe next SYN processed on the same CPU then consumes the non zero value in\ntcp_conn_request(), receiving a potentially predictable ISN.\n\nThis patch moves back tcp_tw_isn to skb->cb[], getting rid of the per-cpu\nvariable.\n\nNote that tcp_v{4,6}_fill_cb() do not set it.\n\nVery litle impact on overall code size/complexity:\n\n$ scripts/bloat-o-meter -t vmlinux.old vmlinux.new\nadd/remove: 0/0 grow/shrink: 2/1 up/down: 8/-15 (-7)\nFunction                                     old     new   delta\ntcp_v6_rcv                                  3038    3042      +4\ntcp_v4_rcv                                  3035    3039      +4\ntcp_conn_request                            2938    2923     -15\nTotal: Before=24436060, After=24436053, chg -0.00%",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-64025": {
                 "cve_id": "CVE-2026-64025",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -76684,6 +76803,23 @@
                 "cve_id": "CVE-2026-64088",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbatman-adv: tt: fix negative tt_buff_len\n\nbatadv_orig_node::tt_buff_len was declared as s16, but the field is never\nintended to hold a negative value. When a value greater than 32767 is\nassigned, it wraps to a negative signed integer.\n\nIn batadv_send_other_tt_response(), tt_buff_len is temporarily widened to\ns32. The incorrectly negative s16 value propagates into the s32, causing\nbatadv_tt_prepare_tvlv_global_data() to allocate a full sized buffer but\npopulates only a small portion of it with the collected changeset. All\nremaining bits are kept uninitialized.\n\nUsing an u16 avoids this type confusion and ensures that no (negative) sign\nextension is performed in batadv_send_other_tt_response().",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64097": {
+                "cve_id": "CVE-2026-64097",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Validate GPIO pin LUT table size before iterating\n\n[Why&How]\nThe GPIO pin table parsers in get_gpio_i2c_info() and\nbios_parser_get_gpio_pin_info() derive an element count from the VBIOS\ntable_header.structuresize field, then iterate over gpio_pin[] entries.\nHowever, GET_IMAGE() only validates that the table header itself fits\nwithin the BIOS image. If the VBIOS reports a structuresize larger than\nthe actual mapped data, the loop reads past the end of the BIOS image,\ncausing an out-of-bounds read.\n\nFix this by calling bios_get_image() to validate that the full claimed\nstructuresize is accessible within the BIOS image before entering the\nloop in both functions.\n\n(cherry picked from commit ba5e95b43b773ae1bf1f66ee6b31eb774e65afe3)",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -77518,6 +77654,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (lm90) Add lock protection to lm90_alert\n\nSashiko reports:\n\nlm90_alert() executes in the smbus alert context and calls\nlm90_update_confreg() to disable the hardware alert line, without\nacquiring hwmon_lock.\n\nConcurrently, sysfs write operations (such as lm90_write_convrate) hold\nthe hwmon_lock, temporarily modify data->config, and then restore it.\n\nIf an alert interrupt occurs concurrently with a sysfs write, the sysfs\npath will overwrite the alert handler's modifications to data->config\nand the hardware register.\n\nThis unintentionally re-enables the hardware alert line while the alarm is\nstill active, causing an interrupt storm.\n\nAdd the missing lock to lm90_alert() to solve the problem.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64219": {
+                "cve_id": "CVE-2026-64219",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Validate payload length and link_index in dc_process_dmub_aux_transfer_async\n\n[Why&How]\ndc_process_dmub_aux_transfer_async() copies payload->length bytes into a\n16-byte stack buffer (dpaux.data[16]) guarded only by an ASSERT(), which\nis a no-op in release builds. If a caller ever passes length > 16 this\nresults in a stack buffer overflow via memcpy.\n\nAdditionally, link_index is used to dereference dc->links[] without\nbounds checking against dc->link_count, risking an out-of-bounds access.\n\nReplace the ASSERT with a hard runtime check that returns false when\npayload->length exceeds the destination buffer size, and add a bounds\ncheck for link_index before it is used.\n\n(cherry picked from commit ba4caa9fecdf7a38f98c878ad05a8a64148b6881)",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -79778,6 +79931,23 @@
                 "cve_id": "CVE-2026-64515",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: mac80211: fix MLE defragmentation\n\nIf either reconf or EPCS multi-link element (MLE) is contained in\na non-transmitted profile, the defragmentation routine is called\nwith a pointer to the defragmented copy, but the original elements.\n\nThis is incorrect for two reasons:\n - if the original defragmentation was needed, it will not find the\n   correct data\n - if the original frame is at a higher address, the parsing will\n   potentially overrun the heap data (though given the layout of\n   the buffers, only into the new defragmentation buffer, and then\n   it has to stop and fail once that's filled with copied data.\n\nFix it by tracking the container along with the pointer and in\ndoing so also unify the two almost identical defragmentation\nroutines.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64516": {
+                "cve_id": "CVE-2026-64516",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vce1: Fix VCE 1 firmware size and offsets\n\nThe VCPU BO contains the actual FW at an offset, but\nit was not calculated into the VCPU BO size.\nSubtract this from the FW size to make sure there is\nno out of bounds access.\n\nMake sure the stack and data offsets are aligned to\nthe 32K TLB size.\n\nCheck that the FW microcode actually fits in the\nspace that is reserved for it.\n\n(cherry picked from commit c16fe59f622a080fc457a57b3e8f14c780699449)",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
