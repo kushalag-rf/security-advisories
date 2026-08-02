@@ -15559,6 +15559,23 @@
                     }
                 ]
             },
+            "CVE-2025-68793": {
+                "cve_id": "CVE-2025-68793",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix a job->pasid access race in gpu recovery\n\nAvoid a possible UAF in GPU recovery due to a race between\nthe sched timeout callback and the tdr work queue.\n\nThe gpu recovery function calls drm_sched_stop() and\nlater drm_sched_start().  drm_sched_start() restarts\nthe tdr queue which will eventually free the job.  If\nthe tdr queue frees the job before time out callback\ncompletes, the job will be freed and we'll get a UAF\nwhen accessing the pasid.  Cache it early to avoid the\nUAF.\n\nExample KASAN trace:\n[  493.058141] BUG: KASAN: slab-use-after-free in amdgpu_device_gpu_recover+0x968/0x990 [amdgpu]\n[  493.067530] Read of size 4 at addr ffff88b0ce3f794c by task kworker/u128:1/323\n[  493.074892]\n[  493.076485] CPU: 9 UID: 0 PID: 323 Comm: kworker/u128:1 Tainted: G            E       6.16.0-1289896.2.zuul.bf4f11df81c1410bbe901c4373305a31 #1 PREEMPT(voluntary)\n[  493.076493] Tainted: [E]=UNSIGNED_MODULE\n[  493.076495] Hardware name: TYAN B8021G88V2HR-2T/S8021GM2NR-2T, BIOS V1.03.B10 04/01/2019\n[  493.076500] Workqueue: amdgpu-reset-dev drm_sched_job_timedout [gpu_sched]\n[  493.076512] Call Trace:\n[  493.076515]  <TASK>\n[  493.076518]  dump_stack_lvl+0x64/0x80\n[  493.076529]  print_report+0xce/0x630\n[  493.076536]  ? _raw_spin_lock_irqsave+0x86/0xd0\n[  493.076541]  ? __pfx__raw_spin_lock_irqsave+0x10/0x10\n[  493.076545]  ? amdgpu_device_gpu_recover+0x968/0x990 [amdgpu]\n[  493.077253]  kasan_report+0xb8/0xf0\n[  493.077258]  ? amdgpu_device_gpu_recover+0x968/0x990 [amdgpu]\n[  493.077965]  amdgpu_device_gpu_recover+0x968/0x990 [amdgpu]\n[  493.078672]  ? __pfx_amdgpu_device_gpu_recover+0x10/0x10 [amdgpu]\n[  493.079378]  ? amdgpu_coredump+0x1fd/0x4c0 [amdgpu]\n[  493.080111]  amdgpu_job_timedout+0x642/0x1400 [amdgpu]\n[  493.080903]  ? pick_task_fair+0x24e/0x330\n[  493.080910]  ? __pfx_amdgpu_job_timedout+0x10/0x10 [amdgpu]\n[  493.081702]  ? _raw_spin_lock+0x75/0xc0\n[  493.081708]  ? __pfx__raw_spin_lock+0x10/0x10\n[  493.081712]  drm_sched_job_timedout+0x1b0/0x4b0 [gpu_sched]\n[  493.081721]  ? __pfx__raw_spin_lock_irq+0x10/0x10\n[  493.081725]  process_one_work+0x679/0xff0\n[  493.081732]  worker_thread+0x6ce/0xfd0\n[  493.081736]  ? __pfx_worker_thread+0x10/0x10\n[  493.081739]  kthread+0x376/0x730\n[  493.081744]  ? __pfx_kthread+0x10/0x10\n[  493.081748]  ? __pfx__raw_spin_lock_irq+0x10/0x10\n[  493.081751]  ? __pfx_kthread+0x10/0x10\n[  493.081755]  ret_from_fork+0x247/0x330\n[  493.081761]  ? __pfx_kthread+0x10/0x10\n[  493.081764]  ret_from_fork_asm+0x1a/0x30\n[  493.081771]  </TASK>\n\n(cherry picked from commit 20880a3fd5dd7bca1a079534cf6596bda92e107d)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2025-68794": {
                 "cve_id": "CVE-2025-68794",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -16715,6 +16732,23 @@
                     }
                 ]
             },
+            "CVE-2025-71293": {
+                "cve_id": "CVE-2025-71293",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/ras: Move ras data alloc before bad page check\n\nIn the rare event if eeprom has only invalid address entries,\nallocation is skipped, this causes following NULL pointer issue\n[  547.103445] BUG: kernel NULL pointer dereference, address: 0000000000000010\n[  547.118897] #PF: supervisor read access in kernel mode\n[  547.130292] #PF: error_code(0x0000) - not-present page\n[  547.141689] PGD 124757067 P4D 0\n[  547.148842] Oops: 0000 [#1] PREEMPT SMP NOPTI\n[  547.158504] CPU: 49 PID: 8167 Comm: cat Tainted: G           OE      6.8.0-38-generic #38-Ubuntu\n[  547.177998] Hardware name: Supermicro AS -8126GS-TNMR/H14DSG-OD, BIOS 1.7 09/12/2025\n[  547.195178] RIP: 0010:amdgpu_ras_sysfs_badpages_read+0x2f2/0x5d0 [amdgpu]\n[  547.210375] Code: e8 63 78 82 c0 45 31 d2 45 3b 75 08 48 8b 45 a0 73 44 44 89 f1 48 8b 7d 88 48 89 ca 48 c1 e2 05 48 29 ca 49 8b 4d 00 48 01 d1 <48> 83 79 10 00 74 17 49 63 f2 48 8b 49 08 41 83 c2 01 48 8d 34 76\n[  547.252045] RSP: 0018:ffa0000067287ac0 EFLAGS: 00010246\n[  547.263636] RAX: ff11000167c28130 RBX: ff11000127600000 RCX: 0000000000000000\n[  547.279467] RDX: 0000000000000000 RSI: 0000000000000000 RDI: ff11000125b1c800\n[  547.295298] RBP: ffa0000067287b50 R08: 0000000000000000 R09: 0000000000000000\n[  547.311129] R10: 0000000000000000 R11: 0000000000000000 R12: 0000000000000000\n[  547.326959] R13: ff11000217b1de00 R14: 0000000000000000 R15: 0000000000000092\n[  547.342790] FS:  0000746e59d14740(0000) GS:ff11017dfda80000(0000) knlGS:0000000000000000\n[  547.360744] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[  547.373489] CR2: 0000000000000010 CR3: 000000019585e001 CR4: 0000000000f71ef0\n[  547.389321] PKRU: 55555554\n[  547.395316] Call Trace:\n[  547.400737]  <TASK>\n[  547.405386]  ? show_regs+0x6d/0x80\n[  547.412929]  ? __die+0x24/0x80\n[  547.419697]  ? page_fault_oops+0x99/0x1b0\n[  547.428588]  ? do_user_addr_fault+0x2ee/0x6b0\n[  547.438249]  ? exc_page_fault+0x83/0x1b0\n[  547.446949]  ? asm_exc_page_fault+0x27/0x30\n[  547.456225]  ? amdgpu_ras_sysfs_badpages_read+0x2f2/0x5d0 [amdgpu]\n[  547.470040]  ? mas_wr_modify+0xcd/0x140\n[  547.478548]  sysfs_kf_bin_read+0x63/0xb0\n[  547.487248]  kernfs_file_read_iter+0xa1/0x190\n[  547.496909]  kernfs_fop_read_iter+0x25/0x40\n[  547.506182]  vfs_read+0x255/0x390\n\nThis also result in space left assigned to negative values.\nMoving data alloc call before bad page check resolves both the issue.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2025-71295": {
                 "cve_id": "CVE-2025-71295",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -17281,6 +17315,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnull_blk: fix kmemleak by releasing references to fault configfs items\n\nWhen CONFIG_BLK_DEV_NULL_BLK_FAULT_INJECTION is enabled, the null-blk\ndriver sets up fault injection support by creating the timeout_inject,\nrequeue_inject, and init_hctx_fault_inject configfs items as children\nof the top-level nullbX configfs group.\n\nHowever, when the nullbX device is removed, the references taken to\nthese fault-config configfs items are not released. As a result,\nkmemleak reports a memory leak, for example:\n\nunreferenced object 0xc00000021ff25c40 (size 32):\n  comm \"mkdir\", pid 10665, jiffies 4322121578\n  hex dump (first 32 bytes):\n    69 6e 69 74 5f 68 63 74 78 5f 66 61 75 6c 74 5f  init_hctx_fault_\n    69 6e 6a 65 63 74 00 88 00 00 00 00 00 00 00 00  inject..........\n  backtrace (crc 1a018c86):\n    __kmalloc_node_track_caller_noprof+0x494/0xbd8\n    kvasprintf+0x74/0xf4\n    config_item_set_name+0xf0/0x104\n    config_group_init_type_name+0x48/0xfc\n    fault_config_init+0x48/0xf0\n    0xc0080000180559e4\n    configfs_mkdir+0x304/0x814\n    vfs_mkdir+0x49c/0x604\n    do_mkdirat+0x314/0x3d0\n    sys_mkdir+0xa0/0xd8\n    system_call_exception+0x1b0/0x4f0\n    system_call_vectored_common+0x15c/0x2ec\n\nFix this by explicitly releasing the references to the fault-config\nconfigfs items when dropping the reference to the top-level nullbX\nconfigfs group.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-23034": {
+                "cve_id": "CVE-2026-23034",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/userq: Fix fence reference leak on queue teardown v2\n\nThe user mode queue keeps a pointer to the most recent fence in\nuserq->last_fence. This pointer holds an extra dma_fence reference.\n\nWhen the queue is destroyed, we free the fence driver and its xarray,\nbut we forgot to drop the last_fence reference.\n\nBecause of the missing dma_fence_put(), the last fence object can stay\nalive when the driver unloads. This leaves an allocated object in the\namdgpu_userq_fence slab cache and triggers\n\nThis is visible during driver unload as:\n\n  BUG amdgpu_userq_fence: Objects remaining on __kmem_cache_shutdown()\n  kmem_cache_destroy amdgpu_userq_fence: Slab cache still has objects\n  Call Trace:\n    kmem_cache_destroy\n    amdgpu_userq_fence_slab_fini\n    amdgpu_exit\n    __do_sys_delete_module\n\nFix this by putting userq->last_fence and clearing the pointer during\namdgpu_userq_fence_driver_free().\n\nThis makes sure the fence reference is released and the slab cache is\nempty when the module exits.\n\nv2: Update to only release userq->last_fence with dma_fence_put()\n    (Christian)\n\n(cherry picked from commit 8e051e38a8d45caf6a866d4ff842105b577953bb)",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -18211,6 +18262,23 @@
                     }
                 ]
             },
+            "CVE-2026-23163": {
+                "cve_id": "CVE-2026-23163",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix NULL pointer dereference in amdgpu_gmc_filter_faults_remove\n\nOn APUs such as Raven and Renoir (GC 9.1.0, 9.2.2, 9.3.0), the ih1 and\nih2 interrupt ring buffers are not initialized. This is by design, as\nthese secondary IH rings are only available on discrete GPUs. See\nvega10_ih_sw_init() which explicitly skips ih1/ih2 initialization when\nAMD_IS_APU is set.\n\nHowever, amdgpu_gmc_filter_faults_remove() unconditionally uses ih1 to\nget the timestamp of the last interrupt entry. When retry faults are\nenabled on APUs (noretry=0), this function is called from the SVM page\nfault recovery path, resulting in a NULL pointer dereference when\namdgpu_ih_decode_iv_ts_helper() attempts to access ih->ring[].\n\nThe crash manifests as:\n\n  BUG: kernel NULL pointer dereference, address: 0000000000000004\n  RIP: 0010:amdgpu_ih_decode_iv_ts_helper+0x22/0x40 [amdgpu]\n  Call Trace:\n   amdgpu_gmc_filter_faults_remove+0x60/0x130 [amdgpu]\n   svm_range_restore_pages+0xae5/0x11c0 [amdgpu]\n   amdgpu_vm_handle_fault+0xc8/0x340 [amdgpu]\n   gmc_v9_0_process_interrupt+0x191/0x220 [amdgpu]\n   amdgpu_irq_dispatch+0xed/0x2c0 [amdgpu]\n   amdgpu_ih_process+0x84/0x100 [amdgpu]\n\nThis issue was exposed by commit 1446226d32a4 (\"drm/amdgpu: Remove GC HW\nIP 9.3.0 from noretry=1\") which changed the default for Renoir APU from\nnoretry=1 to noretry=0, enabling retry fault handling and thus\nexercising the buggy code path.\n\nFix this by adding a check for ih1.ring_size before attempting to use\nit. Also restore the soft_ih support from commit dd299441654f (\"drm/amdgpu:\nRework retry fault removal\").  This is needed if the hardware doesn't\nsupport secondary HW IH rings.\n\nv2: additional updates (Alex)\n\n(cherry picked from commit 6ce8d536c80aa1f059e82184f0d1994436b1d526)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-23164": {
                 "cve_id": "CVE-2026-23164",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -18470,6 +18538,23 @@
                 "cve_id": "CVE-2026-23212",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbonding: annotate data-races around slave->last_rx\n\nslave->last_rx and slave->target_last_arp_rx[...] can be read and written\nlocklessly. Add READ_ONCE() and WRITE_ONCE() annotations.\n\nsyzbot reported:\n\nBUG: KCSAN: data-race in bond_rcv_validate / bond_rcv_validate\n\nwrite to 0xffff888149f0d428 of 8 bytes by interrupt on cpu 1:\n  bond_rcv_validate+0x202/0x7a0 drivers/net/bonding/bond_main.c:3335\n  bond_handle_frame+0xde/0x5e0 drivers/net/bonding/bond_main.c:1533\n  __netif_receive_skb_core+0x5b1/0x1950 net/core/dev.c:6039\n  __netif_receive_skb_one_core net/core/dev.c:6150 [inline]\n  __netif_receive_skb+0x59/0x270 net/core/dev.c:6265\n  netif_receive_skb_internal net/core/dev.c:6351 [inline]\n  netif_receive_skb+0x4b/0x2d0 net/core/dev.c:6410\n...\n\nwrite to 0xffff888149f0d428 of 8 bytes by interrupt on cpu 0:\n  bond_rcv_validate+0x202/0x7a0 drivers/net/bonding/bond_main.c:3335\n  bond_handle_frame+0xde/0x5e0 drivers/net/bonding/bond_main.c:1533\n  __netif_receive_skb_core+0x5b1/0x1950 net/core/dev.c:6039\n  __netif_receive_skb_one_core net/core/dev.c:6150 [inline]\n  __netif_receive_skb+0x59/0x270 net/core/dev.c:6265\n  netif_receive_skb_internal net/core/dev.c:6351 [inline]\n  netif_receive_skb+0x4b/0x2d0 net/core/dev.c:6410\n  br_netif_receive_skb net/bridge/br_input.c:30 [inline]\n  NF_HOOK include/linux/netfilter.h:318 [inline]\n...\n\nvalue changed: 0x0000000100005365 -> 0x0000000100005366",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-23213": {
+                "cve_id": "CVE-2026-23213",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/pm: Disable MMIO access during SMU Mode 1 reset\n\nDuring Mode 1 reset, the ASIC undergoes a reset cycle and becomes\ntemporarily inaccessible via PCIe. Any attempt to access MMIO registers\nduring this window (e.g., from interrupt handlers or other driver threads)\ncan result in uncompleted PCIe transactions, leading to NMI panics or\nsystem hangs.\n\nTo prevent this, set the `no_hw_access` flag to true immediately after\ntriggering the reset. This signals other driver components to skip\nregister accesses while the device is offline.\n\nA memory barrier `smp_mb()` is added to ensure the flag update is\nglobally visible to all cores before the driver enters the sleep/wait\nstate.\n\n(cherry picked from commit 7edb503fe4b6d67f47d8bb0dfafb8e699bb0f8a4)",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -19304,6 +19389,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: cfg80211: cancel rfkill_block work in wiphy_unregister()\n\nThere is a use-after-free error in cfg80211_shutdown_all_interfaces found\nby syzkaller:\n\nBUG: KASAN: use-after-free in cfg80211_shutdown_all_interfaces+0x213/0x220\nRead of size 8 at addr ffff888112a78d98 by task kworker/0:5/5326\nCPU: 0 UID: 0 PID: 5326 Comm: kworker/0:5 Not tainted 6.19.0-rc2 #2 PREEMPT(voluntary)\nHardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS 1.15.0-1 04/01/2014\nWorkqueue: events cfg80211_rfkill_block_work\nCall Trace:\n <TASK>\n dump_stack_lvl+0x116/0x1f0\n print_report+0xcd/0x630\n kasan_report+0xe0/0x110\n cfg80211_shutdown_all_interfaces+0x213/0x220\n cfg80211_rfkill_block_work+0x1e/0x30\n process_one_work+0x9cf/0x1b70\n worker_thread+0x6c8/0xf10\n kthread+0x3c5/0x780\n ret_from_fork+0x56d/0x700\n ret_from_fork_asm+0x1a/0x30\n </TASK>\n\nThe problem arises due to the rfkill_block work is not cancelled when wiphy\nis being unregistered. In order to fix the issue cancel the corresponding\nwork in wiphy_unregister().\n\nFound by Linux Verification Center (linuxtesting.org) with Syzkaller.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-23338": {
+                "cve_id": "CVE-2026-23338",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/userq: Do not allow userspace to trivially triger kernel warnings\n\nUserspace can either deliberately pass in the too small num_fences, or the\nrequired number can legitimately grow between the two calls to the userq\nwait ioctl. In both cases we do not want the emit the kernel warning\nbacktrace since nothing is wrong with the kernel and userspace will simply\nget an errno reported back. So lets simply drop the WARN_ONs.\n\n(cherry picked from commit 2c333ea579de6cc20ea7bc50e9595ef72863e65c)",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -21054,6 +21156,23 @@
                 "cve_id": "CVE-2026-31458",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmm/damon/sysfs: check contexts->nr before accessing contexts_arr[0]\n\nMultiple sysfs command paths dereference contexts_arr[0] without first\nverifying that kdamond->contexts->nr == 1.  A user can set nr_contexts to\n0 via sysfs while DAMON is running, causing NULL pointer dereferences.\n\nIn more detail, the issue can be triggered by privileged users like\nbelow.\n\nFirst, start DAMON and make contexts directory empty\n(kdamond->contexts->nr == 0).\n\n    # damo start\n    # cd /sys/kernel/mm/damon/admin/kdamonds/0\n    # echo 0 > contexts/nr_contexts\n\nThen, each of below commands will cause the NULL pointer dereference.\n\n    # echo update_schemes_stats > state\n    # echo update_schemes_tried_regions > state\n    # echo update_schemes_tried_bytes > state\n    # echo update_schemes_effective_quotas > state\n    # echo update_tuned_intervals > state\n\nGuard all commands (except OFF) at the entry point of\ndamon_sysfs_handle_cmd().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-31462": {
+                "cve_id": "CVE-2026-31462",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: prevent immediate PASID reuse case\n\nPASID resue could cause interrupt issue when process\nimmediately runs into hw state left by previous\nprocess exited with the same PASID, it's possible that\npage faults are still pending in the IH ring buffer when\nthe process exits and frees up its PASID. To prevent the\ncase, it uses idr cyclic allocator same as kernel pid's.\n\n(cherry picked from commit 8f1de51f49be692de137c8525106e0fce2d1912d)",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -23379,6 +23498,23 @@
                     }
                 ]
             },
+            "CVE-2026-31765": {
+                "cve_id": "CVE-2026-31765",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: Change AMDGPU_VA_RESERVED_TRAP_SIZE to 64KB\n\nCurrently, AMDGPU_VA_RESERVED_TRAP_SIZE is hardcoded to 8KB, while\nKFD_CWSR_TBA_TMA_SIZE is defined as 2 * PAGE_SIZE. On systems with\n4K pages, both values match (8KB), so allocation and reserved space\nare consistent.\n\nHowever, on 64K page-size systems, KFD_CWSR_TBA_TMA_SIZE becomes 128KB,\nwhile the reserved trap area remains 8KB. This mismatch causes the\nkernel to crash when running rocminfo or rccl unit tests.\n\nKernel attempted to read user page (2) - exploit attempt? (uid: 1001)\nBUG: Kernel NULL pointer dereference on read at 0x00000002\nFaulting instruction address: 0xc0000000002c8a64\nOops: Kernel access of bad area, sig: 11 [#1]\nLE PAGE_SIZE=64K MMU=Radix SMP NR_CPUS=2048 NUMA pSeries\nCPU: 34 UID: 1001 PID: 9379 Comm: rocminfo Tainted: G E\n6.19.0-rc4-amdgpu-00320-gf23176405700 #56 VOLUNTARY\nTainted: [E]=UNSIGNED_MODULE\nHardware name: IBM,9105-42A POWER10 (architected) 0x800200 0xf000006\nof:IBM,FW1060.30 (ML1060_896) hv:phyp pSeries\nNIP:  c0000000002c8a64 LR: c00000000125dbc8 CTR: c00000000125e730\nREGS: c0000001e0957580 TRAP: 0300 Tainted: G E\nMSR:  8000000000009033 <SF,EE,ME,IR,DR,RI,LE> CR: 24008268\nXER: 00000036\nCFAR: c00000000125dbc4 DAR: 0000000000000002 DSISR: 40000000\nIRQMASK: 1\nGPR00: c00000000125d908 c0000001e0957820 c0000000016e8100\nc00000013d814540\nGPR04: 0000000000000002 c00000013d814550 0000000000000045\n0000000000000000\nGPR08: c00000013444d000 c00000013d814538 c00000013d814538\n0000000084002268\nGPR12: c00000000125e730 c000007e2ffd5f00 ffffffffffffffff\n0000000000020000\nGPR16: 0000000000000000 0000000000000002 c00000015f653000\n0000000000000000\nGPR20: c000000138662400 c00000013d814540 0000000000000000\nc00000013d814500\nGPR24: 0000000000000000 0000000000000002 c0000001e0957888\nc0000001e0957878\nGPR28: c00000013d814548 0000000000000000 c00000013d814540\nc0000001e0957888\nNIP [c0000000002c8a64] __mutex_add_waiter+0x24/0xc0\nLR [c00000000125dbc8] __mutex_lock.constprop.0+0x318/0xd00\nCall Trace:\n0xc0000001e0957890 (unreliable)\n__mutex_lock.constprop.0+0x58/0xd00\namdgpu_amdkfd_gpuvm_alloc_memory_of_gpu+0x6fc/0xb60 [amdgpu]\nkfd_process_alloc_gpuvm+0x54/0x1f0 [amdgpu]\nkfd_process_device_init_cwsr_dgpu+0xa4/0x1a0 [amdgpu]\nkfd_process_device_init_vm+0xd8/0x2e0 [amdgpu]\nkfd_ioctl_acquire_vm+0xd0/0x130 [amdgpu]\nkfd_ioctl+0x514/0x670 [amdgpu]\nsys_ioctl+0x134/0x180\nsystem_call_exception+0x114/0x300\nsystem_call_vectored_common+0x15c/0x2ec\n\nThis patch changes AMDGPU_VA_RESERVED_TRAP_SIZE to 64 KB and\nKFD_CWSR_TBA_TMA_SIZE to the AMD GPU page size. This means we reserve\n64 KB for the trap in the address space, but only allocate 8 KB within\nit. With this approach, the allocation size never exceeds the reserved\narea.\n\n(cherry picked from commit 31b8de5e55666f26ea7ece5f412b83eab3f56dbb)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-31771": {
                 "cve_id": "CVE-2026-31771",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -25096,6 +25232,23 @@
                     }
                 ]
             },
+            "CVE-2026-43195": {
+                "cve_id": "CVE-2026-43195",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: validate user queue size constraints\n\nAdd validation to ensure user queue sizes meet hardware requirements:\n- Size must be a power of two for efficient ring buffer wrapping\n- Size must be at least AMDGPU_GPU_PAGE_SIZE to prevent undersized allocations\n\nThis prevents invalid configurations that could lead to GPU faults or\nunexpected behavior.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-43199": {
                 "cve_id": "CVE-2026-43199",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -25766,6 +25919,23 @@
                     }
                 ]
             },
+            "CVE-2026-43318": {
+                "cve_id": "CVE-2026-43318",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix sync handling in amdgpu_dma_buf_move_notify\n\nInvalidating a dmabuf will impact other users of the shared BO.\nIn the scenario where process A moves the BO, it needs to inform\nprocess B about the move and process B will need to update its\npage table.\n\nThe commit fixes a synchronisation bug caused by the use of the\nticket: it made amdgpu_vm_handle_moved behave as if updating\nthe page table immediately was correct but in this case it's not.\n\nAn example is the following scenario, with 2 GPUs and glxgears\nrunning on GPU0 and Xorg running on GPU1, on a system where P2P\nPCI isn't supported:\n\nglxgears:\n  export linear buffer from GPU0 and import using GPU1\n  submit frame rendering to GPU0\n  submit tiled->linear blit\nXorg:\n  copy of linear buffer\n\nThe sequence of jobs would be:\n  drm_sched_job_run                       # GPU0, frame rendering\n  drm_sched_job_queue                     # GPU0, blit\n  drm_sched_job_done                      # GPU0, frame rendering\n  drm_sched_job_run                       # GPU0, blit\n  move linear buffer for GPU1 access      #\n  amdgpu_dma_buf_move_notify -> update pt # GPU0\n\nIt this point the blit job on GPU0 is still running and would\nlikely produce a page fault.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-43321": {
                 "cve_id": "CVE-2026-43321",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -26144,6 +26314,57 @@
                 "cve_id": "CVE-2026-43396",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe/sync: Fix user fence leak on alloc failure\n\nWhen dma_fence_chain_alloc() fails, properly release the user fence\nreference to prevent a memory leak.\n\n(cherry picked from commit a5d5634cde48a9fcd68c8504aa07f89f175074a0)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-43398": {
+                "cve_id": "CVE-2026-43398",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: add upper bound check on user inputs in wait ioctl\n\nHuge input values in amdgpu_userq_wait_ioctl can lead to a OOM and\ncould be exploited.\n\nSo check these input value against AMDGPU_USERQ_MAX_HANDLES\nwhich is big enough value for genuine use cases and could\npotentially avoid OOM.\n\nv2: squash in Srini's fix\n\n(cherry picked from commit fcec012c664247531aed3e662f4280ff804d1476)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-43399": {
+                "cve_id": "CVE-2026-43399",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/userq: Fix reference leak in amdgpu_userq_wait_ioctl\n\nDrop reference to syncobj and timeline fence when aborting the ioctl due\noutput array being too small.\n\n(cherry picked from commit 68951e9c3e6bb22396bc42ef2359751c8315dd27)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-43400": {
+                "cve_id": "CVE-2026-43400",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: add upper bound check on user inputs in signal ioctl\n\nHuge input values in amdgpu_userq_signal_ioctl can lead to a OOM and\ncould be exploited.\n\nSo check these input value against AMDGPU_USERQ_MAX_HANDLES\nwhich is big enough value for genuine use cases and could\npotentially avoid OOM.\n\n(cherry picked from commit be267e15f99bc97cbe202cd556717797cdcf79a5)",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -27211,6 +27432,23 @@
                     }
                 ]
             },
+            "CVE-2026-45853": {
+                "cve_id": "CVE-2026-45853",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: Use kvfree instead of kfree in amdgpu_gmc_get_nps_memranges()\n\namdgpu_discovery_get_nps_info() internally allocates memory for ranges\nusing kvcalloc(), which may use vmalloc() for large allocation. Using\nkfree() to release vmalloc memory will lead to a memory corruption.\n\nUse kvfree() to safely handle both kmalloc and vmalloc allocations.\n\nCompile tested only. Issue found using a prototype static analysis tool\nand code review.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-45855": {
                 "cve_id": "CVE-2026-45855",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -27352,6 +27590,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nHID: intel-ish-hid: fix NULL-ptr-deref in ishtp_bus_remove_all_clients\n\nDuring a warm reset flow, the cl->device pointer may be NULL if the\nreset occurs while clients are still being enumerated. Accessing\ncl->device->reference_count without a NULL check leads to a kernel panic.\n\nThis issue was identified during multi-unit warm reboot stress clycles.\nAdd a defensive NULL check for cl->device to ensure stability under\nsuch intensive testing conditions.\n\nKASAN: null-ptr-deref in range [0000000000000000-0000000000000007]\nWorkqueue: ish_fw_update_wq fw_reset_work_fn\n\nCall Trace:\n ishtp_bus_remove_all_clients+0xbe/0x130 [intel_ishtp]\n ishtp_reset_handler+0x85/0x1a0 [intel_ishtp]\n fw_reset_work_fn+0x8a/0xc0 [intel_ish_ipc]",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-45878": {
+                "cve_id": "CVE-2026-45878",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdkfd: Fix watch_id bounds checking in debug address watch v2\n\nThe address watch clear code receives watch_id as an unsigned value\n(u32), but some helper functions were using a signed int and checked\nbits by shifting with watch_id.\n\nIf a very large watch_id is passed from userspace, it can be converted\nto a negative value.  This can cause invalid shifts and may access\nmemory outside the watch_points array.\n\ndrm/amdkfd: Fix watch_id bounds checking in debug address watch v2\n\nFix this by checking that watch_id is within MAX_WATCH_ADDRESSES before\nusing it.  Also use BIT(watch_id) to test and clear bits safely.\n\nThis keeps the behavior unchanged for valid watch IDs and avoids\nundefined behavior for invalid ones.\n\nFixes the below:\ndrivers/gpu/drm/amd/amdgpu/../amdkfd/kfd_debug.c:448\nkfd_dbg_trap_clear_dev_address_watch() error: buffer overflow\n'pdd->watch_points' 4 <= u32max user_rl='0-3,2147483648-u32max' uncapped\n\ndrivers/gpu/drm/amd/amdgpu/../amdkfd/kfd_debug.c\n    433 int kfd_dbg_trap_clear_dev_address_watch(struct kfd_process_device *pdd,\n    434                                         uint32_t watch_id)\n    435 {\n    436         int r;\n    437\n    438         if (!kfd_dbg_owns_dev_watch_id(pdd, watch_id))\n\nkfd_dbg_owns_dev_watch_id() doesn't check for negative values so if\nwatch_id is larger than INT_MAX it leads to a buffer overflow.\n(Negative shifts are undefined).\n\n    439                 return -EINVAL;\n    440\n    441         if (!pdd->dev->kfd->shared_resources.enable_mes) {\n    442                 r = debug_lock_and_unmap(pdd->dev->dqm);\n    443                 if (r)\n    444                         return r;\n    445         }\n    446\n    447         amdgpu_gfx_off_ctrl(pdd->dev->adev, false);\n--> 448         pdd->watch_points[watch_id] = pdd->dev->kfd2kgd->clear_address_watch(\n    449                                                         pdd->dev->adev,\n    450                                                         watch_id);\n\nv2: (as per, Jonathan Kim)\n - Add early watch_id >= MAX_WATCH_ADDRESSES validation in the set path to\n   match the clear path.\n - Drop the redundant bounds check in kfd_dbg_owns_dev_watch_id().",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -29438,10 +29693,61 @@
                     }
                 ]
             },
+            "CVE-2026-46197": {
+                "cve_id": "CVE-2026-46197",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdkfd: validate SVM ioctl nattr against buffer size\n\nValidate nattr field against the buffer size, preventing\nout-of-bounds buffer access via user-controlled attribute count.\n\n(cherry picked from commit 5eca8bfdfa456c3304ca77523718fe24254c172f)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46199": {
+                "cve_id": "CVE-2026-46199",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vcn4: Prevent OOB reads when parsing dec msg\n\nCheck bounds against the end of the BO whenever we access the msg.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46201": {
                 "cve_id": "CVE-2026-46201",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe: Fix dma-buf attachment leak in xe_gem_prime_import()\n\nWhen xe_dma_buf_init_obj() fails, the attachment from\ndma_buf_dynamic_attach() is not detached. Add dma_buf_detach() before\nreturning the error. Note: we cannot use goto out_err here because\nxe_dma_buf_init_obj() already frees bo on failure, and out_err would\ndouble-free it.\n\n(cherry picked from commit a828eb185aac41800df8eae4b60501ccc0dbbe51)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46204": {
+                "cve_id": "CVE-2026-46204",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vcn4: Prevent OOB reads when parsing IB\n\nRewrite the IB parsing to use amdgpu_ib_get_value() which handles the\nbounds checks.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -29506,6 +29812,23 @@
                     }
                 ]
             },
+            "CVE-2026-46220": {
+                "cve_id": "CVE-2026-46220",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/sdma4: replace BUG_ON with WARN_ON in fence emission\n\nsdma_v4_0_ring_emit_fence() contains two BUG_ON(addr & 0x3) assertions\nthat verify fence writeback addresses are dword-aligned.  These\nassertions can be reached from unprivileged userspace via crafted\nDRM_IOCTL_AMDGPU_CS submissions, causing a fatal kernel panic in a\nscheduler worker thread.\n\nReplace both BUG_ON() calls with WARN_ON() to log the condition without\ncrashing the kernel.  A misaligned fence address at this point indicates\na driver bug, but crashing the kernel is never the correct response when\nthe assertion is reachable from userspace.\n\nThe CS IOCTL path is the correct place to filter invalid submissions;\nthe ring emission callback is too late to do anything about it.\n\n(cherry picked from commit b90250bd933afd1ba94d86d6b13821997b22b18e)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46224": {
                 "cve_id": "CVE-2026-46224",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -29523,11 +29846,79 @@
                     }
                 ]
             },
+            "CVE-2026-46229": {
+                "cve_id": "CVE-2026-46229",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdkfd: Clear VRAM on allocation to prevent stale data exposure\n\nKFD VRAM allocations set AMDGPU_GEM_CREATE_VRAM_WIPE_ON_RELEASE\nbut not AMDGPU_GEM_CREATE_VRAM_CLEARED, leaving freshly allocated\nVRAM with stale data from prior use observable by compute kernels.\n\nThe GEM ioctl path already sets VRAM_CLEARED for all userspace\nallocations via amdgpu_gem_create_ioctl() and\namdgpu_mode_dumb_create(). The KFD path was missing this flag,\nallowing stale page table remnants to leak into user buffers.\n\nThis causes crashes in RCCL P2P transport where non-zero data in\nptrExchange/head/tail fields corrupts the protocol handshake.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46230": {
+                "cve_id": "CVE-2026-46230",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vcn3: Prevent OOB reads when parsing dec msg\n\nCheck bounds against the end of the BO whenever we access the msg.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46234": {
                 "cve_id": "CVE-2026-46234",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock: fix buffer size clamping order\n\nIn vsock_update_buffer_size(), the buffer size was being clamped to the\nmaximum first, and then to the minimum. If a user sets a minimum buffer\nsize larger than the maximum, the minimum check overrides the maximum\ncheck, inverting the constraint.\n\nThis breaks the intended socket memory boundaries by allowing the\nvsk->buffer_size to grow beyond the configured vsk->buffer_max_size.\n\nFix this by checking the minimum first, and then the maximum. This\nensures the buffer size never exceeds the buffer_max_size.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46237": {
+                "cve_id": "CVE-2026-46237",
+                "title": "Rejected reason: This CVE ID has been rejected or withdrawn by it ...",
+                "description": "Rejected reason: This CVE ID has been rejected or withdrawn by its CVE Numbering Authority.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46245": {
+                "cve_id": "CVE-2026-46245",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Fix dc_link NULL handling in HPD init\n\namdgpu_dm_hpd_init() may see connectors without a valid dc_link.\n\nThe code already checks dc_link for the polling decision, but later\nunconditionally dereferences it when setting up HPD interrupts.\n\nAssign dc_link early and skip connectors where it is NULL.\n\nFixes the below:\ndrivers/gpu/drm/amd/amdgpu/../display/amdgpu_dm/amdgpu_dm_irq.c:940 amdgpu_dm_hpd_init()\nerror: we previously assumed 'dc_link' could be null (see line 931)\n\ndrivers/gpu/drm/amd/amdgpu/../display/amdgpu_dm/amdgpu_dm_irq.c\n    923                 /*\n    924                  * Analog connectors may be hot-plugged unlike other connector\n    925                  * types that don't support HPD. Only poll analog connectors.\n    926                  */\n    927                 use_polling |=\n    928                         amdgpu_dm_connector->dc_link &&\n                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ The patch adds this NULL check but hopefully it can be removed\n\n    929                         dc_connector_supports_analog(amdgpu_dm_connector->dc_link->link_id.id);\n    930\n    931                 dc_link = amdgpu_dm_connector->dc_link;\n\ndc_link assigned here.\n\n    932\n    933                 /*\n    934                  * Get a base driver irq reference for hpd ints for the lifetime\n    935                  * of dm. Note that only hpd interrupt types are registered with\n    936                  * base driver; hpd_rx types aren't. IOW, amdgpu_irq_get/put on\n    937                  * hpd_rx isn't available. DM currently controls hpd_rx\n    938                  * explicitly with dc_interrupt_set()\n    939                  */\n--> 940                 if (dc_link->irq_source_hpd != DC_IRQ_SOURCE_INVALID) {\n                            ^^^^^^^^^^^^^^^^^^^^^^^ If it's NULL then we are trouble because we dereference it here.\n\n    941                         irq_type = dc_link->irq_source_hpd - DC_IRQ_SOURCE_HPD1;\n    942                         /*\n    943                          * TODO: There's a mismatch between mode_info.num_hpd\n    944                          * and what bios reports as the # of connectors with hpd",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -29625,6 +30016,23 @@
                     }
                 ]
             },
+            "CVE-2026-46263": {
+                "cve_id": "CVE-2026-46263",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Fix out-of-bounds stream encoder index v3\n\neng_id can be negative and that stream_enc_regs[]\ncan be indexed out of bounds.\n\neng_id is used directly as an index into stream_enc_regs[], which has\nonly 5 entries. When eng_id is 5 (ENGINE_ID_DIGF) or negative, this can\naccess memory past the end of the array.\n\nAdd a bounds check using ARRAY_SIZE() before using eng_id as an index.\nThe unsigned cast also rejects negative values.\n\nThis avoids out-of-bounds access.\n\nFixes the below smatch error:\ndcn*_resource.c: stream_encoder_create() may index\nstream_enc_regs[eng_id] out of bounds (size 5).\n\ndrivers/gpu/drm/amd/amdgpu/../display/dc/resource/dcn351/dcn351_resource.c\n    1246 static struct stream_encoder *dcn35_stream_encoder_create(\n    1247         enum engine_id eng_id,\n    1248         struct dc_context *ctx)\n    1249 {\n\n    ...\n\n    1255\n    1256         /* Mapping of VPG, AFMT, DME register blocks to DIO block instance */\n    1257         if (eng_id <= ENGINE_ID_DIGF) {\n\nENGINE_ID_DIGF is 5.  should <= be <?\n\nUnrelated but, ugh, why is Smatch saying that \"eng_id\" can be negative?\nend_id is type signed long, but there are checks in the caller which prevent it from being negative.\n\n    1258                 vpg_inst = eng_id;\n    1259                 afmt_inst = eng_id;\n    1260         } else\n    1261                 return NULL;\n    1262\n\n    ...\n\n    1281\n    1282         dcn35_dio_stream_encoder_construct(enc1, ctx, ctx->dc_bios,\n    1283                                         eng_id, vpg, afmt,\n--> 1284                                         &stream_enc_regs[eng_id],\n                                                  ^^^^^^^^^^^^^^^^^^^^^^^ This stream_enc_regs[] array has 5 elements so we are one element beyond the end of the array.\n\n    ...\n\n    1287         return &enc1->base;\n    1288 }\n\nv2: use explicit bounds check as suggested by Roman/Dan; avoid unsigned int cast\n\nv3: The compiler already knows how to compare the two values, so the\n    cast (int) is not needed. (Roman)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46266": {
                 "cve_id": "CVE-2026-46266",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -29681,6 +30089,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: hci_uart: fix UAFs and race conditions in close and init paths\n\nVulnerabilities leading to Use-After-Free (UAF) and Null Pointer\nDereference (NPD) conditions were observed in the lifecycle management\nof hci_uart.\n\nThe primary issue arises because the workqueues (init_ready and\nwrite_work) are only flushed/cancelled if the HCI_UART_PROTO_READY\nflag is set during TTY close. If a hangup occurs before setup completes,\nhci_uart_tty_close() skips the teardown of these workqueues and\nproceeds to free the `hu` struct. When the scheduled work executes\nlater, it blindly dereferences the freed `hu` struct.\n\nFurthermore, several data races and UAFs were identified in the teardown\nsequence:\n1. Calling hci_uart_flush() from hci_uart_close() without effectively\n   disabling write_work causes a race condition where both can concurrently\n   double-free hu->tx_skb. This happens because protocol timers can\n   concurrently invoke hci_uart_tx_wakeup() and requeue write_work.\n2. Calling hci_free_dev(hdev) before hu->proto->close(hu) causes a UAF\n   when vendor specific protocol close callbacks dereference hu->hdev.\n3. In the initialization error paths, failing to take the proto_lock\n   write lock before clearing PROTO_READY leads to races with active\n   readers. Additionally, hci_uart_tty_receive() accesses hu->hdev\n   outside the read lock, leading to UAFs if the initialization error\n   path frees hdev concurrently.\n\nFix these synchronization and lifecycle issues by:\n1. Re-ordering hci_uart_tty_close() to clear HCI_UART_PROTO_READY first,\n   followed immediately by a cancel_work_sync(&hu->write_work). Clearing\n   the flag locks out concurrent protocol timers from successfully invoking\n   hci_uart_tx_wakeup(), effectively rendering the cancellation permanent\n   and preventing the tx_skb double-free.\n2. Note: Clearing PROTO_READY early causes hci_uart_close() to skip\n   hu->proto->flush(). This is perfectly safe in the tty_close path\n   because hu->proto->close() executes shortly after, which intrinsically\n   purges all protocol SKB queues and tears down the state.\n3. Relocating hu->proto->close(hu) strictly prior to hci_free_dev(hdev)\n   across all close and error paths to prevent vendor-level UAFs.\n4. Moving the hdev->stat.byte_rx increment in hci_uart_tty_receive()\n   inside the proto_lock read-side critical section to safely synchronize\n   with device unregistration.\n5. Adding cancel_work_sync(&hu->write_work) to hci_uart_close() to safely\n   flush the workqueue before hci_uart_flush() is invoked via the HCI core.\n6. Utilizing cancel_work_sync() instead of disable_work_sync() across\n   all paths to prevent permanently breaking user-space retry capabilities.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46276": {
+                "cve_id": "CVE-2026-46276",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix zero-size GDS range init on RDNA4\n\nRDNA4 (GFX 12) hardware removes the GDS, GWS, and OA on-chip memory\nresources. The gfx_v12_0 initialisation code correctly leaves\nadev->gds.gds_size, adev->gds.gws_size, and adev->gds.oa_size at\nzero to reflect this.\n\namdgpu_ttm_init() unconditionally calls amdgpu_ttm_init_on_chip() for\neach of these resources regardless of size. When the size is zero,\namdgpu_ttm_init_on_chip() forwards the call to ttm_range_man_init(),\nwhich calls drm_mm_init(mm, 0, 0). drm_mm_init() immediately fires\nDRM_MM_BUG_ON(start + size <= start) -- trivially true when size is\nzero -- crashing the kernel during modprobe of amdgpu on an RX 9070 XT.\n\nGuard against this by returning 0 early from\namdgpu_ttm_init_on_chip() when size_in_page is zero. This skips TTM\nresource manager registration for hardware resources that are absent,\nwithout affecting any other GPU type.\n\nDRM_MM_BUG_ON() only asserts if CONFIG_DRM_DEBUG_MM is enabled in\nthe kernel config.  This is apparently rarely enabled as these chips\nhave been in the market for over a year and this issue was only reported\nnow.\n\nOops-Analysis: http://oops.fenrus.org/reports/bugzilla.korg/221376/report.html\n(cherry picked from commit 5719ce5865279cad4fd5f01011fe037168503f2d)",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -29857,6 +30282,23 @@
                 "cve_id": "CVE-2026-46309",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe/uapi: Reject coh_none PAT index for CPU cached memory in madvise\n\nAdd validation in xe_vm_madvise_ioctl() to reject PAT indices with\nXE_COH_NONE coherency mode when applied to CPU cached memory.\n\nUsing coh_none with CPU cached buffers is a security issue. When the\nkernel clears pages before reallocation, the clear operation stays in\nCPU cache (dirty). GPU with coh_none can bypass CPU caches and read\nstale sensitive data directly from DRAM, potentially leaking data from\npreviously freed pages of other processes.\n\nThis aligns with the existing validation in vm_bind path\n(xe_vm_bind_ioctl_validate_bo).\n\nv2(Matthew brost)\n- Add fixes\n- Move one debug print to better place\n\nv3(Matthew Auld)\n- Should be drm/xe/uapi\n- More Cc\n\nv4(Shuicheng Lin)\n- Fix kmem leak issues by the way\n\nv5\n- Remove kmem leak because it has been merged by another patch\n\nv6\n- Remove the fix which is not related to current fix\n\nv7\n- No change\n\nv8\n- Rebase\n\nv9\n- Limit the restrictions to iGPU\n\nv10\n- No change\n\n(cherry picked from commit 016ccdb674b8c899940b3944952c96a6a490d10a)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46311": {
+                "cve_id": "CVE-2026-46311",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/userq: fix access to stale wptr mapping\n\nUse drm_exec to take both locks i.e vm root bo and\nwptr_obj bo to access the mapping data properly.\n\nThis fixes the security issue of unmap the wptr_obj while\na queue creation is in progress and passing other\nbo at same address.\n\n(cherry picked from commit 1fc6c8ab45dbee096469c08c13f6099d57a52d6c)",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -30902,6 +31344,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_conntrack_sip: don't use simple_strtoul\n\nReplace unsafe port parsing in epaddr_len(), ct_sip_parse_header_uri(),\nand ct_sip_parse_request() with a new sip_parse_port() helper that\nvalidates each digit against the buffer limit, eliminating the use of\nsimple_strtoul() which assumes NUL-terminated strings.\n\nThe previous code dereferenced pointers without bounds checks after\nsip_parse_addr() and relied on simple_strtoul() on non-NUL-terminated\nskb data. A port that reaches the buffer limit without a trailing\ncharacter is also rejected as malformed.\n\nAlso get rid of all simple_strtoul() usage in conntrack, prefer a\nstricter version instead.  There are intentional changes:\n\n- Bail out if number is > UINT_MAX and indicate a failure, same for\n  too long sequences.\n  While we do accept 05535 as port 5535, we will not accept e.g.\n  'sip:10.0.0.1:005060'.  While its syntactically valid under RFC 3261,\n  we should restrict this to not waste cycles when presented with\n  malformed packets with 64k '0' characters.\n\n- Force base 10 in ct_sip_parse_numerical_param(). This is used to fetch\n  'expire=' and 'rports='; both are expected to use base-10.\n\n- In nf_nat_sip.c, only accept the parsed value if its within the 1k-64k\n  range.\n\n- epaddr_len now returns 0 if the port is invalid, as it already does\n  for invalid ip addresses.  This is intentional. nf_conntrack_sip\n  performs lots of guesswork to find the right parts of the message\n  to parse.  Being stricter could break existing setups.\n  Connection tracking helpers are designed to allow traffic to\n  pass, not to block it.\n\nBased on an earlier patch from Jenny Guanni Qu <qguanni@gmail.com>.",
                 "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-52987": {
+                "cve_id": "CVE-2026-52987",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: avoid double drm_exec_fini() in userq validate\n\nWhen new_addition is true, amdgpu_userq_vm_validate() calls\ndrm_exec_fini(&exec) before iterating over the collected HMM ranges and\ncalling amdgpu_ttm_tt_get_user_pages().\n\nIf amdgpu_ttm_tt_get_user_pages() fails in that path, the code jumps to\nunlock_all and calls drm_exec_fini(&exec) a second time on the same\nexec object. drm_exec_fini() is not idempotent: it frees exec->objects\nand may also drop exec->contended and finalize the ww acquire context.\n\nRoute that error path directly to the range cleanup once exec has\nalready been finalized.\n\nIssue found using a prototype static analysis tool\nand confirmed by code review.\n\n(cherry picked from commit 2802952e4a07306da6ebe813ff1acacc5691851a)",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -56291,6 +56750,23 @@
                     }
                 ]
             },
+            "CVE-2025-68793": {
+                "cve_id": "CVE-2025-68793",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix a job->pasid access race in gpu recovery\n\nAvoid a possible UAF in GPU recovery due to a race between\nthe sched timeout callback and the tdr work queue.\n\nThe gpu recovery function calls drm_sched_stop() and\nlater drm_sched_start().  drm_sched_start() restarts\nthe tdr queue which will eventually free the job.  If\nthe tdr queue frees the job before time out callback\ncompletes, the job will be freed and we'll get a UAF\nwhen accessing the pasid.  Cache it early to avoid the\nUAF.\n\nExample KASAN trace:\n[  493.058141] BUG: KASAN: slab-use-after-free in amdgpu_device_gpu_recover+0x968/0x990 [amdgpu]\n[  493.067530] Read of size 4 at addr ffff88b0ce3f794c by task kworker/u128:1/323\n[  493.074892]\n[  493.076485] CPU: 9 UID: 0 PID: 323 Comm: kworker/u128:1 Tainted: G            E       6.16.0-1289896.2.zuul.bf4f11df81c1410bbe901c4373305a31 #1 PREEMPT(voluntary)\n[  493.076493] Tainted: [E]=UNSIGNED_MODULE\n[  493.076495] Hardware name: TYAN B8021G88V2HR-2T/S8021GM2NR-2T, BIOS V1.03.B10 04/01/2019\n[  493.076500] Workqueue: amdgpu-reset-dev drm_sched_job_timedout [gpu_sched]\n[  493.076512] Call Trace:\n[  493.076515]  <TASK>\n[  493.076518]  dump_stack_lvl+0x64/0x80\n[  493.076529]  print_report+0xce/0x630\n[  493.076536]  ? _raw_spin_lock_irqsave+0x86/0xd0\n[  493.076541]  ? __pfx__raw_spin_lock_irqsave+0x10/0x10\n[  493.076545]  ? amdgpu_device_gpu_recover+0x968/0x990 [amdgpu]\n[  493.077253]  kasan_report+0xb8/0xf0\n[  493.077258]  ? amdgpu_device_gpu_recover+0x968/0x990 [amdgpu]\n[  493.077965]  amdgpu_device_gpu_recover+0x968/0x990 [amdgpu]\n[  493.078672]  ? __pfx_amdgpu_device_gpu_recover+0x10/0x10 [amdgpu]\n[  493.079378]  ? amdgpu_coredump+0x1fd/0x4c0 [amdgpu]\n[  493.080111]  amdgpu_job_timedout+0x642/0x1400 [amdgpu]\n[  493.080903]  ? pick_task_fair+0x24e/0x330\n[  493.080910]  ? __pfx_amdgpu_job_timedout+0x10/0x10 [amdgpu]\n[  493.081702]  ? _raw_spin_lock+0x75/0xc0\n[  493.081708]  ? __pfx__raw_spin_lock+0x10/0x10\n[  493.081712]  drm_sched_job_timedout+0x1b0/0x4b0 [gpu_sched]\n[  493.081721]  ? __pfx__raw_spin_lock_irq+0x10/0x10\n[  493.081725]  process_one_work+0x679/0xff0\n[  493.081732]  worker_thread+0x6ce/0xfd0\n[  493.081736]  ? __pfx_worker_thread+0x10/0x10\n[  493.081739]  kthread+0x376/0x730\n[  493.081744]  ? __pfx_kthread+0x10/0x10\n[  493.081748]  ? __pfx__raw_spin_lock_irq+0x10/0x10\n[  493.081751]  ? __pfx_kthread+0x10/0x10\n[  493.081755]  ret_from_fork+0x247/0x330\n[  493.081761]  ? __pfx_kthread+0x10/0x10\n[  493.081764]  ret_from_fork_asm+0x1a/0x30\n[  493.081771]  </TASK>\n\n(cherry picked from commit 20880a3fd5dd7bca1a079534cf6596bda92e107d)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2025-68794": {
                 "cve_id": "CVE-2025-68794",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -57447,6 +57923,23 @@
                     }
                 ]
             },
+            "CVE-2025-71293": {
+                "cve_id": "CVE-2025-71293",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/ras: Move ras data alloc before bad page check\n\nIn the rare event if eeprom has only invalid address entries,\nallocation is skipped, this causes following NULL pointer issue\n[  547.103445] BUG: kernel NULL pointer dereference, address: 0000000000000010\n[  547.118897] #PF: supervisor read access in kernel mode\n[  547.130292] #PF: error_code(0x0000) - not-present page\n[  547.141689] PGD 124757067 P4D 0\n[  547.148842] Oops: 0000 [#1] PREEMPT SMP NOPTI\n[  547.158504] CPU: 49 PID: 8167 Comm: cat Tainted: G           OE      6.8.0-38-generic #38-Ubuntu\n[  547.177998] Hardware name: Supermicro AS -8126GS-TNMR/H14DSG-OD, BIOS 1.7 09/12/2025\n[  547.195178] RIP: 0010:amdgpu_ras_sysfs_badpages_read+0x2f2/0x5d0 [amdgpu]\n[  547.210375] Code: e8 63 78 82 c0 45 31 d2 45 3b 75 08 48 8b 45 a0 73 44 44 89 f1 48 8b 7d 88 48 89 ca 48 c1 e2 05 48 29 ca 49 8b 4d 00 48 01 d1 <48> 83 79 10 00 74 17 49 63 f2 48 8b 49 08 41 83 c2 01 48 8d 34 76\n[  547.252045] RSP: 0018:ffa0000067287ac0 EFLAGS: 00010246\n[  547.263636] RAX: ff11000167c28130 RBX: ff11000127600000 RCX: 0000000000000000\n[  547.279467] RDX: 0000000000000000 RSI: 0000000000000000 RDI: ff11000125b1c800\n[  547.295298] RBP: ffa0000067287b50 R08: 0000000000000000 R09: 0000000000000000\n[  547.311129] R10: 0000000000000000 R11: 0000000000000000 R12: 0000000000000000\n[  547.326959] R13: ff11000217b1de00 R14: 0000000000000000 R15: 0000000000000092\n[  547.342790] FS:  0000746e59d14740(0000) GS:ff11017dfda80000(0000) knlGS:0000000000000000\n[  547.360744] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[  547.373489] CR2: 0000000000000010 CR3: 000000019585e001 CR4: 0000000000f71ef0\n[  547.389321] PKRU: 55555554\n[  547.395316] Call Trace:\n[  547.400737]  <TASK>\n[  547.405386]  ? show_regs+0x6d/0x80\n[  547.412929]  ? __die+0x24/0x80\n[  547.419697]  ? page_fault_oops+0x99/0x1b0\n[  547.428588]  ? do_user_addr_fault+0x2ee/0x6b0\n[  547.438249]  ? exc_page_fault+0x83/0x1b0\n[  547.446949]  ? asm_exc_page_fault+0x27/0x30\n[  547.456225]  ? amdgpu_ras_sysfs_badpages_read+0x2f2/0x5d0 [amdgpu]\n[  547.470040]  ? mas_wr_modify+0xcd/0x140\n[  547.478548]  sysfs_kf_bin_read+0x63/0xb0\n[  547.487248]  kernfs_file_read_iter+0xa1/0x190\n[  547.496909]  kernfs_fop_read_iter+0x25/0x40\n[  547.506182]  vfs_read+0x255/0x390\n\nThis also result in space left assigned to negative values.\nMoving data alloc call before bad page check resolves both the issue.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2025-71295": {
                 "cve_id": "CVE-2025-71295",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -58013,6 +58506,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnull_blk: fix kmemleak by releasing references to fault configfs items\n\nWhen CONFIG_BLK_DEV_NULL_BLK_FAULT_INJECTION is enabled, the null-blk\ndriver sets up fault injection support by creating the timeout_inject,\nrequeue_inject, and init_hctx_fault_inject configfs items as children\nof the top-level nullbX configfs group.\n\nHowever, when the nullbX device is removed, the references taken to\nthese fault-config configfs items are not released. As a result,\nkmemleak reports a memory leak, for example:\n\nunreferenced object 0xc00000021ff25c40 (size 32):\n  comm \"mkdir\", pid 10665, jiffies 4322121578\n  hex dump (first 32 bytes):\n    69 6e 69 74 5f 68 63 74 78 5f 66 61 75 6c 74 5f  init_hctx_fault_\n    69 6e 6a 65 63 74 00 88 00 00 00 00 00 00 00 00  inject..........\n  backtrace (crc 1a018c86):\n    __kmalloc_node_track_caller_noprof+0x494/0xbd8\n    kvasprintf+0x74/0xf4\n    config_item_set_name+0xf0/0x104\n    config_group_init_type_name+0x48/0xfc\n    fault_config_init+0x48/0xf0\n    0xc0080000180559e4\n    configfs_mkdir+0x304/0x814\n    vfs_mkdir+0x49c/0x604\n    do_mkdirat+0x314/0x3d0\n    sys_mkdir+0xa0/0xd8\n    system_call_exception+0x1b0/0x4f0\n    system_call_vectored_common+0x15c/0x2ec\n\nFix this by explicitly releasing the references to the fault-config\nconfigfs items when dropping the reference to the top-level nullbX\nconfigfs group.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-23034": {
+                "cve_id": "CVE-2026-23034",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/userq: Fix fence reference leak on queue teardown v2\n\nThe user mode queue keeps a pointer to the most recent fence in\nuserq->last_fence. This pointer holds an extra dma_fence reference.\n\nWhen the queue is destroyed, we free the fence driver and its xarray,\nbut we forgot to drop the last_fence reference.\n\nBecause of the missing dma_fence_put(), the last fence object can stay\nalive when the driver unloads. This leaves an allocated object in the\namdgpu_userq_fence slab cache and triggers\n\nThis is visible during driver unload as:\n\n  BUG amdgpu_userq_fence: Objects remaining on __kmem_cache_shutdown()\n  kmem_cache_destroy amdgpu_userq_fence: Slab cache still has objects\n  Call Trace:\n    kmem_cache_destroy\n    amdgpu_userq_fence_slab_fini\n    amdgpu_exit\n    __do_sys_delete_module\n\nFix this by putting userq->last_fence and clearing the pointer during\namdgpu_userq_fence_driver_free().\n\nThis makes sure the fence reference is released and the slab cache is\nempty when the module exits.\n\nv2: Update to only release userq->last_fence with dma_fence_put()\n    (Christian)\n\n(cherry picked from commit 8e051e38a8d45caf6a866d4ff842105b577953bb)",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -58943,6 +59453,23 @@
                     }
                 ]
             },
+            "CVE-2026-23163": {
+                "cve_id": "CVE-2026-23163",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix NULL pointer dereference in amdgpu_gmc_filter_faults_remove\n\nOn APUs such as Raven and Renoir (GC 9.1.0, 9.2.2, 9.3.0), the ih1 and\nih2 interrupt ring buffers are not initialized. This is by design, as\nthese secondary IH rings are only available on discrete GPUs. See\nvega10_ih_sw_init() which explicitly skips ih1/ih2 initialization when\nAMD_IS_APU is set.\n\nHowever, amdgpu_gmc_filter_faults_remove() unconditionally uses ih1 to\nget the timestamp of the last interrupt entry. When retry faults are\nenabled on APUs (noretry=0), this function is called from the SVM page\nfault recovery path, resulting in a NULL pointer dereference when\namdgpu_ih_decode_iv_ts_helper() attempts to access ih->ring[].\n\nThe crash manifests as:\n\n  BUG: kernel NULL pointer dereference, address: 0000000000000004\n  RIP: 0010:amdgpu_ih_decode_iv_ts_helper+0x22/0x40 [amdgpu]\n  Call Trace:\n   amdgpu_gmc_filter_faults_remove+0x60/0x130 [amdgpu]\n   svm_range_restore_pages+0xae5/0x11c0 [amdgpu]\n   amdgpu_vm_handle_fault+0xc8/0x340 [amdgpu]\n   gmc_v9_0_process_interrupt+0x191/0x220 [amdgpu]\n   amdgpu_irq_dispatch+0xed/0x2c0 [amdgpu]\n   amdgpu_ih_process+0x84/0x100 [amdgpu]\n\nThis issue was exposed by commit 1446226d32a4 (\"drm/amdgpu: Remove GC HW\nIP 9.3.0 from noretry=1\") which changed the default for Renoir APU from\nnoretry=1 to noretry=0, enabling retry fault handling and thus\nexercising the buggy code path.\n\nFix this by adding a check for ih1.ring_size before attempting to use\nit. Also restore the soft_ih support from commit dd299441654f (\"drm/amdgpu:\nRework retry fault removal\").  This is needed if the hardware doesn't\nsupport secondary HW IH rings.\n\nv2: additional updates (Alex)\n\n(cherry picked from commit 6ce8d536c80aa1f059e82184f0d1994436b1d526)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-23164": {
                 "cve_id": "CVE-2026-23164",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -59202,6 +59729,23 @@
                 "cve_id": "CVE-2026-23212",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbonding: annotate data-races around slave->last_rx\n\nslave->last_rx and slave->target_last_arp_rx[...] can be read and written\nlocklessly. Add READ_ONCE() and WRITE_ONCE() annotations.\n\nsyzbot reported:\n\nBUG: KCSAN: data-race in bond_rcv_validate / bond_rcv_validate\n\nwrite to 0xffff888149f0d428 of 8 bytes by interrupt on cpu 1:\n  bond_rcv_validate+0x202/0x7a0 drivers/net/bonding/bond_main.c:3335\n  bond_handle_frame+0xde/0x5e0 drivers/net/bonding/bond_main.c:1533\n  __netif_receive_skb_core+0x5b1/0x1950 net/core/dev.c:6039\n  __netif_receive_skb_one_core net/core/dev.c:6150 [inline]\n  __netif_receive_skb+0x59/0x270 net/core/dev.c:6265\n  netif_receive_skb_internal net/core/dev.c:6351 [inline]\n  netif_receive_skb+0x4b/0x2d0 net/core/dev.c:6410\n...\n\nwrite to 0xffff888149f0d428 of 8 bytes by interrupt on cpu 0:\n  bond_rcv_validate+0x202/0x7a0 drivers/net/bonding/bond_main.c:3335\n  bond_handle_frame+0xde/0x5e0 drivers/net/bonding/bond_main.c:1533\n  __netif_receive_skb_core+0x5b1/0x1950 net/core/dev.c:6039\n  __netif_receive_skb_one_core net/core/dev.c:6150 [inline]\n  __netif_receive_skb+0x59/0x270 net/core/dev.c:6265\n  netif_receive_skb_internal net/core/dev.c:6351 [inline]\n  netif_receive_skb+0x4b/0x2d0 net/core/dev.c:6410\n  br_netif_receive_skb net/bridge/br_input.c:30 [inline]\n  NF_HOOK include/linux/netfilter.h:318 [inline]\n...\n\nvalue changed: 0x0000000100005365 -> 0x0000000100005366",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-23213": {
+                "cve_id": "CVE-2026-23213",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/pm: Disable MMIO access during SMU Mode 1 reset\n\nDuring Mode 1 reset, the ASIC undergoes a reset cycle and becomes\ntemporarily inaccessible via PCIe. Any attempt to access MMIO registers\nduring this window (e.g., from interrupt handlers or other driver threads)\ncan result in uncompleted PCIe transactions, leading to NMI panics or\nsystem hangs.\n\nTo prevent this, set the `no_hw_access` flag to true immediately after\ntriggering the reset. This signals other driver components to skip\nregister accesses while the device is offline.\n\nA memory barrier `smp_mb()` is added to ensure the flag update is\nglobally visible to all cores before the driver enters the sleep/wait\nstate.\n\n(cherry picked from commit 7edb503fe4b6d67f47d8bb0dfafb8e699bb0f8a4)",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -60036,6 +60580,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: cfg80211: cancel rfkill_block work in wiphy_unregister()\n\nThere is a use-after-free error in cfg80211_shutdown_all_interfaces found\nby syzkaller:\n\nBUG: KASAN: use-after-free in cfg80211_shutdown_all_interfaces+0x213/0x220\nRead of size 8 at addr ffff888112a78d98 by task kworker/0:5/5326\nCPU: 0 UID: 0 PID: 5326 Comm: kworker/0:5 Not tainted 6.19.0-rc2 #2 PREEMPT(voluntary)\nHardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS 1.15.0-1 04/01/2014\nWorkqueue: events cfg80211_rfkill_block_work\nCall Trace:\n <TASK>\n dump_stack_lvl+0x116/0x1f0\n print_report+0xcd/0x630\n kasan_report+0xe0/0x110\n cfg80211_shutdown_all_interfaces+0x213/0x220\n cfg80211_rfkill_block_work+0x1e/0x30\n process_one_work+0x9cf/0x1b70\n worker_thread+0x6c8/0xf10\n kthread+0x3c5/0x780\n ret_from_fork+0x56d/0x700\n ret_from_fork_asm+0x1a/0x30\n </TASK>\n\nThe problem arises due to the rfkill_block work is not cancelled when wiphy\nis being unregistered. In order to fix the issue cancel the corresponding\nwork in wiphy_unregister().\n\nFound by Linux Verification Center (linuxtesting.org) with Syzkaller.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-23338": {
+                "cve_id": "CVE-2026-23338",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/userq: Do not allow userspace to trivially triger kernel warnings\n\nUserspace can either deliberately pass in the too small num_fences, or the\nrequired number can legitimately grow between the two calls to the userq\nwait ioctl. In both cases we do not want the emit the kernel warning\nbacktrace since nothing is wrong with the kernel and userspace will simply\nget an errno reported back. So lets simply drop the WARN_ONs.\n\n(cherry picked from commit 2c333ea579de6cc20ea7bc50e9595ef72863e65c)",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -61786,6 +62347,23 @@
                 "cve_id": "CVE-2026-31458",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmm/damon/sysfs: check contexts->nr before accessing contexts_arr[0]\n\nMultiple sysfs command paths dereference contexts_arr[0] without first\nverifying that kdamond->contexts->nr == 1.  A user can set nr_contexts to\n0 via sysfs while DAMON is running, causing NULL pointer dereferences.\n\nIn more detail, the issue can be triggered by privileged users like\nbelow.\n\nFirst, start DAMON and make contexts directory empty\n(kdamond->contexts->nr == 0).\n\n    # damo start\n    # cd /sys/kernel/mm/damon/admin/kdamonds/0\n    # echo 0 > contexts/nr_contexts\n\nThen, each of below commands will cause the NULL pointer dereference.\n\n    # echo update_schemes_stats > state\n    # echo update_schemes_tried_regions > state\n    # echo update_schemes_tried_bytes > state\n    # echo update_schemes_effective_quotas > state\n    # echo update_tuned_intervals > state\n\nGuard all commands (except OFF) at the entry point of\ndamon_sysfs_handle_cmd().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-31462": {
+                "cve_id": "CVE-2026-31462",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: prevent immediate PASID reuse case\n\nPASID resue could cause interrupt issue when process\nimmediately runs into hw state left by previous\nprocess exited with the same PASID, it's possible that\npage faults are still pending in the IH ring buffer when\nthe process exits and frees up its PASID. To prevent the\ncase, it uses idr cyclic allocator same as kernel pid's.\n\n(cherry picked from commit 8f1de51f49be692de137c8525106e0fce2d1912d)",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -64111,6 +64689,23 @@
                     }
                 ]
             },
+            "CVE-2026-31765": {
+                "cve_id": "CVE-2026-31765",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: Change AMDGPU_VA_RESERVED_TRAP_SIZE to 64KB\n\nCurrently, AMDGPU_VA_RESERVED_TRAP_SIZE is hardcoded to 8KB, while\nKFD_CWSR_TBA_TMA_SIZE is defined as 2 * PAGE_SIZE. On systems with\n4K pages, both values match (8KB), so allocation and reserved space\nare consistent.\n\nHowever, on 64K page-size systems, KFD_CWSR_TBA_TMA_SIZE becomes 128KB,\nwhile the reserved trap area remains 8KB. This mismatch causes the\nkernel to crash when running rocminfo or rccl unit tests.\n\nKernel attempted to read user page (2) - exploit attempt? (uid: 1001)\nBUG: Kernel NULL pointer dereference on read at 0x00000002\nFaulting instruction address: 0xc0000000002c8a64\nOops: Kernel access of bad area, sig: 11 [#1]\nLE PAGE_SIZE=64K MMU=Radix SMP NR_CPUS=2048 NUMA pSeries\nCPU: 34 UID: 1001 PID: 9379 Comm: rocminfo Tainted: G E\n6.19.0-rc4-amdgpu-00320-gf23176405700 #56 VOLUNTARY\nTainted: [E]=UNSIGNED_MODULE\nHardware name: IBM,9105-42A POWER10 (architected) 0x800200 0xf000006\nof:IBM,FW1060.30 (ML1060_896) hv:phyp pSeries\nNIP:  c0000000002c8a64 LR: c00000000125dbc8 CTR: c00000000125e730\nREGS: c0000001e0957580 TRAP: 0300 Tainted: G E\nMSR:  8000000000009033 <SF,EE,ME,IR,DR,RI,LE> CR: 24008268\nXER: 00000036\nCFAR: c00000000125dbc4 DAR: 0000000000000002 DSISR: 40000000\nIRQMASK: 1\nGPR00: c00000000125d908 c0000001e0957820 c0000000016e8100\nc00000013d814540\nGPR04: 0000000000000002 c00000013d814550 0000000000000045\n0000000000000000\nGPR08: c00000013444d000 c00000013d814538 c00000013d814538\n0000000084002268\nGPR12: c00000000125e730 c000007e2ffd5f00 ffffffffffffffff\n0000000000020000\nGPR16: 0000000000000000 0000000000000002 c00000015f653000\n0000000000000000\nGPR20: c000000138662400 c00000013d814540 0000000000000000\nc00000013d814500\nGPR24: 0000000000000000 0000000000000002 c0000001e0957888\nc0000001e0957878\nGPR28: c00000013d814548 0000000000000000 c00000013d814540\nc0000001e0957888\nNIP [c0000000002c8a64] __mutex_add_waiter+0x24/0xc0\nLR [c00000000125dbc8] __mutex_lock.constprop.0+0x318/0xd00\nCall Trace:\n0xc0000001e0957890 (unreliable)\n__mutex_lock.constprop.0+0x58/0xd00\namdgpu_amdkfd_gpuvm_alloc_memory_of_gpu+0x6fc/0xb60 [amdgpu]\nkfd_process_alloc_gpuvm+0x54/0x1f0 [amdgpu]\nkfd_process_device_init_cwsr_dgpu+0xa4/0x1a0 [amdgpu]\nkfd_process_device_init_vm+0xd8/0x2e0 [amdgpu]\nkfd_ioctl_acquire_vm+0xd0/0x130 [amdgpu]\nkfd_ioctl+0x514/0x670 [amdgpu]\nsys_ioctl+0x134/0x180\nsystem_call_exception+0x114/0x300\nsystem_call_vectored_common+0x15c/0x2ec\n\nThis patch changes AMDGPU_VA_RESERVED_TRAP_SIZE to 64 KB and\nKFD_CWSR_TBA_TMA_SIZE to the AMD GPU page size. This means we reserve\n64 KB for the trap in the address space, but only allocate 8 KB within\nit. With this approach, the allocation size never exceeds the reserved\narea.\n\n(cherry picked from commit 31b8de5e55666f26ea7ece5f412b83eab3f56dbb)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-31771": {
                 "cve_id": "CVE-2026-31771",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -65828,6 +66423,23 @@
                     }
                 ]
             },
+            "CVE-2026-43195": {
+                "cve_id": "CVE-2026-43195",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: validate user queue size constraints\n\nAdd validation to ensure user queue sizes meet hardware requirements:\n- Size must be a power of two for efficient ring buffer wrapping\n- Size must be at least AMDGPU_GPU_PAGE_SIZE to prevent undersized allocations\n\nThis prevents invalid configurations that could lead to GPU faults or\nunexpected behavior.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-43199": {
                 "cve_id": "CVE-2026-43199",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -66498,6 +67110,23 @@
                     }
                 ]
             },
+            "CVE-2026-43318": {
+                "cve_id": "CVE-2026-43318",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix sync handling in amdgpu_dma_buf_move_notify\n\nInvalidating a dmabuf will impact other users of the shared BO.\nIn the scenario where process A moves the BO, it needs to inform\nprocess B about the move and process B will need to update its\npage table.\n\nThe commit fixes a synchronisation bug caused by the use of the\nticket: it made amdgpu_vm_handle_moved behave as if updating\nthe page table immediately was correct but in this case it's not.\n\nAn example is the following scenario, with 2 GPUs and glxgears\nrunning on GPU0 and Xorg running on GPU1, on a system where P2P\nPCI isn't supported:\n\nglxgears:\n  export linear buffer from GPU0 and import using GPU1\n  submit frame rendering to GPU0\n  submit tiled->linear blit\nXorg:\n  copy of linear buffer\n\nThe sequence of jobs would be:\n  drm_sched_job_run                       # GPU0, frame rendering\n  drm_sched_job_queue                     # GPU0, blit\n  drm_sched_job_done                      # GPU0, frame rendering\n  drm_sched_job_run                       # GPU0, blit\n  move linear buffer for GPU1 access      #\n  amdgpu_dma_buf_move_notify -> update pt # GPU0\n\nIt this point the blit job on GPU0 is still running and would\nlikely produce a page fault.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-43321": {
                 "cve_id": "CVE-2026-43321",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -66876,6 +67505,57 @@
                 "cve_id": "CVE-2026-43396",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe/sync: Fix user fence leak on alloc failure\n\nWhen dma_fence_chain_alloc() fails, properly release the user fence\nreference to prevent a memory leak.\n\n(cherry picked from commit a5d5634cde48a9fcd68c8504aa07f89f175074a0)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-43398": {
+                "cve_id": "CVE-2026-43398",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: add upper bound check on user inputs in wait ioctl\n\nHuge input values in amdgpu_userq_wait_ioctl can lead to a OOM and\ncould be exploited.\n\nSo check these input value against AMDGPU_USERQ_MAX_HANDLES\nwhich is big enough value for genuine use cases and could\npotentially avoid OOM.\n\nv2: squash in Srini's fix\n\n(cherry picked from commit fcec012c664247531aed3e662f4280ff804d1476)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-43399": {
+                "cve_id": "CVE-2026-43399",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/userq: Fix reference leak in amdgpu_userq_wait_ioctl\n\nDrop reference to syncobj and timeline fence when aborting the ioctl due\noutput array being too small.\n\n(cherry picked from commit 68951e9c3e6bb22396bc42ef2359751c8315dd27)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-43400": {
+                "cve_id": "CVE-2026-43400",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: add upper bound check on user inputs in signal ioctl\n\nHuge input values in amdgpu_userq_signal_ioctl can lead to a OOM and\ncould be exploited.\n\nSo check these input value against AMDGPU_USERQ_MAX_HANDLES\nwhich is big enough value for genuine use cases and could\npotentially avoid OOM.\n\n(cherry picked from commit be267e15f99bc97cbe202cd556717797cdcf79a5)",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -67943,6 +68623,23 @@
                     }
                 ]
             },
+            "CVE-2026-45853": {
+                "cve_id": "CVE-2026-45853",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: Use kvfree instead of kfree in amdgpu_gmc_get_nps_memranges()\n\namdgpu_discovery_get_nps_info() internally allocates memory for ranges\nusing kvcalloc(), which may use vmalloc() for large allocation. Using\nkfree() to release vmalloc memory will lead to a memory corruption.\n\nUse kvfree() to safely handle both kmalloc and vmalloc allocations.\n\nCompile tested only. Issue found using a prototype static analysis tool\nand code review.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-45855": {
                 "cve_id": "CVE-2026-45855",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -68084,6 +68781,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nHID: intel-ish-hid: fix NULL-ptr-deref in ishtp_bus_remove_all_clients\n\nDuring a warm reset flow, the cl->device pointer may be NULL if the\nreset occurs while clients are still being enumerated. Accessing\ncl->device->reference_count without a NULL check leads to a kernel panic.\n\nThis issue was identified during multi-unit warm reboot stress clycles.\nAdd a defensive NULL check for cl->device to ensure stability under\nsuch intensive testing conditions.\n\nKASAN: null-ptr-deref in range [0000000000000000-0000000000000007]\nWorkqueue: ish_fw_update_wq fw_reset_work_fn\n\nCall Trace:\n ishtp_bus_remove_all_clients+0xbe/0x130 [intel_ishtp]\n ishtp_reset_handler+0x85/0x1a0 [intel_ishtp]\n fw_reset_work_fn+0x8a/0xc0 [intel_ish_ipc]",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-45878": {
+                "cve_id": "CVE-2026-45878",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdkfd: Fix watch_id bounds checking in debug address watch v2\n\nThe address watch clear code receives watch_id as an unsigned value\n(u32), but some helper functions were using a signed int and checked\nbits by shifting with watch_id.\n\nIf a very large watch_id is passed from userspace, it can be converted\nto a negative value.  This can cause invalid shifts and may access\nmemory outside the watch_points array.\n\ndrm/amdkfd: Fix watch_id bounds checking in debug address watch v2\n\nFix this by checking that watch_id is within MAX_WATCH_ADDRESSES before\nusing it.  Also use BIT(watch_id) to test and clear bits safely.\n\nThis keeps the behavior unchanged for valid watch IDs and avoids\nundefined behavior for invalid ones.\n\nFixes the below:\ndrivers/gpu/drm/amd/amdgpu/../amdkfd/kfd_debug.c:448\nkfd_dbg_trap_clear_dev_address_watch() error: buffer overflow\n'pdd->watch_points' 4 <= u32max user_rl='0-3,2147483648-u32max' uncapped\n\ndrivers/gpu/drm/amd/amdgpu/../amdkfd/kfd_debug.c\n    433 int kfd_dbg_trap_clear_dev_address_watch(struct kfd_process_device *pdd,\n    434                                         uint32_t watch_id)\n    435 {\n    436         int r;\n    437\n    438         if (!kfd_dbg_owns_dev_watch_id(pdd, watch_id))\n\nkfd_dbg_owns_dev_watch_id() doesn't check for negative values so if\nwatch_id is larger than INT_MAX it leads to a buffer overflow.\n(Negative shifts are undefined).\n\n    439                 return -EINVAL;\n    440\n    441         if (!pdd->dev->kfd->shared_resources.enable_mes) {\n    442                 r = debug_lock_and_unmap(pdd->dev->dqm);\n    443                 if (r)\n    444                         return r;\n    445         }\n    446\n    447         amdgpu_gfx_off_ctrl(pdd->dev->adev, false);\n--> 448         pdd->watch_points[watch_id] = pdd->dev->kfd2kgd->clear_address_watch(\n    449                                                         pdd->dev->adev,\n    450                                                         watch_id);\n\nv2: (as per, Jonathan Kim)\n - Add early watch_id >= MAX_WATCH_ADDRESSES validation in the set path to\n   match the clear path.\n - Drop the redundant bounds check in kfd_dbg_owns_dev_watch_id().",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -70170,10 +70884,61 @@
                     }
                 ]
             },
+            "CVE-2026-46197": {
+                "cve_id": "CVE-2026-46197",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdkfd: validate SVM ioctl nattr against buffer size\n\nValidate nattr field against the buffer size, preventing\nout-of-bounds buffer access via user-controlled attribute count.\n\n(cherry picked from commit 5eca8bfdfa456c3304ca77523718fe24254c172f)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46199": {
+                "cve_id": "CVE-2026-46199",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vcn4: Prevent OOB reads when parsing dec msg\n\nCheck bounds against the end of the BO whenever we access the msg.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46201": {
                 "cve_id": "CVE-2026-46201",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe: Fix dma-buf attachment leak in xe_gem_prime_import()\n\nWhen xe_dma_buf_init_obj() fails, the attachment from\ndma_buf_dynamic_attach() is not detached. Add dma_buf_detach() before\nreturning the error. Note: we cannot use goto out_err here because\nxe_dma_buf_init_obj() already frees bo on failure, and out_err would\ndouble-free it.\n\n(cherry picked from commit a828eb185aac41800df8eae4b60501ccc0dbbe51)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46204": {
+                "cve_id": "CVE-2026-46204",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vcn4: Prevent OOB reads when parsing IB\n\nRewrite the IB parsing to use amdgpu_ib_get_value() which handles the\nbounds checks.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -70238,6 +71003,23 @@
                     }
                 ]
             },
+            "CVE-2026-46220": {
+                "cve_id": "CVE-2026-46220",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/sdma4: replace BUG_ON with WARN_ON in fence emission\n\nsdma_v4_0_ring_emit_fence() contains two BUG_ON(addr & 0x3) assertions\nthat verify fence writeback addresses are dword-aligned.  These\nassertions can be reached from unprivileged userspace via crafted\nDRM_IOCTL_AMDGPU_CS submissions, causing a fatal kernel panic in a\nscheduler worker thread.\n\nReplace both BUG_ON() calls with WARN_ON() to log the condition without\ncrashing the kernel.  A misaligned fence address at this point indicates\na driver bug, but crashing the kernel is never the correct response when\nthe assertion is reachable from userspace.\n\nThe CS IOCTL path is the correct place to filter invalid submissions;\nthe ring emission callback is too late to do anything about it.\n\n(cherry picked from commit b90250bd933afd1ba94d86d6b13821997b22b18e)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46224": {
                 "cve_id": "CVE-2026-46224",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -70255,11 +71037,79 @@
                     }
                 ]
             },
+            "CVE-2026-46229": {
+                "cve_id": "CVE-2026-46229",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdkfd: Clear VRAM on allocation to prevent stale data exposure\n\nKFD VRAM allocations set AMDGPU_GEM_CREATE_VRAM_WIPE_ON_RELEASE\nbut not AMDGPU_GEM_CREATE_VRAM_CLEARED, leaving freshly allocated\nVRAM with stale data from prior use observable by compute kernels.\n\nThe GEM ioctl path already sets VRAM_CLEARED for all userspace\nallocations via amdgpu_gem_create_ioctl() and\namdgpu_mode_dumb_create(). The KFD path was missing this flag,\nallowing stale page table remnants to leak into user buffers.\n\nThis causes crashes in RCCL P2P transport where non-zero data in\nptrExchange/head/tail fields corrupts the protocol handshake.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46230": {
+                "cve_id": "CVE-2026-46230",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/vcn3: Prevent OOB reads when parsing dec msg\n\nCheck bounds against the end of the BO whenever we access the msg.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46234": {
                 "cve_id": "CVE-2026-46234",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock: fix buffer size clamping order\n\nIn vsock_update_buffer_size(), the buffer size was being clamped to the\nmaximum first, and then to the minimum. If a user sets a minimum buffer\nsize larger than the maximum, the minimum check overrides the maximum\ncheck, inverting the constraint.\n\nThis breaks the intended socket memory boundaries by allowing the\nvsk->buffer_size to grow beyond the configured vsk->buffer_max_size.\n\nFix this by checking the minimum first, and then the maximum. This\nensures the buffer size never exceeds the buffer_max_size.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46237": {
+                "cve_id": "CVE-2026-46237",
+                "title": "Rejected reason: This CVE ID has been rejected or withdrawn by it ...",
+                "description": "Rejected reason: This CVE ID has been rejected or withdrawn by its CVE Numbering Authority.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46245": {
+                "cve_id": "CVE-2026-46245",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Fix dc_link NULL handling in HPD init\n\namdgpu_dm_hpd_init() may see connectors without a valid dc_link.\n\nThe code already checks dc_link for the polling decision, but later\nunconditionally dereferences it when setting up HPD interrupts.\n\nAssign dc_link early and skip connectors where it is NULL.\n\nFixes the below:\ndrivers/gpu/drm/amd/amdgpu/../display/amdgpu_dm/amdgpu_dm_irq.c:940 amdgpu_dm_hpd_init()\nerror: we previously assumed 'dc_link' could be null (see line 931)\n\ndrivers/gpu/drm/amd/amdgpu/../display/amdgpu_dm/amdgpu_dm_irq.c\n    923                 /*\n    924                  * Analog connectors may be hot-plugged unlike other connector\n    925                  * types that don't support HPD. Only poll analog connectors.\n    926                  */\n    927                 use_polling |=\n    928                         amdgpu_dm_connector->dc_link &&\n                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ The patch adds this NULL check but hopefully it can be removed\n\n    929                         dc_connector_supports_analog(amdgpu_dm_connector->dc_link->link_id.id);\n    930\n    931                 dc_link = amdgpu_dm_connector->dc_link;\n\ndc_link assigned here.\n\n    932\n    933                 /*\n    934                  * Get a base driver irq reference for hpd ints for the lifetime\n    935                  * of dm. Note that only hpd interrupt types are registered with\n    936                  * base driver; hpd_rx types aren't. IOW, amdgpu_irq_get/put on\n    937                  * hpd_rx isn't available. DM currently controls hpd_rx\n    938                  * explicitly with dc_interrupt_set()\n    939                  */\n--> 940                 if (dc_link->irq_source_hpd != DC_IRQ_SOURCE_INVALID) {\n                            ^^^^^^^^^^^^^^^^^^^^^^^ If it's NULL then we are trouble because we dereference it here.\n\n    941                         irq_type = dc_link->irq_source_hpd - DC_IRQ_SOURCE_HPD1;\n    942                         /*\n    943                          * TODO: There's a mismatch between mode_info.num_hpd\n    944                          * and what bios reports as the # of connectors with hpd",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -70357,6 +71207,23 @@
                     }
                 ]
             },
+            "CVE-2026-46263": {
+                "cve_id": "CVE-2026-46263",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Fix out-of-bounds stream encoder index v3\n\neng_id can be negative and that stream_enc_regs[]\ncan be indexed out of bounds.\n\neng_id is used directly as an index into stream_enc_regs[], which has\nonly 5 entries. When eng_id is 5 (ENGINE_ID_DIGF) or negative, this can\naccess memory past the end of the array.\n\nAdd a bounds check using ARRAY_SIZE() before using eng_id as an index.\nThe unsigned cast also rejects negative values.\n\nThis avoids out-of-bounds access.\n\nFixes the below smatch error:\ndcn*_resource.c: stream_encoder_create() may index\nstream_enc_regs[eng_id] out of bounds (size 5).\n\ndrivers/gpu/drm/amd/amdgpu/../display/dc/resource/dcn351/dcn351_resource.c\n    1246 static struct stream_encoder *dcn35_stream_encoder_create(\n    1247         enum engine_id eng_id,\n    1248         struct dc_context *ctx)\n    1249 {\n\n    ...\n\n    1255\n    1256         /* Mapping of VPG, AFMT, DME register blocks to DIO block instance */\n    1257         if (eng_id <= ENGINE_ID_DIGF) {\n\nENGINE_ID_DIGF is 5.  should <= be <?\n\nUnrelated but, ugh, why is Smatch saying that \"eng_id\" can be negative?\nend_id is type signed long, but there are checks in the caller which prevent it from being negative.\n\n    1258                 vpg_inst = eng_id;\n    1259                 afmt_inst = eng_id;\n    1260         } else\n    1261                 return NULL;\n    1262\n\n    ...\n\n    1281\n    1282         dcn35_dio_stream_encoder_construct(enc1, ctx, ctx->dc_bios,\n    1283                                         eng_id, vpg, afmt,\n--> 1284                                         &stream_enc_regs[eng_id],\n                                                  ^^^^^^^^^^^^^^^^^^^^^^^ This stream_enc_regs[] array has 5 elements so we are one element beyond the end of the array.\n\n    ...\n\n    1287         return &enc1->base;\n    1288 }\n\nv2: use explicit bounds check as suggested by Roman/Dan; avoid unsigned int cast\n\nv3: The compiler already knows how to compare the two values, so the\n    cast (int) is not needed. (Roman)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-46266": {
                 "cve_id": "CVE-2026-46266",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -70413,6 +71280,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: hci_uart: fix UAFs and race conditions in close and init paths\n\nVulnerabilities leading to Use-After-Free (UAF) and Null Pointer\nDereference (NPD) conditions were observed in the lifecycle management\nof hci_uart.\n\nThe primary issue arises because the workqueues (init_ready and\nwrite_work) are only flushed/cancelled if the HCI_UART_PROTO_READY\nflag is set during TTY close. If a hangup occurs before setup completes,\nhci_uart_tty_close() skips the teardown of these workqueues and\nproceeds to free the `hu` struct. When the scheduled work executes\nlater, it blindly dereferences the freed `hu` struct.\n\nFurthermore, several data races and UAFs were identified in the teardown\nsequence:\n1. Calling hci_uart_flush() from hci_uart_close() without effectively\n   disabling write_work causes a race condition where both can concurrently\n   double-free hu->tx_skb. This happens because protocol timers can\n   concurrently invoke hci_uart_tx_wakeup() and requeue write_work.\n2. Calling hci_free_dev(hdev) before hu->proto->close(hu) causes a UAF\n   when vendor specific protocol close callbacks dereference hu->hdev.\n3. In the initialization error paths, failing to take the proto_lock\n   write lock before clearing PROTO_READY leads to races with active\n   readers. Additionally, hci_uart_tty_receive() accesses hu->hdev\n   outside the read lock, leading to UAFs if the initialization error\n   path frees hdev concurrently.\n\nFix these synchronization and lifecycle issues by:\n1. Re-ordering hci_uart_tty_close() to clear HCI_UART_PROTO_READY first,\n   followed immediately by a cancel_work_sync(&hu->write_work). Clearing\n   the flag locks out concurrent protocol timers from successfully invoking\n   hci_uart_tx_wakeup(), effectively rendering the cancellation permanent\n   and preventing the tx_skb double-free.\n2. Note: Clearing PROTO_READY early causes hci_uart_close() to skip\n   hu->proto->flush(). This is perfectly safe in the tty_close path\n   because hu->proto->close() executes shortly after, which intrinsically\n   purges all protocol SKB queues and tears down the state.\n3. Relocating hu->proto->close(hu) strictly prior to hci_free_dev(hdev)\n   across all close and error paths to prevent vendor-level UAFs.\n4. Moving the hdev->stat.byte_rx increment in hci_uart_tty_receive()\n   inside the proto_lock read-side critical section to safely synchronize\n   with device unregistration.\n5. Adding cancel_work_sync(&hu->write_work) to hci_uart_close() to safely\n   flush the workqueue before hci_uart_flush() is invoked via the HCI core.\n6. Utilizing cancel_work_sync() instead of disable_work_sync() across\n   all paths to prevent permanently breaking user-space retry capabilities.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46276": {
+                "cve_id": "CVE-2026-46276",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: fix zero-size GDS range init on RDNA4\n\nRDNA4 (GFX 12) hardware removes the GDS, GWS, and OA on-chip memory\nresources. The gfx_v12_0 initialisation code correctly leaves\nadev->gds.gds_size, adev->gds.gws_size, and adev->gds.oa_size at\nzero to reflect this.\n\namdgpu_ttm_init() unconditionally calls amdgpu_ttm_init_on_chip() for\neach of these resources regardless of size. When the size is zero,\namdgpu_ttm_init_on_chip() forwards the call to ttm_range_man_init(),\nwhich calls drm_mm_init(mm, 0, 0). drm_mm_init() immediately fires\nDRM_MM_BUG_ON(start + size <= start) -- trivially true when size is\nzero -- crashing the kernel during modprobe of amdgpu on an RX 9070 XT.\n\nGuard against this by returning 0 early from\namdgpu_ttm_init_on_chip() when size_in_page is zero. This skips TTM\nresource manager registration for hardware resources that are absent,\nwithout affecting any other GPU type.\n\nDRM_MM_BUG_ON() only asserts if CONFIG_DRM_DEBUG_MM is enabled in\nthe kernel config.  This is apparently rarely enabled as these chips\nhave been in the market for over a year and this issue was only reported\nnow.\n\nOops-Analysis: http://oops.fenrus.org/reports/bugzilla.korg/221376/report.html\n(cherry picked from commit 5719ce5865279cad4fd5f01011fe037168503f2d)",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -70589,6 +71473,23 @@
                 "cve_id": "CVE-2026-46309",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe/uapi: Reject coh_none PAT index for CPU cached memory in madvise\n\nAdd validation in xe_vm_madvise_ioctl() to reject PAT indices with\nXE_COH_NONE coherency mode when applied to CPU cached memory.\n\nUsing coh_none with CPU cached buffers is a security issue. When the\nkernel clears pages before reallocation, the clear operation stays in\nCPU cache (dirty). GPU with coh_none can bypass CPU caches and read\nstale sensitive data directly from DRAM, potentially leaking data from\npreviously freed pages of other processes.\n\nThis aligns with the existing validation in vm_bind path\n(xe_vm_bind_ioctl_validate_bo).\n\nv2(Matthew brost)\n- Add fixes\n- Move one debug print to better place\n\nv3(Matthew Auld)\n- Should be drm/xe/uapi\n- More Cc\n\nv4(Shuicheng Lin)\n- Fix kmem leak issues by the way\n\nv5\n- Remove kmem leak because it has been merged by another patch\n\nv6\n- Remove the fix which is not related to current fix\n\nv7\n- No change\n\nv8\n- Rebase\n\nv9\n- Limit the restrictions to iGPU\n\nv10\n- No change\n\n(cherry picked from commit 016ccdb674b8c899940b3944952c96a6a490d10a)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-46311": {
+                "cve_id": "CVE-2026-46311",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/userq: fix access to stale wptr mapping\n\nUse drm_exec to take both locks i.e vm root bo and\nwptr_obj bo to access the mapping data properly.\n\nThis fixes the security issue of unmap the wptr_obj while\na queue creation is in progress and passing other\nbo at same address.\n\n(cherry picked from commit 1fc6c8ab45dbee096469c08c13f6099d57a52d6c)",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -71634,6 +72535,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_conntrack_sip: don't use simple_strtoul\n\nReplace unsafe port parsing in epaddr_len(), ct_sip_parse_header_uri(),\nand ct_sip_parse_request() with a new sip_parse_port() helper that\nvalidates each digit against the buffer limit, eliminating the use of\nsimple_strtoul() which assumes NUL-terminated strings.\n\nThe previous code dereferenced pointers without bounds checks after\nsip_parse_addr() and relied on simple_strtoul() on non-NUL-terminated\nskb data. A port that reaches the buffer limit without a trailing\ncharacter is also rejected as malformed.\n\nAlso get rid of all simple_strtoul() usage in conntrack, prefer a\nstricter version instead.  There are intentional changes:\n\n- Bail out if number is > UINT_MAX and indicate a failure, same for\n  too long sequences.\n  While we do accept 05535 as port 5535, we will not accept e.g.\n  'sip:10.0.0.1:005060'.  While its syntactically valid under RFC 3261,\n  we should restrict this to not waste cycles when presented with\n  malformed packets with 64k '0' characters.\n\n- Force base 10 in ct_sip_parse_numerical_param(). This is used to fetch\n  'expire=' and 'rports='; both are expected to use base-10.\n\n- In nf_nat_sip.c, only accept the parsed value if its within the 1k-64k\n  range.\n\n- epaddr_len now returns 0 if the port is invalid, as it already does\n  for invalid ip addresses.  This is intentional. nf_conntrack_sip\n  performs lots of guesswork to find the right parts of the message\n  to parse.  Being stricter could break existing setups.\n  Connection tracking helpers are designed to allow traffic to\n  pass, not to block it.\n\nBased on an earlier patch from Jenny Guanni Qu <qguanni@gmail.com>.",
                 "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-52987": {
+                "cve_id": "CVE-2026-52987",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu: avoid double drm_exec_fini() in userq validate\n\nWhen new_addition is true, amdgpu_userq_vm_validate() calls\ndrm_exec_fini(&exec) before iterating over the collected HMM ranges and\ncalling amdgpu_ttm_tt_get_user_pages().\n\nIf amdgpu_ttm_tt_get_user_pages() fails in that path, the code jumps to\nunlock_all and calls drm_exec_fini(&exec) a second time on the same\nexec object. drm_exec_fini() is not idempotent: it frees exec->objects\nand may also drop exec->contended and finalize the ww acquire context.\n\nRoute that error path directly to the range cleanup once exec has\nalready been finalized.\n\nIssue found using a prototype static analysis tool\nand confirmed by code review.\n\n(cherry picked from commit 2802952e4a07306da6ebe813ff1acacc5691851a)",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
