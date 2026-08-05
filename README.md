@@ -48,14 +48,16 @@ OS/oracle/glibc_advisory.json
 | **Red Hat** | 5, 6, 7, 8, 9, 10 | rpm |
 | **Oracle Linux** | 6, 7, 8, 9, 10 | rpm |
 
-### Red Hat and Oracle Linux Stream Identifiers
+### Stream Identifiers
 
-Red Hat and Oracle Linux advisory events include an `identifier` field to disambiguate between distribution streams under the same major release:
+Red Hat, Oracle Linux, and Ubuntu advisory events include an `identifier` field to disambiguate between package streams under the same release key:
 
 | Prefix | Stream | Examples |
 |---|---|---|
-| `el` | RHEL / CentOS / Oracle Linux | `el6`, `el7`, `el8`, `el9` |
+| `el` | RHEL / CentOS / Oracle Linux | `el6`, `el7`, `el8`, `el9`, `el10` |
 | `fc` | Fedora | `fc39`, `fc40`, `fc41`, `fc42`, `fc43` |
+| `ubuntu` | Ubuntu archive | `ubuntu` |
+| `rf` | RapidFort-rebuilt package | `rf` |
 
 ---
 
@@ -71,7 +73,7 @@ Each advisory file is a JSON object with the following structure:
       "<CVE-ID>": {
         "cve_id": "CVE-2026-27171",
         "title": "Short vulnerability summary ...",
-        "description": "Full vulnerab",
+        "description": "Full vulnerability description.",
         "severity": "MEDIUM",
         "status": "fixed",
         "events": [
@@ -111,7 +113,7 @@ Each advisory file is a JSON object with the following structure:
 |---|---|---|---|
 | `introduced` | string | Yes | Version where the vulnerability was introduced. `"0"` means all versions are affected. |
 | `fixed` | string | No | Version that resolves the vulnerability. Absent when no fix is available. |
-| `identifier` | string | No | **Red Hat and Oracle Linux only.** Distribution stream tag (e.g. `el9`, `fc41`) used to disambiguate when a release key maps to multiple package streams. |
+| `identifier` | string | No | **Red Hat, Oracle Linux, and Ubuntu only.** Package stream tag (e.g. `el9`, `fc41`, `ubuntu`, `rf`) used to disambiguate when a release key maps to multiple package streams. |
 
 ### Release Key Format by OS
 
@@ -185,13 +187,14 @@ installed_version < fixed_version  -->  report as vulnerable
 installed_version >= fixed_version -->  not affected
 ```
 
-#### Red Hat and Oracle Linux Identifier Matching
+#### Identifier Matching
 
-For Red Hat and Oracle Linux advisories, events may include an `identifier` field. When present, **only evaluate events whose `identifier` matches the target system's stream**:
+For Red Hat, Oracle Linux, and Ubuntu advisories, events may include an `identifier` field. When present, **only evaluate events whose `identifier` matches the target system's stream**:
 
 - On RHEL 9, evaluate only events with `identifier = "el9"`
 - On Oracle Linux 9, evaluate only events with `identifier = "el9"`
 - On Fedora 41, evaluate only events with `identifier = "fc41"`
+- On Ubuntu, evaluate only events with `identifier = "ubuntu"` for archive packages, or `identifier = "rf"` for RapidFort-rebuilt packages
 
 ```json
 {
@@ -199,6 +202,17 @@ For Red Hat and Oracle Linux advisories, events may include an `identifier` fiel
     { "introduced": "0", "identifier": "el7" },
     { "introduced": "2:40.3-2.el9", "fixed": "2:40.3-2.el9_6.1", "identifier": "el9" },
     { "introduced": "2:42.2-6.fc41", "fixed": "42.2-9.fc41", "identifier": "fc41" }
+  ]
+}
+```
+
+Ubuntu example — the same CVE tracked separately in the Ubuntu archive and in the RapidFort rebuild, where only the rebuild has a fix:
+
+```json
+{
+  "events": [
+    { "introduced": "0:2.46-3ubuntu2", "identifier": "ubuntu" },
+    { "introduced": "0:0", "fixed": "0:2.46-10rfubu", "identifier": "rf" }
   ]
 }
 ```
