@@ -6,7 +6,7 @@ RapidFort provides **validated, research-backed security advisory data** for all
 - Integrate **per-package advisory data** seamlessly into their scanning workflow
 - **Eliminate false positives** by excluding vulnerabilities that do not apply to RapidFort Curated Images
 
-The repository contains a structured JSON database of per-package CVE advisories covering **Alpine Linux**, **Ubuntu**, and **Red Hat** distributions.
+The repository contains a structured JSON database of per-package CVE advisories covering **Alpine Linux**, **Ubuntu**, **Red Hat**, and **Oracle Linux** distributions.
 
 ---
 
@@ -16,7 +16,8 @@ The repository contains a structured JSON database of per-package CVE advisories
 OS/
 ├── alpine/    # Alpine Linux advisory files
 ├── ubuntu/    # Ubuntu advisory files
-└── redhat/    # Red Hat advisory files
+├── redhat/    # Red Hat advisory files
+└── oracle/    # Oracle Linux advisory files
 ```
 
 Each advisory file covers a single source package and follows the naming convention:
@@ -31,6 +32,7 @@ OS/{os_name}/{package_name}_advisory.json
 OS/ubuntu/openssl_advisory.json
 OS/alpine/busybox_advisory.json
 OS/redhat/zlib_advisory.json
+OS/oracle/glibc_advisory.json
 ```
 
 ---
@@ -44,15 +46,18 @@ OS/redhat/zlib_advisory.json
 | **Alpine Linux** | 3.20, 3.21, 3.22 | apk |
 | **Ubuntu** | focal (20.04), jammy (22.04), noble (24.04) | dpkg |
 | **Red Hat** | 5, 6, 7, 8, 9, 10 | rpm |
+| **Oracle Linux** | 6, 7, 8, 9, 10 | rpm |
 
-### Red Hat Stream Identifiers
+### Stream Identifiers
 
-Red Hat advisory events include an `identifier` field to disambiguate between distribution streams under the same major release:
+Red Hat, Oracle Linux, and Ubuntu advisory events include an `identifier` field to disambiguate between package streams under the same release key:
 
 | Prefix | Stream | Examples |
 |---|---|---|
-| `el` | RHEL / CentOS | `el6`, `el7`, `el8`, `el9` |
+| `el` | RHEL / CentOS / Oracle Linux | `el6`, `el7`, `el8`, `el9`, `el10` |
 | `fc` | Fedora | `fc39`, `fc40`, `fc41`, `fc42`, `fc43` |
+| `ubuntu` | Ubuntu archive | `ubuntu` |
+| `rf` | RapidFort-rebuilt package | `rf` |
 
 ---
 
@@ -108,7 +113,7 @@ Each advisory file is a JSON object with the following structure:
 |---|---|---|---|
 | `introduced` | string | Yes | Version where the vulnerability was introduced. `"0"` means all versions are affected. |
 | `fixed` | string | No | Version that resolves the vulnerability. Absent when no fix is available. |
-| `identifier` | string | No | **Red Hat only.** Distribution stream tag (e.g. `el9`, `fc41`) used to disambiguate when a release key maps to multiple package streams. |
+| `identifier` | string | No | **Red Hat, Oracle Linux, and Ubuntu only.** Package stream tag (e.g. `el9`, `fc41`, `ubuntu`, `rf`) used to disambiguate when a release key maps to multiple package streams. |
 
 ### Release Key Format by OS
 
@@ -117,6 +122,7 @@ Each advisory file is a JSON object with the following structure:
 | Alpine | `"3.20"`, `"3.21"`, `"3.22"` | Alpine minor version |
 | Ubuntu | `"20.04"`, `"22.04"`, `"24.04"` | Ubuntu version number |
 | Red Hat | `"5"`, `"6"`, `"7"`, `"8"`, `"9"`, `"10"` | Major release number |
+| Oracle Linux | `"6"`, `"7"`, `"8"`, `"9"`, `"10"` | Major release number |
 
 ---
 
@@ -124,7 +130,7 @@ Each advisory file is a JSON object with the following structure:
 
 ### Step 1: Identify the OS and Release
 
-Determine the operating system and release version of the target system being scanned (e.g. Alpine 3.21, Ubuntu 22.04, Red Hat 9).
+Determine the operating system and release version of the target system being scanned (e.g. Alpine 3.21, Ubuntu 22.04, Red Hat 9, Oracle Linux 9).
 
 ### Step 2: Locate the Advisory File
 
@@ -140,6 +146,7 @@ OS/{os_name}/{package_name}_advisory.json
 OS/ubuntu/openssl_advisory.json
 OS/alpine/busybox_advisory.json
 OS/redhat/yelp_advisory.json
+OS/oracle/glibc_advisory.json
 ```
 
 ### Step 3: Load and Navigate the Advisory
@@ -180,12 +187,14 @@ installed_version < fixed_version  -->  report as vulnerable
 installed_version >= fixed_version -->  not affected
 ```
 
-#### Red Hat Identifier Matching
+#### Identifier Matching
 
-For Red Hat advisories, events may include an `identifier` field. When present, **only evaluate events whose `identifier` matches the target system's stream**:
+For Red Hat, Oracle Linux, and Ubuntu advisories, events may include an `identifier` field. When present, **only evaluate events whose `identifier` matches the target system's stream**:
 
 - On RHEL 9, evaluate only events with `identifier = "el9"`
+- On Oracle Linux 9, evaluate only events with `identifier = "el9"`
 - On Fedora 41, evaluate only events with `identifier = "fc41"`
+- On Ubuntu, evaluate only events with `identifier = "ubuntu"` for archive packages, or `identifier = "rf"` for RapidFort-rebuilt packages
 
 ```json
 {
@@ -193,6 +202,17 @@ For Red Hat advisories, events may include an `identifier` field. When present, 
     { "introduced": "0", "identifier": "el7" },
     { "introduced": "2:40.3-2.el9", "fixed": "2:40.3-2.el9_6.1", "identifier": "el9" },
     { "introduced": "2:42.2-6.fc41", "fixed": "42.2-9.fc41", "identifier": "fc41" }
+  ]
+}
+```
+
+Ubuntu example — the same CVE tracked separately in the Ubuntu archive and in the RapidFort rebuild, where only the rebuild has a fix:
+
+```json
+{
+  "events": [
+    { "introduced": "0:2.46-3ubuntu2", "identifier": "ubuntu" },
+    { "introduced": "0:0", "fixed": "0:2.46-10rfubu", "identifier": "rf" }
   ]
 }
 ```
@@ -220,6 +240,7 @@ Version strings are OS-specific. Consumers must use the appropriate version comp
 | Alpine | `{version}-r{revision}` | `1.3.1-r1` |
 | Ubuntu | `{epoch}:{upstream}-{debian}{ubuntu}` | `1:1.2.11.dfsg-2ubuntu9.2` |
 | Red Hat | `{epoch}:{version}-{release}.{dist}` | `2:42.2-5.fc40` |
+| Oracle Linux | `{epoch}:{version}-{release}.{dist}` | `2:1.2.11-40.el9` |
 
 **Notes:**
 - The epoch prefix (e.g. `1:`, `2:`) is significant for version ordering and must not be ignored.
