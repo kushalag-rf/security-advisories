@@ -35523,6 +35523,23 @@
                     }
                 ]
             },
+            "CVE-2026-63821": {
+                "cve_id": "CVE-2026-63821",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: rtw88: usb: fix memory leaks on USB write failures\n\nWhen rtw_usb_write_port() fails to submit a USB Request Block (URB)\n(e.g., due to device disconnect or ENOMEM), the completion callback is\nnever executed.\n\nCurrently, the driver ignores the return value of rtw_usb_write_port()\nin rtw_usb_write_data() and rtw_usb_tx_agg_skb(). Because these\nfunctions rely on the completion callback to free the socket buffers\n(skbs) and the transaction control block (txcb), a submission failure\nresults in:\n1. A memory leak of the allocated skb in rtw_usb_write_data().\n2. A memory leak of the txcb structure and all aggregated skbs in\n   rtw_usb_tx_agg_skb().\n\nFix this by checking the return value of rtw_usb_write_port(). If it\nfails, explicitly free the skb in rtw_usb_write_data(), and properly\npurge the tx_ack_queue and free the txcb in rtw_usb_tx_agg_skb().\n\nThe issue was discovered in practice during device disconnect/reconnect\nscenarios and memory pressure conditions. Tested by verifying normal TX\noperation continues after the fix without regressions.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63822": {
                 "cve_id": "CVE-2026-63822",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -35642,28 +35659,11 @@
                     }
                 ]
             },
-            "CVE-2026-63838": {
-                "cve_id": "CVE-2026-63838",
+            "CVE-2026-63837": {
+                "cve_id": "CVE-2026-63837",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: rsnd: Fix potential out-of-bounds access of component_dais[]\n\ncomponent_dais[RSND_MAX_COMPONENT] is initially zero-initialized\nand later populated in rsnd_dai_of_node(). However, the existing boundary check:\n  if (i >= RSND_MAX_COMPONENT)\n\ndoes not guarantee that the last valid element remains zero. As a result,\nthe loop can rely on component_dais[RSND_MAX_COMPONENT] being zero,\nwhich may lead to an out-of-bounds access.\n\nFound by Linux Verification Center (linuxtesting.org) with SVACE.",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: ena: PHC: Check return code before setting timestamp output\n\nena_phc_gettimex64() is setting the output parameter regardless\nof whether ena_com_phc_get_timestamp() succeeded or failed.\n\nWhen ena_com_phc_get_timestamp() returns an error, the timestamp\nparameter may contain uninitialized stack memory (e.g., when PHC is\ndisabled or in blocked state) or invalid hardware values. Passing\nthese to userspace via the PTP ioctl is both a security issue\n(information leak) and a correctness bug.\n\nFix by checking the return code after releasing the lock and only\nsetting the output timestamp on success.",
                 "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-63839": {
-                "cve_id": "CVE-2026-63839",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nplatform/x86: lenovo-wmi-helpers: Fix memory leak in lwmi_dev_evaluate_int()\n\nlwmi_dev_evaluate_int() leaks output.pointer when retval == NULL (found\nby sashiko.dev [1]).\n\nFix it by moving `ret_obj = output.pointer' outside of the `if (retval)'\nblock so that it is always freed by the __free cleanup callback.\n\nNo functional change intended.",
-                "severity": "",
                 "status": "open",
                 "events": [
                     {
@@ -37784,23 +37784,6 @@
                     }
                 ]
             },
-            "CVE-2026-64038": {
-                "cve_id": "CVE-2026-64038",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (lm90) Stop work before releasing hwmon device\n\nSashiko reports:\n\nIn lm90_probe(), the devm action to cancel the alert_work and report_work\n(lm90_restore_conf) is registered in lm90_init_client() before\ndevm_hwmon_device_register_with_info() is called.\n\nBecause devm executes cleanup actions in reverse order during module\nunbind or probe failure, the hwmon device is unregistered and freed first.\n\nIf lm90_alert_work() or lm90_report_alarms() runs in the window between\nthe hwmon device being freed and the delayed works being cancelled,\nlm90_update_alarms() will dereference the freed data->hwmon_dev here.\n\nFix the problem by canceling the workers separately after registering\nthe hwmon device and before registering the interrupt handler. This ensures\nthat the workers are canceled after interrupts are disabled and before\nthe hwmon device is released. Add \"shutdown\" flag to indicate that device\nshutdown is in progress to prevent workers from being re-armed.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64046": {
                 "cve_id": "CVE-2026-64046",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -38010,40 +37993,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: x_tables: allocate hook ops while under mutex\n\narp/ip(6)t_register_table() add the table to the per-netns list via\nxt_register_table() before allocating the per-netns hook ops copy\nvia kmemdup_array().  This leaves a window where the table is\nvisible in the list with ops=NULL.\n\nIf the pernet exit happens runs concurrently the pre_exit callback finds\nthe table via xt_find_table() and passes the NULL ops pointer to\nnf_unregister_net_hooks(), causing a NULL dereference:\n\n  general protection fault in nf_unregister_net_hooks+0xbc/0x150\n  RIP: nf_unregister_net_hooks (net/netfilter/core.c:613)\n  Call Trace:\n    ipt_unregister_table_pre_exit\n    iptable_mangle_net_pre_exit\n    ops_pre_exit_list\n    cleanup_net\n\nFix by moving the ops allocation into the xtables core so the table is\nnever in the list without valid ops.  Also ensure the table is no longer\nprocessing packets before its torn down on error unwind.\nnf_register_net_hooks might have published at least one hook; call\nsynchronize_rcu() if there was an error.\n\naudit log register message gets deferred until all operations have\npassed, this avoids need to emit another ureg message in case of\nerror unwinding.\n\nBased on earlier patch by Tristan Madani.",
                 "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64083": {
-                "cve_id": "CVE-2026-64083",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (pmbus/adm1266) reject short block-read responses in the GPIO accessors\n\nadm1266_gpio_get() and adm1266_gpio_get_multiple() both compose the\npin-status word as\n\n\tpins_status = read_buf[0] + (read_buf[1] << 8);\n\nright after i2c_smbus_read_block_data(), guarding only against an\nerror return.  A well-behaved device returns 2 bytes for\nGPIO_STATUS/PDIO_STATUS, but the helper happily reports a 0- or\n1-byte response too.  If the device returns 0 bytes, both read_buf\nslots are uninitialized stack memory; if it returns 1 byte, read_buf[1]\nis.\n\nThe composed value then flows through set_bit() into the caller's\n*bits in adm1266_gpio_get_multiple(), or into the return value of\nadm1266_gpio_get(), and ends up in userspace via gpiolib (sysfs and\nthe char-dev ioctls).  That leaks a few bits of kernel stack per\nrequest on any device whose firmware glitch, bus error, or hostile\nslave produces a short block-read response.\n\nAdd the missing length check to both call sites and surface a short\nresponse as -EIO.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64085": {
-                "cve_id": "CVE-2026-64085",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (pmbus/adm1266) bounce blackbox records through a protocol-sized buffer\n\nadm1266_pmbus_block_xfer() copies the device-supplied block payload\ninto the caller-provided buffer using the device-supplied length:\n\n\tmemcpy(data_r, &msgs[1].buf[1], msgs[1].buf[0]);\n\nThe helper does not know how large data_r is and trusts the device to\nreturn at most one record's worth of bytes.  adm1266_nvmem_read_blackbox()\nviolates that contract: it advances read_buff inside data->dev_mem in\nADM1266_BLACKBOX_SIZE (64-byte) strides while the helper is willing to\nwrite up to ADM1266_PMBUS_BLOCK_MAX (255) bytes.  A device that returns\nmore than 64 bytes on the trailing record (read_buff offset 1984 in\nthe 2048-byte dev_mem allocation) overflows dev_mem by up to 191 bytes\nbefore the post-call\n\n\tif (ret != ADM1266_BLACKBOX_SIZE)\n\t\treturn -EIO;\n\ncan reject the response.\n\nContain the fix in the caller without changing the helper signature:\nread each record into a 255-byte local bounce buffer that matches the\nhelper's maximum output, validate the returned length, and only then\ncopy exactly ADM1266_BLACKBOX_SIZE bytes into the dev_mem slot.",
-                "severity": "",
                 "status": "open",
                 "events": [
                     {
@@ -38554,6 +38503,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ni2c: tegra: fix pm_runtime leak on mutex_lock failure\n\nIf tegra_i2c_mutex_lock() fails, the function returns without calling\npm_runtime_put(), leaking the runtime PM reference acquired by the\npreceding pm_runtime_get_sync(). This prevents the device from ever\nentering runtime suspend.\n\nAdd the missing pm_runtime_put() before returning on lock failure.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64173": {
+                "cve_id": "CVE-2026-64173",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntracing: Do not call map->ops->elt_free() if elt_alloc() fails\n\nIn paths where tracing_map_elt_alloc() failed to allocate objects,\nthe map->ops->elt_alloc() call was never successful. In this case,\nmap->ops->elt_free() should not be called.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -41456,23 +41422,6 @@
                     }
                 ]
             },
-            "CVE-2026-64531": {
-                "cve_id": "CVE-2026-64531",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: openvswitch: reject oversized nested action attrs\n\nOpen vSwitch stores generated flow actions as nlattrs, whose nla_len\nfield is u16. Commit a1e64addf3ff (\"net: openvswitch: remove\nmisbehaving actions length check\") allowed the total sw_flow_actions\nstream to grow beyond 64 KiB, which is valid, but also removed the last\nguard preventing a generated nested action attribute from exceeding\nU16_MAX.\n\nAn oversized generated container can thus be closed with a truncated\nnla_len. A later dump or teardown then walks a structurally different\nstream than the one that was validated. In particular, an oversized\nnested CLONE/CT action may cause subsequent bytes in the generated\nstream to be interpreted as independent actions.\n\nKeep the larger total-action-stream behavior, but make nested action\nclose reject generated containers that do not fit in nla_len, and return\nthe error through all callers. For recursive SAMPLE, CLONE, DEC_TTL, and\nCHECK_PKT_LEN builders, trim resource-owning action-list tails in reverse\nconstruction order before discarding failed wrappers, so resources copied\ninto the rejected tails are released before the wrappers are removed.\n\nMost failed outer wrappers are discarded by truncating actions_len after\nchild resources have been released. CHECK_PKT_LEN also trims its parent\nafter branch resources are gone. SET/TUNNEL close failures unwind their\nknown tun_dst ownership directly, and SET_TO_MASKED has no external\nownership and truncates on close failure.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64534": {
                 "cve_id": "CVE-2026-64534",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -41834,23 +41783,6 @@
                 "cve_id": "CVE-2026-64560",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nposix-cpu-timers: Prevent UAF caused by non-leader exec() race\n\nWongi and Jungwoo decoded and reported a non-leader exec() related race\nwhich can result in an UAF:\n\n sys_timer_delete()\t\t\texec()\n   posix_cpu_timer_del()\n   // Observes old leader\n   p = pid_task(pid, pid_type);\t\tde_thread()\n   \t\t\t\t\t  switch_leader();\n\t\t\t\t\t  release_task(old_leader)\n\t\t\t\t\t    __exit_signal(old_leader)\n\t\t\t\t\t      sighand = lock(old_leader, sighand);\n\t\t\t\t\t      posix_cpu_timers*_exit();\n   sighand = lock_task_sighand(p)\t      unhash_task(old_leader);\n     sh = lock(p, sighand)\t    \t      old_leader->sighand = NULL;\n\t\t\t\t\t      unlock(sighand);\n     (p->sighand == NULL)\n\tunlock(sh)\n\treturn NULL;\n\n   // Returns without action\n   if(!sighand)\n      return 0;\n   free_posix_timer();\n\nThis is \"harmless\" unless the deleted timer was armed and enqueued in\np->signal because on exec() a TGID targeted timer is inherited.\n\nAs sys_timer_delete() freed the underlying posix timer object\nrun_posix_cpu_timers() or any timerqueue related add/delete operations on\nother timers will access the freed object's timerqueue node, which results\nin an UAF.\n\nThere is a similar problem vs. posix_cpu_timer_set(). For regular posix\ntimers it just transiently returns -ESRCH to user space, but for the use\ncase in do_cpu_nanosleep() it's the same UAF just that the k_itimer is\nallocated on the stack.\n\nAlso posix_cpu_timer_rearm() fails to rearm the timer, which means it stops\nto expire.\n\nWhile debating solutions Frederic pointed out another problem:\n\n   posix_cpu_timer_del(tmr)\n\t\t\t\t\t__exit_signal(p)\n\t\t\t\t\t  posix_cpu_timers*_exit(p);\n\t\t\t\t\t  unhash_task(p);\n\t\t\t\t\t  p->sighand = NULL;\n     sh = lock_task_sighand(p)\n        sighand = p->sighand;\n\tif (!sighand)\n\t    return NULL;\n\tlock(sighand);\n\n     if (!sh)\n\tWARN_ON_ONCE(timer_queued(tmr));\n\nOn weakly ordered architectures it is not guaranteed that\nposix_cpu_timer_del() will observe the stores in posix_cpu_timers*_exit()\nwhen p->sighand is observed as NULL, which means the WARN() can be a false\npositive.\n\nSolve these issues by:\n\n  1) Changing the store in __exit_signal() to smp_store_release().\n\n  2) Adding a smp_acquire__after_ctrl_dep() into the !sighand path\n     of lock_task_sighand().\n\n  3) Creating a helper function for looking up the task and locking sighand\n     which does not return when sighand == NULL. Instead it retries the\n     task lookup and only if that fails it gives up.\n\n  4) Using that helper in the three affected functions.\n\n#1/#2 ensures that the reader side which observes sighand == NULL also\nobserves all preceeding stores, i.e. the stores in posix_cpu_timers*_exit()\nand the ones in unhash_task().\n\n#3 ensures that the above described non-leader exec() situation is handled\ngracefully. When the task lookup returns the old leader, but sighand ==\nNULL then it retries. In the non-leader exec() case the subsequent task\nlookup will observe the new leader due to #1/#2. In normal exit() scenarios\nthe subsequent lookup fails.\n\nWhen the task lookup fails, the function also checks whether the timer is\nstill enqueued and issues a warning if that's the case. Unfortunately there\nis nothing which can be done about it, but as the task is already not\nlonger visible the timer should not be accessed anymore. This check also\nrequires memory ordering, which is not provided when the first lookup\nfails. To achieve that the check is preceeded by a smp_rmb() which pairs\nwith the smp_wmb() in write_seqlock() in __exit_signal(). That ensures that\nthe stores in posix_cpu_timers*_exit() are visible.\n\nThe history of the non-leader exec() issue goes back to the early days of\nposix CPU timers, which stored a pointer to the group leader task in the\ntimer. That obviously fails when a non-leader exec() switches the leader.\ncommit e0a70217107e (\"posix-cpu-timers: workaround to suppress the problems\nwith mt exec\") added a temporary workaround for that in 2010 which surv\n---truncated---",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64561": {
-                "cve_id": "CVE-2026-64561",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: x86: Check for invalid/obsolete root *after* making MMU pages available\n\nCheck for a \"stale\" page fault, i.e. for an invalid and/or obsolete root,\nafter making MMU pages available for the shadow MMU.  If reclaiming shadow\npages zaps an in-use root, i.e. marks it invalid, then KVM will attempt to\nmap memory into an invalid root.  On its own, populating an invalid root is\n\"fine\", but because child shadow pages inherit their parent's role, any\nchildren created during the map/fetch will be created as invalid pages,\nthus violating KVM's invariant that invalid pages are never on the list of\nactive MMU pages.\n\nNote, the underlying flaw has existed since KVM first started tracking\ninvalid roots in 2008 (commit 2e53d63acba7, \"KVM: MMU: ignore zapped root\npagetables\"), but the true badness only came along in 2020 (Linux 5.9)\nwith the invariant that invalid shadow pages can't be on the list of\nactive pages.\n\nNote #2, inheriting role.invalid when creating child shadow pages is also\nfar from ideal; that flaw will be addressed separately.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -74197,6 +74129,19 @@
                     }
                 ]
             },
+            "CVE-2026-63821": {
+                "cve_id": "CVE-2026-63821",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: rtw88: usb: fix memory leaks on USB write failures\n\nWhen rtw_usb_write_port() fails to submit a USB Request Block (URB)\n(e.g., due to device disconnect or ENOMEM), the completion callback is\nnever executed.\n\nCurrently, the driver ignores the return value of rtw_usb_write_port()\nin rtw_usb_write_data() and rtw_usb_tx_agg_skb(). Because these\nfunctions rely on the completion callback to free the socket buffers\n(skbs) and the transaction control block (txcb), a submission failure\nresults in:\n1. A memory leak of the allocated skb in rtw_usb_write_data().\n2. A memory leak of the txcb structure and all aggregated skbs in\n   rtw_usb_tx_agg_skb().\n\nFix this by checking the return value of rtw_usb_write_port(). If it\nfails, explicitly free the skb in rtw_usb_write_data(), and properly\npurge the tx_ack_queue and free the txcb in rtw_usb_tx_agg_skb().\n\nThe issue was discovered in practice during device disconnect/reconnect\nscenarios and memory pressure conditions. Tested by verifying normal TX\noperation continues after the fix without regressions.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63822": {
                 "cve_id": "CVE-2026-63822",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -74312,30 +74257,13 @@
                     }
                 ]
             },
-            "CVE-2026-63838": {
-                "cve_id": "CVE-2026-63838",
+            "CVE-2026-63837": {
+                "cve_id": "CVE-2026-63837",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: rsnd: Fix potential out-of-bounds access of component_dais[]\n\ncomponent_dais[RSND_MAX_COMPONENT] is initially zero-initialized\nand later populated in rsnd_dai_of_node(). However, the existing boundary check:\n  if (i >= RSND_MAX_COMPONENT)\n\ndoes not guarantee that the last valid element remains zero. As a result,\nthe loop can rely on component_dais[RSND_MAX_COMPONENT] being zero,\nwhich may lead to an out-of-bounds access.\n\nFound by Linux Verification Center (linuxtesting.org) with SVACE.",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: ena: PHC: Check return code before setting timestamp output\n\nena_phc_gettimex64() is setting the output parameter regardless\nof whether ena_com_phc_get_timestamp() succeeded or failed.\n\nWhen ena_com_phc_get_timestamp() returns an error, the timestamp\nparameter may contain uninitialized stack memory (e.g., when PHC is\ndisabled or in blocked state) or invalid hardware values. Passing\nthese to userspace via the PTP ioctl is both a security issue\n(information leak) and a correctness bug.\n\nFix by checking the return code after releasing the lock and only\nsetting the output timestamp on success.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-63839": {
-                "cve_id": "CVE-2026-63839",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nplatform/x86: lenovo-wmi-helpers: Fix memory leak in lwmi_dev_evaluate_int()\n\nlwmi_dev_evaluate_int() leaks output.pointer when retval == NULL (found\nby sashiko.dev [1]).\n\nFix it by moving `ret_obj = output.pointer' outside of the `if (retval)'\nblock so that it is always freed by the __free cleanup callback.\n\nNo functional change intended.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
@@ -76206,23 +76134,6 @@
                     }
                 ]
             },
-            "CVE-2026-64038": {
-                "cve_id": "CVE-2026-64038",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (lm90) Stop work before releasing hwmon device\n\nSashiko reports:\n\nIn lm90_probe(), the devm action to cancel the alert_work and report_work\n(lm90_restore_conf) is registered in lm90_init_client() before\ndevm_hwmon_device_register_with_info() is called.\n\nBecause devm executes cleanup actions in reverse order during module\nunbind or probe failure, the hwmon device is unregistered and freed first.\n\nIf lm90_alert_work() or lm90_report_alarms() runs in the window between\nthe hwmon device being freed and the delayed works being cancelled,\nlm90_update_alarms() will dereference the freed data->hwmon_dev here.\n\nFix the problem by canceling the workers separately after registering\nthe hwmon device and before registering the interrupt handler. This ensures\nthat the workers are canceled after interrupts are disabled and before\nthe hwmon device is released. Add \"shutdown\" flag to indicate that device\nshutdown is in progress to prevent workers from being re-armed.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64046": {
                 "cve_id": "CVE-2026-64046",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -76412,32 +76323,6 @@
                     }
                 ]
             },
-            "CVE-2026-64083": {
-                "cve_id": "CVE-2026-64083",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (pmbus/adm1266) reject short block-read responses in the GPIO accessors\n\nadm1266_gpio_get() and adm1266_gpio_get_multiple() both compose the\npin-status word as\n\n\tpins_status = read_buf[0] + (read_buf[1] << 8);\n\nright after i2c_smbus_read_block_data(), guarding only against an\nerror return.  A well-behaved device returns 2 bytes for\nGPIO_STATUS/PDIO_STATUS, but the helper happily reports a 0- or\n1-byte response too.  If the device returns 0 bytes, both read_buf\nslots are uninitialized stack memory; if it returns 1 byte, read_buf[1]\nis.\n\nThe composed value then flows through set_bit() into the caller's\n*bits in adm1266_gpio_get_multiple(), or into the return value of\nadm1266_gpio_get(), and ends up in userspace via gpiolib (sysfs and\nthe char-dev ioctls).  That leaks a few bits of kernel stack per\nrequest on any device whose firmware glitch, bus error, or hostile\nslave produces a short block-read response.\n\nAdd the missing length check to both call sites and surface a short\nresponse as -EIO.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64085": {
-                "cve_id": "CVE-2026-64085",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (pmbus/adm1266) bounce blackbox records through a protocol-sized buffer\n\nadm1266_pmbus_block_xfer() copies the device-supplied block payload\ninto the caller-provided buffer using the device-supplied length:\n\n\tmemcpy(data_r, &msgs[1].buf[1], msgs[1].buf[0]);\n\nThe helper does not know how large data_r is and trusts the device to\nreturn at most one record's worth of bytes.  adm1266_nvmem_read_blackbox()\nviolates that contract: it advances read_buff inside data->dev_mem in\nADM1266_BLACKBOX_SIZE (64-byte) strides while the helper is willing to\nwrite up to ADM1266_PMBUS_BLOCK_MAX (255) bytes.  A device that returns\nmore than 64 bytes on the trailing record (read_buff offset 1984 in\nthe 2048-byte dev_mem allocation) overflows dev_mem by up to 191 bytes\nbefore the post-call\n\n\tif (ret != ADM1266_BLACKBOX_SIZE)\n\t\treturn -EIO;\n\ncan reject the response.\n\nContain the fix in the caller without changing the helper signature:\nread each record into a 255-byte local bounce buffer that matches the\nhelper's maximum output, validate the returned length, and only then\ncopy exactly ADM1266_BLACKBOX_SIZE bytes into the dev_mem slot.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64097": {
                 "cve_id": "CVE-2026-64097",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -76492,10 +76377,6 @@
                 "severity": "LOW",
                 "status": "open",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
@@ -76658,10 +76539,6 @@
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
@@ -76896,6 +76773,23 @@
                     }
                 ]
             },
+            "CVE-2026-64173": {
+                "cve_id": "CVE-2026-64173",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntracing: Do not call map->ops->elt_free() if elt_alloc() fails\n\nIn paths where tracing_map_elt_alloc() failed to allocate objects,\nthe map->ops->elt_alloc() call was never successful. In this case,\nmap->ops->elt_free() should not be called.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-64174": {
                 "cve_id": "CVE-2026-64174",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -76963,10 +76857,6 @@
                 "severity": "LOW",
                 "status": "open",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
@@ -79426,19 +79316,6 @@
                     }
                 ]
             },
-            "CVE-2026-64531": {
-                "cve_id": "CVE-2026-64531",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: openvswitch: reject oversized nested action attrs\n\nOpen vSwitch stores generated flow actions as nlattrs, whose nla_len\nfield is u16. Commit a1e64addf3ff (\"net: openvswitch: remove\nmisbehaving actions length check\") allowed the total sw_flow_actions\nstream to grow beyond 64 KiB, which is valid, but also removed the last\nguard preventing a generated nested action attribute from exceeding\nU16_MAX.\n\nAn oversized generated container can thus be closed with a truncated\nnla_len. A later dump or teardown then walks a structurally different\nstream than the one that was validated. In particular, an oversized\nnested CLONE/CT action may cause subsequent bytes in the generated\nstream to be interpreted as independent actions.\n\nKeep the larger total-action-stream behavior, but make nested action\nclose reject generated containers that do not fit in nla_len, and return\nthe error through all callers. For recursive SAMPLE, CLONE, DEC_TTL, and\nCHECK_PKT_LEN builders, trim resource-owning action-list tails in reverse\nconstruction order before discarding failed wrappers, so resources copied\ninto the rejected tails are released before the wrappers are removed.\n\nMost failed outer wrappers are discarded by truncating actions_len after\nchild resources have been released. CHECK_PKT_LEN also trims its parent\nafter branch resources are gone. SET/TUNNEL close failures unwind their\nknown tun_dst ownership directly, and SET_TO_MASKED has no external\nownership and truncates on close failure.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64534": {
                 "cve_id": "CVE-2026-64534",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -79779,23 +79656,6 @@
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64561": {
-                "cve_id": "CVE-2026-64561",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: x86: Check for invalid/obsolete root *after* making MMU pages available\n\nCheck for a \"stale\" page fault, i.e. for an invalid and/or obsolete root,\nafter making MMU pages available for the shadow MMU.  If reclaiming shadow\npages zaps an in-use root, i.e. marks it invalid, then KVM will attempt to\nmap memory into an invalid root.  On its own, populating an invalid root is\n\"fine\", but because child shadow pages inherit their parent's role, any\nchildren created during the map/fetch will be created as invalid pages,\nthus violating KVM's invariant that invalid pages are never on the list of\nactive MMU pages.\n\nNote, the underlying flaw has existed since KVM first started tracking\ninvalid roots in 2008 (commit 2e53d63acba7, \"KVM: MMU: ignore zapped root\npagetables\"), but the true badness only came along in 2020 (Linux 5.9)\nwith the invariant that invalid shadow pages can't be on the list of\nactive pages.\n\nNote #2, inheriting role.invalid when creating child shadow pages is also\nfar from ideal; that flaw will be addressed separately.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
@@ -115443,6 +115303,23 @@
                     }
                 ]
             },
+            "CVE-2026-63821": {
+                "cve_id": "CVE-2026-63821",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: rtw88: usb: fix memory leaks on USB write failures\n\nWhen rtw_usb_write_port() fails to submit a USB Request Block (URB)\n(e.g., due to device disconnect or ENOMEM), the completion callback is\nnever executed.\n\nCurrently, the driver ignores the return value of rtw_usb_write_port()\nin rtw_usb_write_data() and rtw_usb_tx_agg_skb(). Because these\nfunctions rely on the completion callback to free the socket buffers\n(skbs) and the transaction control block (txcb), a submission failure\nresults in:\n1. A memory leak of the allocated skb in rtw_usb_write_data().\n2. A memory leak of the txcb structure and all aggregated skbs in\n   rtw_usb_tx_agg_skb().\n\nFix this by checking the return value of rtw_usb_write_port(). If it\nfails, explicitly free the skb in rtw_usb_write_data(), and properly\npurge the tx_ack_queue and free the txcb in rtw_usb_tx_agg_skb().\n\nThe issue was discovered in practice during device disconnect/reconnect\nscenarios and memory pressure conditions. Tested by verifying normal TX\noperation continues after the fix without regressions.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63822": {
                 "cve_id": "CVE-2026-63822",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -115562,28 +115439,11 @@
                     }
                 ]
             },
-            "CVE-2026-63838": {
-                "cve_id": "CVE-2026-63838",
+            "CVE-2026-63837": {
+                "cve_id": "CVE-2026-63837",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: rsnd: Fix potential out-of-bounds access of component_dais[]\n\ncomponent_dais[RSND_MAX_COMPONENT] is initially zero-initialized\nand later populated in rsnd_dai_of_node(). However, the existing boundary check:\n  if (i >= RSND_MAX_COMPONENT)\n\ndoes not guarantee that the last valid element remains zero. As a result,\nthe loop can rely on component_dais[RSND_MAX_COMPONENT] being zero,\nwhich may lead to an out-of-bounds access.\n\nFound by Linux Verification Center (linuxtesting.org) with SVACE.",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: ena: PHC: Check return code before setting timestamp output\n\nena_phc_gettimex64() is setting the output parameter regardless\nof whether ena_com_phc_get_timestamp() succeeded or failed.\n\nWhen ena_com_phc_get_timestamp() returns an error, the timestamp\nparameter may contain uninitialized stack memory (e.g., when PHC is\ndisabled or in blocked state) or invalid hardware values. Passing\nthese to userspace via the PTP ioctl is both a security issue\n(information leak) and a correctness bug.\n\nFix by checking the return code after releasing the lock and only\nsetting the output timestamp on success.",
                 "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-63839": {
-                "cve_id": "CVE-2026-63839",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nplatform/x86: lenovo-wmi-helpers: Fix memory leak in lwmi_dev_evaluate_int()\n\nlwmi_dev_evaluate_int() leaks output.pointer when retval == NULL (found\nby sashiko.dev [1]).\n\nFix it by moving `ret_obj = output.pointer' outside of the `if (retval)'\nblock so that it is always freed by the __free cleanup callback.\n\nNo functional change intended.",
-                "severity": "",
                 "status": "open",
                 "events": [
                     {
@@ -117704,23 +117564,6 @@
                     }
                 ]
             },
-            "CVE-2026-64038": {
-                "cve_id": "CVE-2026-64038",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (lm90) Stop work before releasing hwmon device\n\nSashiko reports:\n\nIn lm90_probe(), the devm action to cancel the alert_work and report_work\n(lm90_restore_conf) is registered in lm90_init_client() before\ndevm_hwmon_device_register_with_info() is called.\n\nBecause devm executes cleanup actions in reverse order during module\nunbind or probe failure, the hwmon device is unregistered and freed first.\n\nIf lm90_alert_work() or lm90_report_alarms() runs in the window between\nthe hwmon device being freed and the delayed works being cancelled,\nlm90_update_alarms() will dereference the freed data->hwmon_dev here.\n\nFix the problem by canceling the workers separately after registering\nthe hwmon device and before registering the interrupt handler. This ensures\nthat the workers are canceled after interrupts are disabled and before\nthe hwmon device is released. Add \"shutdown\" flag to indicate that device\nshutdown is in progress to prevent workers from being re-armed.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64046": {
                 "cve_id": "CVE-2026-64046",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -117930,40 +117773,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: x_tables: allocate hook ops while under mutex\n\narp/ip(6)t_register_table() add the table to the per-netns list via\nxt_register_table() before allocating the per-netns hook ops copy\nvia kmemdup_array().  This leaves a window where the table is\nvisible in the list with ops=NULL.\n\nIf the pernet exit happens runs concurrently the pre_exit callback finds\nthe table via xt_find_table() and passes the NULL ops pointer to\nnf_unregister_net_hooks(), causing a NULL dereference:\n\n  general protection fault in nf_unregister_net_hooks+0xbc/0x150\n  RIP: nf_unregister_net_hooks (net/netfilter/core.c:613)\n  Call Trace:\n    ipt_unregister_table_pre_exit\n    iptable_mangle_net_pre_exit\n    ops_pre_exit_list\n    cleanup_net\n\nFix by moving the ops allocation into the xtables core so the table is\nnever in the list without valid ops.  Also ensure the table is no longer\nprocessing packets before its torn down on error unwind.\nnf_register_net_hooks might have published at least one hook; call\nsynchronize_rcu() if there was an error.\n\naudit log register message gets deferred until all operations have\npassed, this avoids need to emit another ureg message in case of\nerror unwinding.\n\nBased on earlier patch by Tristan Madani.",
                 "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64083": {
-                "cve_id": "CVE-2026-64083",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (pmbus/adm1266) reject short block-read responses in the GPIO accessors\n\nadm1266_gpio_get() and adm1266_gpio_get_multiple() both compose the\npin-status word as\n\n\tpins_status = read_buf[0] + (read_buf[1] << 8);\n\nright after i2c_smbus_read_block_data(), guarding only against an\nerror return.  A well-behaved device returns 2 bytes for\nGPIO_STATUS/PDIO_STATUS, but the helper happily reports a 0- or\n1-byte response too.  If the device returns 0 bytes, both read_buf\nslots are uninitialized stack memory; if it returns 1 byte, read_buf[1]\nis.\n\nThe composed value then flows through set_bit() into the caller's\n*bits in adm1266_gpio_get_multiple(), or into the return value of\nadm1266_gpio_get(), and ends up in userspace via gpiolib (sysfs and\nthe char-dev ioctls).  That leaks a few bits of kernel stack per\nrequest on any device whose firmware glitch, bus error, or hostile\nslave produces a short block-read response.\n\nAdd the missing length check to both call sites and surface a short\nresponse as -EIO.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64085": {
-                "cve_id": "CVE-2026-64085",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (pmbus/adm1266) bounce blackbox records through a protocol-sized buffer\n\nadm1266_pmbus_block_xfer() copies the device-supplied block payload\ninto the caller-provided buffer using the device-supplied length:\n\n\tmemcpy(data_r, &msgs[1].buf[1], msgs[1].buf[0]);\n\nThe helper does not know how large data_r is and trusts the device to\nreturn at most one record's worth of bytes.  adm1266_nvmem_read_blackbox()\nviolates that contract: it advances read_buff inside data->dev_mem in\nADM1266_BLACKBOX_SIZE (64-byte) strides while the helper is willing to\nwrite up to ADM1266_PMBUS_BLOCK_MAX (255) bytes.  A device that returns\nmore than 64 bytes on the trailing record (read_buff offset 1984 in\nthe 2048-byte dev_mem allocation) overflows dev_mem by up to 191 bytes\nbefore the post-call\n\n\tif (ret != ADM1266_BLACKBOX_SIZE)\n\t\treturn -EIO;\n\ncan reject the response.\n\nContain the fix in the caller without changing the helper signature:\nread each record into a 255-byte local bounce buffer that matches the\nhelper's maximum output, validate the returned length, and only then\ncopy exactly ADM1266_BLACKBOX_SIZE bytes into the dev_mem slot.",
-                "severity": "",
                 "status": "open",
                 "events": [
                     {
@@ -118474,6 +118283,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ni2c: tegra: fix pm_runtime leak on mutex_lock failure\n\nIf tegra_i2c_mutex_lock() fails, the function returns without calling\npm_runtime_put(), leaking the runtime PM reference acquired by the\npreceding pm_runtime_get_sync(). This prevents the device from ever\nentering runtime suspend.\n\nAdd the missing pm_runtime_put() before returning on lock failure.",
                 "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64173": {
+                "cve_id": "CVE-2026-64173",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntracing: Do not call map->ops->elt_free() if elt_alloc() fails\n\nIn paths where tracing_map_elt_alloc() failed to allocate objects,\nthe map->ops->elt_alloc() call was never successful. In this case,\nmap->ops->elt_free() should not be called.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -121376,23 +121202,6 @@
                     }
                 ]
             },
-            "CVE-2026-64531": {
-                "cve_id": "CVE-2026-64531",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: openvswitch: reject oversized nested action attrs\n\nOpen vSwitch stores generated flow actions as nlattrs, whose nla_len\nfield is u16. Commit a1e64addf3ff (\"net: openvswitch: remove\nmisbehaving actions length check\") allowed the total sw_flow_actions\nstream to grow beyond 64 KiB, which is valid, but also removed the last\nguard preventing a generated nested action attribute from exceeding\nU16_MAX.\n\nAn oversized generated container can thus be closed with a truncated\nnla_len. A later dump or teardown then walks a structurally different\nstream than the one that was validated. In particular, an oversized\nnested CLONE/CT action may cause subsequent bytes in the generated\nstream to be interpreted as independent actions.\n\nKeep the larger total-action-stream behavior, but make nested action\nclose reject generated containers that do not fit in nla_len, and return\nthe error through all callers. For recursive SAMPLE, CLONE, DEC_TTL, and\nCHECK_PKT_LEN builders, trim resource-owning action-list tails in reverse\nconstruction order before discarding failed wrappers, so resources copied\ninto the rejected tails are released before the wrappers are removed.\n\nMost failed outer wrappers are discarded by truncating actions_len after\nchild resources have been released. CHECK_PKT_LEN also trims its parent\nafter branch resources are gone. SET/TUNNEL close failures unwind their\nknown tun_dst ownership directly, and SET_TO_MASKED has no external\nownership and truncates on close failure.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64534": {
                 "cve_id": "CVE-2026-64534",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -121754,23 +121563,6 @@
                 "cve_id": "CVE-2026-64560",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nposix-cpu-timers: Prevent UAF caused by non-leader exec() race\n\nWongi and Jungwoo decoded and reported a non-leader exec() related race\nwhich can result in an UAF:\n\n sys_timer_delete()\t\t\texec()\n   posix_cpu_timer_del()\n   // Observes old leader\n   p = pid_task(pid, pid_type);\t\tde_thread()\n   \t\t\t\t\t  switch_leader();\n\t\t\t\t\t  release_task(old_leader)\n\t\t\t\t\t    __exit_signal(old_leader)\n\t\t\t\t\t      sighand = lock(old_leader, sighand);\n\t\t\t\t\t      posix_cpu_timers*_exit();\n   sighand = lock_task_sighand(p)\t      unhash_task(old_leader);\n     sh = lock(p, sighand)\t    \t      old_leader->sighand = NULL;\n\t\t\t\t\t      unlock(sighand);\n     (p->sighand == NULL)\n\tunlock(sh)\n\treturn NULL;\n\n   // Returns without action\n   if(!sighand)\n      return 0;\n   free_posix_timer();\n\nThis is \"harmless\" unless the deleted timer was armed and enqueued in\np->signal because on exec() a TGID targeted timer is inherited.\n\nAs sys_timer_delete() freed the underlying posix timer object\nrun_posix_cpu_timers() or any timerqueue related add/delete operations on\nother timers will access the freed object's timerqueue node, which results\nin an UAF.\n\nThere is a similar problem vs. posix_cpu_timer_set(). For regular posix\ntimers it just transiently returns -ESRCH to user space, but for the use\ncase in do_cpu_nanosleep() it's the same UAF just that the k_itimer is\nallocated on the stack.\n\nAlso posix_cpu_timer_rearm() fails to rearm the timer, which means it stops\nto expire.\n\nWhile debating solutions Frederic pointed out another problem:\n\n   posix_cpu_timer_del(tmr)\n\t\t\t\t\t__exit_signal(p)\n\t\t\t\t\t  posix_cpu_timers*_exit(p);\n\t\t\t\t\t  unhash_task(p);\n\t\t\t\t\t  p->sighand = NULL;\n     sh = lock_task_sighand(p)\n        sighand = p->sighand;\n\tif (!sighand)\n\t    return NULL;\n\tlock(sighand);\n\n     if (!sh)\n\tWARN_ON_ONCE(timer_queued(tmr));\n\nOn weakly ordered architectures it is not guaranteed that\nposix_cpu_timer_del() will observe the stores in posix_cpu_timers*_exit()\nwhen p->sighand is observed as NULL, which means the WARN() can be a false\npositive.\n\nSolve these issues by:\n\n  1) Changing the store in __exit_signal() to smp_store_release().\n\n  2) Adding a smp_acquire__after_ctrl_dep() into the !sighand path\n     of lock_task_sighand().\n\n  3) Creating a helper function for looking up the task and locking sighand\n     which does not return when sighand == NULL. Instead it retries the\n     task lookup and only if that fails it gives up.\n\n  4) Using that helper in the three affected functions.\n\n#1/#2 ensures that the reader side which observes sighand == NULL also\nobserves all preceeding stores, i.e. the stores in posix_cpu_timers*_exit()\nand the ones in unhash_task().\n\n#3 ensures that the above described non-leader exec() situation is handled\ngracefully. When the task lookup returns the old leader, but sighand ==\nNULL then it retries. In the non-leader exec() case the subsequent task\nlookup will observe the new leader due to #1/#2. In normal exit() scenarios\nthe subsequent lookup fails.\n\nWhen the task lookup fails, the function also checks whether the timer is\nstill enqueued and issues a warning if that's the case. Unfortunately there\nis nothing which can be done about it, but as the task is already not\nlonger visible the timer should not be accessed anymore. This check also\nrequires memory ordering, which is not provided when the first lookup\nfails. To achieve that the check is preceeded by a smp_rmb() which pairs\nwith the smp_wmb() in write_seqlock() in __exit_signal(). That ensures that\nthe stores in posix_cpu_timers*_exit() are visible.\n\nThe history of the non-leader exec() issue goes back to the early days of\nposix CPU timers, which stored a pointer to the group leader task in the\ntimer. That obviously fails when a non-leader exec() switches the leader.\ncommit e0a70217107e (\"posix-cpu-timers: workaround to suppress the problems\nwith mt exec\") added a temporary workaround for that in 2010 which surv\n---truncated---",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64561": {
-                "cve_id": "CVE-2026-64561",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: x86: Check for invalid/obsolete root *after* making MMU pages available\n\nCheck for a \"stale\" page fault, i.e. for an invalid and/or obsolete root,\nafter making MMU pages available for the shadow MMU.  If reclaiming shadow\npages zaps an in-use root, i.e. marks it invalid, then KVM will attempt to\nmap memory into an invalid root.  On its own, populating an invalid root is\n\"fine\", but because child shadow pages inherit their parent's role, any\nchildren created during the map/fetch will be created as invalid pages,\nthus violating KVM's invariant that invalid pages are never on the list of\nactive MMU pages.\n\nNote, the underlying flaw has existed since KVM first started tracking\ninvalid roots in 2008 (commit 2e53d63acba7, \"KVM: MMU: ignore zapped root\npagetables\"), but the true badness only came along in 2020 (Linux 5.9)\nwith the invariant that invalid shadow pages can't be on the list of\nactive pages.\n\nNote #2, inheriting role.invalid when creating child shadow pages is also\nfar from ideal; that flaw will be addressed separately.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
