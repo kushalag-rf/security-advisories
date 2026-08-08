@@ -22393,23 +22393,6 @@
                     }
                 ]
             },
-            "CVE-2026-31589": {
-                "cve_id": "CVE-2026-31589",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmm: call ->free_folio() directly in folio_unmap_invalidate()\n\nWe can only call filemap_free_folio() if we have a reference to (or hold a\nlock on) the mapping.  Otherwise, we've already removed the folio from the\nmapping so it no longer pins the mapping and the mapping can be removed,\ncausing a use-after-free when accessing mapping->a_ops.\n\nFollow the same pattern as __remove_mapping() and load the free_folio\nfunction pointer before dropping the lock on the mapping.  That lets us\nmake filemap_free_folio() static as this was the only caller outside\nfilemap.c.",
-                "severity": "CRITICAL",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-31590": {
                 "cve_id": "CVE-2026-31590",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -35999,23 +35982,6 @@
                     }
                 ]
             },
-            "CVE-2026-63861": {
-                "cve_id": "CVE-2026-63861",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nspi: mtk-snfi: unregister ECC engine on probe failure and remove() callback\n\nmtk_snand_probe() registers the on-host NAND ECC engine, but teardown was\nmissing from both probe unwind and remove-time cleanup. Add a devm cleanup\naction after successful registration so\nnand_ecc_unregister_on_host_hw_engine() runs automatically on probe\nfailures and during device removal.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-63867": {
                 "cve_id": "CVE-2026-63867",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -36288,6 +36254,23 @@
                     }
                 ]
             },
+            "CVE-2026-63890": {
+                "cve_id": "CVE-2026-63890",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: fcoe: Reject FIP descriptors with zero fip_dlen in CVL walker\n\ndrivers/scsi/fcoe/fcoe_ctlr.c::fcoe_ctlr_recv_clr_vlink() advanced the\ndescriptor cursor by an attacker-supplied fip_dlen without ever\nrequiring dlen >= sizeof(struct fip_desc) in the default branch.  The\nnamed descriptor cases (FIP_DT_MAC, FIP_DT_NAME, FIP_DT_VN_ID) checked\ntheir per-type minimum lengths, but a FIP_DT_NON_CRITICAL descriptor\n(fip_dtype >= 128, which the standard requires receivers to silently\nignore) skipped that check entirely.\n\nAn unauthenticated L2 peer on the FCoE control VLAN could hang\nfcoe_ctlr_recv_work on an fcoe, qedf, or bnx2fc initiator indefinitely\nby emitting one FIP CVL frame whose single descriptor had fip_dtype ==\nFIP_DT_NON_CRITICAL and fip_dlen == 0: the cursor advanced zero bytes\nper iteration and the loop condition rlen >= sizeof(*desc) stayed true\nforever, blocking every subsequent FIP frame on that controller.\n\nTighten the outer dlen guard to also reject dlen < sizeof(struct\nfip_desc), so a malformed descriptor whose length cannot even cover the\ndescriptor header is rejected before the switch.  This is the same\nlower-bound the named cases already apply and is the minimum scope that\ncloses the loop.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63897": {
                 "cve_id": "CVE-2026-63897",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -36394,6 +36377,23 @@
                 "cve_id": "CVE-2026-63903",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nUSB: serial: belkin_sa: validate interrupt status length\n\nThe Belkin interrupt callback treats interrupt data as a four-byte\nstatus report and reads LSR/MSR fields at offsets 2 and 3. The\ninterrupt-in buffer length is derived from endpoint wMaxPacketSize, and\nshort interrupt transfers may complete successfully with a smaller\nactual_length.\n\nCheck the completed interrupt packet length before parsing status\nfields so short interrupt endpoints and short successful packets are\nignored instead of causing out-of-bounds or stale status-byte reads.\n\nKASAN report as below:\n\nBUG: KASAN: slab-out-of-bounds in belkin_sa_read_int_callback()\nRead of size 1\nCall trace:\n  belkin_sa_read_int_callback() (drivers/usb/serial/belkin_sa.c:202)\n  __usb_hcd_giveback_urb() (drivers/usb/core/hcd.c:1630)\n  dummy_timer() (?:?)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63904": {
+                "cve_id": "CVE-2026-63904",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: usbtmc: check URB actual_length for interrupt-IN notifications\n\nUSBTMC devices can use an optional interrupt endpoint for notification\nmessages. These typically contain two-byte headers indicating the\npayload format, but the driver does not check if these headers are\npresent before accessing the data buffers. In cases where the URB\nactual_length is not enough to fit these headers, the driver will either\ncause an out-of-bounds read, or consume stale leftover data from a\nprevious notification.\n\nFix by checking if actual_data contains enough bytes for the headers,\notherwise resubmit URB to the interrupt endpoint.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -36645,40 +36645,6 @@
                     }
                 ]
             },
-            "CVE-2026-63931": {
-                "cve_id": "CVE-2026-63931",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niio: chemical: scd30: fix division by zero in write_raw\n\nAdd a zero check for val2 before using it as a divisor when setting the\nsampling frequency. A user writing a zero fractional part to the\nsampling_frequency sysfs attribute triggers a division by zero in the\nkernel.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-63934": {
-                "cve_id": "CVE-2026-63934",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niio: gyro: itg3200: fix i2c read into the wrong stack location\n\nitg3200_read_all_channels() takes `__be16 *buf' as a parameter and\nfills the i2c_msg destination as `(char *)&buf'. Since `buf' is the\nparameter (a pointer), `&buf' is the address of the local pointer\nslot on the stack of itg3200_read_all_channels(), not the address\nof the caller's scan buffer. The (char *) cast hides the type\nmismatch.\n\ni2c_transfer() therefore writes ITG3200_SCAN_ELEMENTS * sizeof(s16)\n= 8 bytes into the parameter's stack slot, which is discarded when\nthe function returns. The caller's scan buffer in\nitg3200_trigger_handler() is never written to, so\niio_push_to_buffers_with_timestamp() pushes uninitialised stack\ncontents to userspace via /dev/iio:deviceX every scan -- both a\nfunctional bug (no actual gyroscope or temperature data is\ndelivered through the triggered buffer) and an information leak.\n\nThe non-buffered read_raw() path is unaffected: it goes through\nitg3200_read_reg_s16() which uses `&out' on a local s16 value,\nwhere that is correct.\n\nDrop the spurious `&' so the i2c read writes into the caller's\nbuffer.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-63937": {
                 "cve_id": "CVE-2026-63937",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -36849,6 +36815,23 @@
                     }
                 ]
             },
+            "CVE-2026-63948": {
+                "cve_id": "CVE-2026-63948",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: L2CAP: fix chan ref leak in l2cap_chan_timeout() on !conn\n\n__set_chan_timer() takes a l2cap_chan reference via l2cap_chan_hold()\nbefore scheduling the delayed work.  The normal path in\nl2cap_chan_timeout() drops this reference with l2cap_chan_put() at the\nend, but the early return when chan->conn is NULL skips the put,\nleaking the reference.\n\nAdd the missing l2cap_chan_put() before the early return.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63952": {
                 "cve_id": "CVE-2026-63952",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -36883,11 +36866,45 @@
                     }
                 ]
             },
-            "CVE-2026-63959": {
-                "cve_id": "CVE-2026-63959",
+            "CVE-2026-63957": {
+                "cve_id": "CVE-2026-63957",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: tcpm/tcpci_maxim: validate header NDO against RX_BYTE_CNT\n\nA broken/malicious port can transmit a CRC-valid frame whose header\nadvertises up to seven data objects but whose body carries fewer than\nthat.  Check for this, and rightfully reject the message, instead of\nreading from uninitialized stack memory.",
-                "severity": "",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nUSB: serial: safe_serial: fix memory corruption with small endpoint\n\nMake sure that the bulk-out buffer size is at least eight bytes to avoid\nuser-controlled slab corruption in \"safe\" mode should a malicious device\nreport a smaller size.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63958": {
+                "cve_id": "CVE-2026-63958",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: ucsi: validate connector number in ucsi_connector_change()\n\nThe connector number in a UCSI CCI notification is a 7-bit field\nsupplied by the PPM.  ucsi_connector_change() uses it to index the\nucsi->connector[] array without checking it against the number of\nconnectors the PPM reported at init time, so a buggy or malicious PPM\n(EC firmware, or an I2C-attached UCSI controller on the ccg / stm32g0 /\nglink transports) can drive schedule_work() on memory past the end of\nthe array.\n\nReject connector numbers that are zero or exceed cap.num_connectors\nbefore dereferencing the array.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63961": {
+                "cve_id": "CVE-2026-63961",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: altmodes/displayport: validate count before reading Status Update VDO\n\nA broken/malicious device can send the incorrect count for a status\nupdate VDO, which will cause the kernel to read uninitialized stack data\nand send it off elsewhere.\n\nFix this up by correctly verifying the count for the update object.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -36917,6 +36934,23 @@
                     }
                 ]
             },
+            "CVE-2026-63963": {
+                "cve_id": "CVE-2026-63963",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: tcpm: validate VDO count in Discover Identity ACK handlers\n\nProperly validate the count passed from a device when calling\nsvdm_consume_identity() or svdm_consume_identity_sop_prime() as the\ndevice-controlled value could index off of the static arrays, which\ncould leak data.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63964": {
                 "cve_id": "CVE-2026-63964",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -36934,11 +36968,11 @@
                     }
                 ]
             },
-            "CVE-2026-63967": {
-                "cve_id": "CVE-2026-63967",
+            "CVE-2026-63968": {
+                "cve_id": "CVE-2026-63968",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niio: imu: st_lsm6dsx: fix stack leak in tagged FIFO buffer\n\nThe tagged FIFO path declares iio_buff on the stack with __aligned(8)\nbut no initializer, but there is a hole in the structure, which will\nthen leak to userspace as ST_LSM6DSX_SAMPLE_SIZE bytes (6) will be\ncopied, but the space between that and the timestamp are not\ninitialized.\n\nCommit c14edb4d0bdc (\"iio:imu:st_lsm6dsx Fix alignment and data leak\nissues\") moved the untagged FIFO path to a kzalloc'd buffer in hw->scan,\nbut for the tagged path it only added the alignment qualifier and not\nthe initializer :(\n\nFix this by just zero-initializing the structure on the stack.",
-                "severity": "",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix possible infinite loop in fib6_select_path()\n\nFound while auditing the same pattern Sashiko reported in\nrt6_fill_node() [1]. Apply the same fix as\ncommit f8d8ce1b515a (\"ipv6: fix possible infinite loop in fib6_info_uses_dev()\").\n\nWriters holding tb6_lock can list_del_rcu(&first->fib6_siblings)\nwithout waiting for RCU readers; first->fib6_siblings.next then\nstill points into the old ring and this softirq-side walker never\nreaches &first->fib6_siblings as its terminator. fib6_purge_rt()\nalways WRITE_ONCE()s first->fib6_nsiblings to 0 before\nlist_del_rcu(), so an inside-loop check is a reliable detach signal.\n\n[1] https://sashiko.dev/#/patchset/20260526020227.4857-1-jiayuan.chen%40linux.dev",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -36951,11 +36985,11 @@
                     }
                 ]
             },
-            "CVE-2026-63968": {
-                "cve_id": "CVE-2026-63968",
+            "CVE-2026-63969": {
+                "cve_id": "CVE-2026-63969",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix possible infinite loop in fib6_select_path()\n\nFound while auditing the same pattern Sashiko reported in\nrt6_fill_node() [1]. Apply the same fix as\ncommit f8d8ce1b515a (\"ipv6: fix possible infinite loop in fib6_info_uses_dev()\").\n\nWriters holding tb6_lock can list_del_rcu(&first->fib6_siblings)\nwithout waiting for RCU readers; first->fib6_siblings.next then\nstill points into the old ring and this softirq-side walker never\nreaches &first->fib6_siblings as its terminator. fib6_purge_rt()\nalways WRITE_ONCE()s first->fib6_nsiblings to 0 before\nlist_del_rcu(), so an inside-loop check is a reliable detach signal.\n\n[1] https://sashiko.dev/#/patchset/20260526020227.4857-1-jiayuan.chen%40linux.dev",
-                "severity": "HIGH",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix possible infinite loop in rt6_fill_node()\n\nSashiko reported this issue [1]. Apply the same fix as\ncommit f8d8ce1b515a (\"ipv6: fix possible infinite loop in fib6_info_uses_dev()\").\n\nWriters holding tb6_lock can list_del_rcu(&rt->fib6_siblings)\nwithout waiting for RCU readers; rt->fib6_siblings.next then still\npoints into the old ring and this softirq-side walker never reaches\n&rt->fib6_siblings, causing a CPU stall. fib6_del_route() always\nWRITE_ONCE()s rt->fib6_nsiblings to 0 before list_del_rcu(), so an\ninside-loop check is a reliable detach signal.\n\n[1] https://sashiko.dev/#/patchset/20260526020227.4857-1-jiayuan.chen%40linux.dev",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -37223,10 +37257,10 @@
                     }
                 ]
             },
-            "CVE-2026-63989": {
-                "cve_id": "CVE-2026-63989",
+            "CVE-2026-63990": {
+                "cve_id": "CVE-2026-63990",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbridge: Fix sleep in atomic context in netlink path\n\nSince the introduction of the netlink configuration path for bridge\nports in commit 25c71c75ac87 (\"bridge: bridge port parameters over\nnetlink\"), br_setport() was always called with the bridge lock held\naround it. Back then this decision made sense: The bridge lock protects\nthe STP state of the bridge and its ports and at that time the function\nonly processed three STP related netlink attributes (cost, priority and\nstate).\n\nNowadays, br_setport() processes a lot more attributes and most of them\ndo not need the bridge lock:\n\n* Bridge flags: Only require RTNL. Read locklessly by the data path.\n  Annotations can be added in net-next.\n\n* FDB port flushing: Only requires the FDB lock.\n\n* Multicast attributes: Only require the multicast lock.\n\n* Group forward mask: Only requires RTNL. Read locklessly by the data\n  path. Annotations can be added in net-next.\n\n* Backup port and NHID: Only require RTNL. Read locklessly by the data\n  path.\n\nThis is a problem as the bridge calls dev_set_promiscuity() when certain\nbridge port flags change and this function can sleep since the commit\ncited below, resulting in a splat such as [1].\n\nFix this by reducing the scope of the bridge lock and only take it when\nprocessing the three STP related attributes that require it. This is\nconsistent with the multicast attributes where each attribute acquires\nthe multicast lock instead of having one critical section for all\nrelevant attributes.\n\n[1]\nBUG: sleeping function called from invalid context at net/core/dev_addr_lists.c:1262\nin_atomic(): 1, irqs_disabled(): 0, non_block: 0, pid: 356, name: bridge\npreempt_count: 201, expected: 0\nRCU nest depth: 0, expected: 0\n2 locks held by bridge/356:\n#0: ffffffff919473a0 (rtnl_mutex){+.+.}-{4:4}, at: rtnetlink_rcv_msg (net/core/rtnetlink.c:80 net/core/rtnetlink.c:7002)\n#1: ffff888115072d58 (&br->lock){+...}-{3:3}, at: br_setlink (./include/linux/spinlock.h:348 net/bridge/br_netlink.c:1117)\nPreemption disabled at:\n 0x0\nHardware name: Bochs Bochs, BIOS Bochs 01/01/2011\nCall Trace:\n<TASK>\ndump_stack_lvl (lib/dump_stack.c:94 lib/dump_stack.c:120)\n__might_resched.cold (kernel/sched/core.c:9163)\nnetif_rx_mode_run (net/core/dev_addr_lists.c:1262)\nnetif_rx_mode_sync (net/core/dev_addr_lists.c:1428)\ndev_set_promiscuity (net/core/dev_api.c:289)\nbr_manage_promisc (net/bridge/br_if.c:135 net/bridge/br_if.c:172)\nbr_port_flags_change (net/bridge/br_if.c:242 net/bridge/br_if.c:747)\nbr_setport (net/bridge/br_netlink.c:1000)\nbr_setlink (net/bridge/br_netlink.c:1118)\nrtnl_bridge_setlink (net/core/rtnetlink.c:5572)\nrtnetlink_rcv_msg (net/core/rtnetlink.c:7005)\nnetlink_rcv_skb (net/netlink/af_netlink.c:2550)\nnetlink_unicast (net/netlink/af_netlink.c:1318 net/netlink/af_netlink.c:1344)\nnetlink_sendmsg (net/netlink/af_netlink.c:1894)\n__sock_sendmsg (net/socket.c:787 (discriminator 4) net/socket.c:802 (discriminator 4))\n____sys_sendmsg (net/socket.c:2698)\n___sys_sendmsg (net/socket.c:2752)\n__sys_sendmsg (net/socket.c:2784)\ndo_syscall_64 (arch/x86/entry/syscall_64.c:63 arch/x86/entry/syscall_64.c:94)\nentry_SYSCALL_64_after_hwframe (arch/x86/entry/entry_64.S:121)",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbonding: refuse to enslave CAN devices\n\nsyzbot reported a kernel paging request crash in\ncan_rx_unregister() inside net/can/af_can.c. The crash occurs\nbecause a virtual CAN device (vxcan) is being enslaved to a\nbonding master.\n\nDuring the enslavement process, the bonding driver mutates\nand modifies the network device states to fit an Ethernet-like\naggregation model. However, CAN devices operate on a completely\ndifferent Layer 2 architecture, relying on the CAN mid-layer\nprivate data structure (can_ml_priv) instead of standard\nEthernet structures. Since bonding does not initialize or\nmaintain these CAN structures, subsequent operations on the\nhalf-enslaved interface (such as closing associated sockets\nvia isotp_release) lead to a null-pointer dereference when\naccessing the CAN receiver lists.\n\nBonding CAN interfaces is architecturally invalid as CAN lacks\nMAC addresses, ARP capabilities, and standard Ethernet\nlink-layer mechanisms. While generic loopback devices are\nblocked globally in net/core/dev.c, virtual CAN devices\nbypass this check because they do not carry the IFF_LOOPBACK\nflag, despite acting as local software-loopbacks.\n\nFix this by explicitly blocking network devices of type\nARPHRD_CAN from being enslaved at the very beginning of\nbond_enslave(). This prevents illegal state mutations,\neliminates the resulting KASAN crashes, and avoids potential\nmemory leaks from incomplete socket cleanups.\n\nAs the CAN support has been added a long time after bonding\nthe Fixes-tag points to the introduction of ARPHRD_CAN that\nwould have needed a specific handling in bonding_main.c.",
                 "severity": "LOW",
                 "status": "open",
                 "events": [
@@ -37393,6 +37427,23 @@
                     }
                 ]
             },
+            "CVE-2026-64001": {
+                "cve_id": "CVE-2026-64001",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: pcm: oss: Fix setup list UAF on proc write error\n\nsnd_pcm_oss_proc_write() links a newly allocated setup entry into the\nOSS setup list before duplicating the task name. If the task-name\nallocation fails, the error path frees the already linked entry and\nleaves setup_list pointing at freed memory.\n\nA later OSS device open can then walk the stale list entry in\nsnd_pcm_oss_look_for_setup() and dereference freed memory.\n\nAllocate the task name and initialize the setup entry before publishing\nthe entry on setup_list. Also fetch the initial proc read iterator only\nafter taking setup_mutex, so all setup_list traversal follows the same\nlist lifetime rules.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-64002": {
                 "cve_id": "CVE-2026-64002",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -37512,10 +37563,10 @@
                     }
                 ]
             },
-            "CVE-2026-64012": {
-                "cve_id": "CVE-2026-64012",
+            "CVE-2026-64013": {
+                "cve_id": "CVE-2026-64013",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: sch_sfb: Replace direct dequeue call with peek and qdisc_dequeue_peeked\n\nWhen sfb has children (eg qfq qdisc) whose peek() callback is\nqdisc_peek_dequeued(), we could get a kernel panic. When the parent of such\nqdiscs (eg illustrated in patch #3 as tbf) wants to retrieve an skb from\nits child (sfb in this case), it will do the following:\n 1a. do a peek() - and when sensing there's an skb the child can offer, then\n     - the child in this case(sfb) calls its child's (qfq) peek.\n        qfq does the right thing and will return the gso_skb queue packet.\n        Note: if there wasnt a gso_skb entry then qfq will store it there.\n 1b. invoke a dequeue() on the child (sfb). And herein lies the problem.\n     - sfb will call the child's dequeue() which will essentially just\n       try to grab something of qfq's queue.\n\n[  127.594489][  T453] KASAN: null-ptr-deref in range [0x0000000000000048-0x000000000000004f]\n[  127.594741][  T453] CPU: 2 UID: 0 PID: 453 Comm: ping Not tainted 7.1.0-rc1-00035-gac961974495b-dirty #793 PREEMPT(full)\n[  127.595059][  T453] Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011\n[  127.595254][  T453] RIP: 0010:qfq_dequeue+0x35c/0x1650 [sch_qfq]\n[  127.595461][  T453] Code: 00 fc ff df 80 3c 02 00 0f 85 17 0e 00 00 4c 8d 73 48 48 89 9d b8 02 00 00 48 b8 00 00 00 00 00 fc ff df 4c 89 f2 48 c1 ea 03 <80> 3c 02 00 0f 85 76 0c 00 00 48 b8 00 00 00 00 00 fc ff df 4c 8b\n[  127.596081][  T453] RSP: 0018:ffff88810e5af440 EFLAGS: 00010216\n[  127.596337][  T453] RAX: dffffc0000000000 RBX: 0000000000000000 RCX: dffffc0000000000\n[  127.596623][  T453] RDX: 0000000000000009 RSI: 0000001880000000 RDI: ffff888104fd82b0\n[  127.596917][  T453] RBP: ffff888104fd8000 R08: ffff888104fd8280 R09: 1ffff110211893a3\n[  127.597165][  T453] R10: 1ffff110211893a6 R11: 1ffff110211893a7 R12: 0000001880000000\n[  127.597404][  T453] R13: ffff888104fd82b8 R14: 0000000000000048 R15: 0000000040000000\n[  127.597644][  T453] FS:  00007fc380cbfc40(0000) GS:ffff88816f2a8000(0000) knlGS:0000000000000000\n[  127.597956][  T453] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[  127.598160][  T453] CR2: 00005610aa9890a8 CR3: 000000010369e000 CR4: 0000000000750ef0\n[  127.598390][  T453] PKRU: 55555554\n[  127.598509][  T453] Call Trace:\n[  127.598629][  T453]  <TASK>\n[  127.598718][  T453]  ? mark_held_locks+0x40/0x70\n[  127.598890][  T453]  ? srso_alias_return_thunk+0x5/0xfbef5\n[  127.599053][  T453]  sfb_dequeue+0x88/0x4d0\n[  127.599174][  T453]  ? ktime_get+0x137/0x230\n[  127.599328][  T453]  ? srso_alias_return_thunk+0x5/0xfbef5\n[  127.599480][  T453]  ? qdisc_peek_dequeued+0x7b/0x350 [sch_qfq]\n[  127.599670][  T453]  ? srso_alias_return_thunk+0x5/0xfbef5\n[  127.599831][  T453]  tbf_dequeue+0x6b1/0x1098 [sch_tbf]\n[  127.599988][  T453]  __qdisc_run+0x169/0x1900\n\nThe right thing to do in #1b is to grab the skb off gso_skb queue.\nThis patchset fixes that issue by changing #1b to use qdisc_dequeue_peeked()\nmethod instead.",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nACPI: button: Fix ACPI GPE handler leak during removal\n\nCommit a7e23ec17fee (\"ACPI: button: Install notifier for system events\nas well\") changed the ACPI notify handler type for ACPI buttons to\nACPI_ALL_NOTIFY, but it forgot to update acpi_button_remove() to reflect\nthat change.  This leads to leaking the notify handler past driver\nremoval, which may cause a kernel crash to occur if ACPI notify on\nthe given device is triggered after removing the driver, and causes a\nsubsequent probe of the given device with the same driver to fail.\n\nAddress this by updating the acpi_remove_notify_handler() call in\nacpi_button_remove() as appropriate.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -37954,23 +38005,6 @@
                     }
                 ]
             },
-            "CVE-2026-64075": {
-                "cve_id": "CVE-2026-64075",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfprobe: Fix unregister_fprobe() to wait for RCU grace period\n\nCommit 4346ba1604093 (\"fprobe: Rewrite fprobe on function-graph tracer\")\nchanged fprobe to register struct fprobe to an rcu-hlist, but it forgot\nto wait for RCU GP. Thus there can be use-after-free if the fprobe is\nreleased right after unregistering. This can be happened on fprobe\nevent and sample module code.\n\nTo fix this issue, add synchronize_rcu() in unregister_fprobe().\n\nNote that BPF is OK because fprobe is used as a part of\nbpf_kprobe_multi_link. This unregisters its fprobe in\nbpf_kprobe_multi_link_release() and it is deallocated via\nbpf_kprobe_multi_link_dealloc(), which is invoked from\nbpf_link_defer_dealloc_rcu_gp() RCU callback.\n\nFor BPF, this also introduced unregister_fprobe_async() which does\nNOT wait for RCU grace priod.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64076": {
                 "cve_id": "CVE-2026-64076",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -38027,23 +38061,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/virtio: use uninterruptible resv lock for plane updates\n\nvirtio_gpu_cursor_plane_update() and virtio_gpu_resource_flush() lock\nthe framebuffer BO's dma_resv via virtio_gpu_array_lock_resv() and\nignore its return value. The function can fail with -EINTR from\ndma_resv_lock_interruptible() (signal during lock wait) or with\n-ENOMEM from dma_resv_reserve_fences() (fence slot allocation),\nleaving the resv lock not held. The queue path then walks the object\narray and calls dma_resv_add_fence(), which requires the lock held;\nwith lockdep enabled this trips dma_resv_assert_held():\n\n  WARNING: drivers/dma-buf/dma-resv.c:296 at dma_resv_add_fence+0x71e/0x840\n  Call Trace:\n   virtio_gpu_array_add_fence\n   virtio_gpu_queue_ctrl_sgs\n   virtio_gpu_queue_fenced_ctrl_buffer\n   virtio_gpu_cursor_plane_update\n   drm_atomic_helper_commit_planes\n   drm_atomic_helper_commit_tail\n   commit_tail\n   drm_atomic_helper_commit\n   drm_atomic_commit\n   drm_atomic_helper_update_plane\n   __setplane_atomic\n   drm_mode_cursor_universal\n   drm_mode_cursor_common\n   drm_mode_cursor_ioctl\n   drm_ioctl\n   __x64_sys_ioctl\n\nBeyond the WARN, mutating the dma_resv fence list without the lock\nraces with concurrent readers/writers and can corrupt the list.\n\nBoth call sites run inside the .atomic_update plane callback, which\nDRM atomic helpers do not allow to fail (by the time it runs, the\ncommit has been signed off to userspace and there is no clean\nrollback path). Moving the lock acquisition to .prepare_fb was\nrejected because the broader lock scope deadlocks against other BO\nlocking paths in the same atomic commit.\n\nIntroduce virtio_gpu_lock_one_resv_uninterruptible() that uses\ndma_resv_lock() instead of dma_resv_lock_interruptible(). This\neliminates the -EINTR failure mode -- the realistic syzbot trigger\n-- without extending the lock hold across the commit. The helper\nlocks a single BO and rejects nents > 1 with -EINVAL; both fix\nsites lock exactly one BO.\n\nUse it from virtio_gpu_cursor_plane_update() and\nvirtio_gpu_resource_flush(); check the return value to handle the\nremaining -ENOMEM case from dma_resv_reserve_fences() by freeing\nthe objs and skipping the plane update for that frame. The\nframebuffer BOs touched here are not shared with other contexts\nand lock contention is expected to be brief, so the loss of\nsignal-interruptibility is acceptable.\n\nOther callers of virtio_gpu_array_lock_resv() (the ioctl paths)\ncontinue to use the interruptible variant.\n\nThe bug was reported by syzbot, triggered via fault injection\n(fail_nth) on the DRM_IOCTL_MODE_CURSOR path, which forces the\n-ENOMEM branch in dma_resv_reserve_fences().",
                 "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64103": {
-                "cve_id": "CVE-2026-64103",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: isci: Fix use-after-free in device removal path\n\nThe ISCI completion tasklet is initialized in isci_host_alloc()\n(drivers/scsi/isci/init.c:496) and scheduled from both MSI-X and legacy\ninterrupt handlers (drivers/scsi/isci/host.c:223,613).\n\nisci_host_deinit() stops the controller and waits for stop completion,\nbut it never kills completion_tasklet before teardown continues. A\ntop-of-function tasklet_kill() is not sufficient here: interrupts are\nonly disabled when isci_host_stop_complete() runs, so until\nwait_for_stop() returns the IRQ handlers can still requeue the\ntasklet. The tasklet callback also re-enables interrupts after draining\ncompletions, so killing the tasklet before the source is quiesced leaves\nthe same race open.\n\nOnce wait_for_stop() returns, no further IRQ-driven scheduling can\noccur. Kill completion_tasklet there so teardown cannot race a queued\ntasklet running on a dead ihost. On remove or unload, the stale callback\ncan otherwise dereference ihost and touch ihost->smu_registers after the\nhost lifetime ends.\n\nA UML + KASAN analogue reproduced the failure class both with no\ntasklet_kill() and with tasklet_kill() placed before source quiesce, and\nstayed clean once the kill happened after quiescing the scheduling\nsource.\n\nThis mirrors commit f6ab594672d4 (\"scsi: aic94xx: fix use-after-free in\ndevice removal path\"), but ISCI needs the kill after wait_for_stop().",
-                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -62087,23 +62104,6 @@
                     }
                 ]
             },
-            "CVE-2026-31589": {
-                "cve_id": "CVE-2026-31589",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmm: call ->free_folio() directly in folio_unmap_invalidate()\n\nWe can only call filemap_free_folio() if we have a reference to (or hold a\nlock on) the mapping.  Otherwise, we've already removed the folio from the\nmapping so it no longer pins the mapping and the mapping can be removed,\ncausing a use-after-free when accessing mapping->a_ops.\n\nFollow the same pattern as __remove_mapping() and load the free_folio\nfunction pointer before dropping the lock on the mapping.  That lets us\nmake filemap_free_folio() static as this was the only caller outside\nfilemap.c.",
-                "severity": "CRITICAL",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-31590": {
                 "cve_id": "CVE-2026-31590",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -74529,23 +74529,6 @@
                     }
                 ]
             },
-            "CVE-2026-63861": {
-                "cve_id": "CVE-2026-63861",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nspi: mtk-snfi: unregister ECC engine on probe failure and remove() callback\n\nmtk_snand_probe() registers the on-host NAND ECC engine, but teardown was\nmissing from both probe unwind and remove-time cleanup. Add a devm cleanup\naction after successful registration so\nnand_ecc_unregister_on_host_hw_engine() runs automatically on probe\nfailures and during device removal.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-63867": {
                 "cve_id": "CVE-2026-63867",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -74806,6 +74789,23 @@
                     }
                 ]
             },
+            "CVE-2026-63890": {
+                "cve_id": "CVE-2026-63890",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: fcoe: Reject FIP descriptors with zero fip_dlen in CVL walker\n\ndrivers/scsi/fcoe/fcoe_ctlr.c::fcoe_ctlr_recv_clr_vlink() advanced the\ndescriptor cursor by an attacker-supplied fip_dlen without ever\nrequiring dlen >= sizeof(struct fip_desc) in the default branch.  The\nnamed descriptor cases (FIP_DT_MAC, FIP_DT_NAME, FIP_DT_VN_ID) checked\ntheir per-type minimum lengths, but a FIP_DT_NON_CRITICAL descriptor\n(fip_dtype >= 128, which the standard requires receivers to silently\nignore) skipped that check entirely.\n\nAn unauthenticated L2 peer on the FCoE control VLAN could hang\nfcoe_ctlr_recv_work on an fcoe, qedf, or bnx2fc initiator indefinitely\nby emitting one FIP CVL frame whose single descriptor had fip_dtype ==\nFIP_DT_NON_CRITICAL and fip_dlen == 0: the cursor advanced zero bytes\nper iteration and the loop condition rlen >= sizeof(*desc) stayed true\nforever, blocking every subsequent FIP frame on that controller.\n\nTighten the outer dlen guard to also reject dlen < sizeof(struct\nfip_desc), so a malformed descriptor whose length cannot even cover the\ndescriptor header is rejected before the switch.  This is the same\nlower-bound the named cases already apply and is the minimum scope that\ncloses the loop.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63897": {
                 "cve_id": "CVE-2026-63897",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -74912,6 +74912,23 @@
                 "cve_id": "CVE-2026-63903",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nUSB: serial: belkin_sa: validate interrupt status length\n\nThe Belkin interrupt callback treats interrupt data as a four-byte\nstatus report and reads LSR/MSR fields at offsets 2 and 3. The\ninterrupt-in buffer length is derived from endpoint wMaxPacketSize, and\nshort interrupt transfers may complete successfully with a smaller\nactual_length.\n\nCheck the completed interrupt packet length before parsing status\nfields so short interrupt endpoints and short successful packets are\nignored instead of causing out-of-bounds or stale status-byte reads.\n\nKASAN report as below:\n\nBUG: KASAN: slab-out-of-bounds in belkin_sa_read_int_callback()\nRead of size 1\nCall trace:\n  belkin_sa_read_int_callback() (drivers/usb/serial/belkin_sa.c:202)\n  __usb_hcd_giveback_urb() (drivers/usb/core/hcd.c:1630)\n  dummy_timer() (?:?)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63904": {
+                "cve_id": "CVE-2026-63904",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: usbtmc: check URB actual_length for interrupt-IN notifications\n\nUSBTMC devices can use an optional interrupt endpoint for notification\nmessages. These typically contain two-byte headers indicating the\npayload format, but the driver does not check if these headers are\npresent before accessing the data buffers. In cases where the URB\nactual_length is not enough to fit these headers, the driver will either\ncause an out-of-bounds read, or consume stale leftover data from a\nprevious notification.\n\nFix by checking if actual_data contains enough bytes for the headers,\notherwise resubmit URB to the interrupt endpoint.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -75155,36 +75172,6 @@
                     }
                 ]
             },
-            "CVE-2026-63931": {
-                "cve_id": "CVE-2026-63931",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niio: chemical: scd30: fix division by zero in write_raw\n\nAdd a zero check for val2 before using it as a divisor when setting the\nsampling frequency. A user writing a zero fractional part to the\nsampling_frequency sysfs attribute triggers a division by zero in the\nkernel.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-63934": {
-                "cve_id": "CVE-2026-63934",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niio: gyro: itg3200: fix i2c read into the wrong stack location\n\nitg3200_read_all_channels() takes `__be16 *buf' as a parameter and\nfills the i2c_msg destination as `(char *)&buf'. Since `buf' is the\nparameter (a pointer), `&buf' is the address of the local pointer\nslot on the stack of itg3200_read_all_channels(), not the address\nof the caller's scan buffer. The (char *) cast hides the type\nmismatch.\n\ni2c_transfer() therefore writes ITG3200_SCAN_ELEMENTS * sizeof(s16)\n= 8 bytes into the parameter's stack slot, which is discarded when\nthe function returns. The caller's scan buffer in\nitg3200_trigger_handler() is never written to, so\niio_push_to_buffers_with_timestamp() pushes uninitialised stack\ncontents to userspace via /dev/iio:deviceX every scan -- both a\nfunctional bug (no actual gyroscope or temperature data is\ndelivered through the triggered buffer) and an information leak.\n\nThe non-buffered read_raw() path is unaffected: it goes through\nitg3200_read_reg_s16() which uses `&out' on a local s16 value,\nwhere that is correct.\n\nDrop the spurious `&' so the i2c read writes into the caller's\nbuffer.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-63937": {
                 "cve_id": "CVE-2026-63937",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -75327,6 +75314,23 @@
                     }
                 ]
             },
+            "CVE-2026-63948": {
+                "cve_id": "CVE-2026-63948",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: L2CAP: fix chan ref leak in l2cap_chan_timeout() on !conn\n\n__set_chan_timer() takes a l2cap_chan reference via l2cap_chan_hold()\nbefore scheduling the delayed work.  The normal path in\nl2cap_chan_timeout() drops this reference with l2cap_chan_put() at the\nend, but the early return when chan->conn is NULL skips the put,\nleaking the reference.\n\nAdd the missing l2cap_chan_put() before the early return.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63952": {
                 "cve_id": "CVE-2026-63952",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -75357,13 +75361,51 @@
                     }
                 ]
             },
-            "CVE-2026-63959": {
-                "cve_id": "CVE-2026-63959",
+            "CVE-2026-63957": {
+                "cve_id": "CVE-2026-63957",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: tcpm/tcpci_maxim: validate header NDO against RX_BYTE_CNT\n\nA broken/malicious port can transmit a CRC-valid frame whose header\nadvertises up to seven data objects but whose body carries fewer than\nthat.  Check for this, and rightfully reject the message, instead of\nreading from uninitialized stack memory.",
-                "severity": "",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nUSB: serial: safe_serial: fix memory corruption with small endpoint\n\nMake sure that the bulk-out buffer size is at least eight bytes to avoid\nuser-controlled slab corruption in \"safe\" mode should a malicious device\nreport a smaller size.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63958": {
+                "cve_id": "CVE-2026-63958",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: ucsi: validate connector number in ucsi_connector_change()\n\nThe connector number in a UCSI CCI notification is a 7-bit field\nsupplied by the PPM.  ucsi_connector_change() uses it to index the\nucsi->connector[] array without checking it against the number of\nconnectors the PPM reported at init time, so a buggy or malicious PPM\n(EC firmware, or an I2C-attached UCSI controller on the ccg / stm32g0 /\nglink transports) can drive schedule_work() on memory past the end of\nthe array.\n\nReject connector numbers that are zero or exceed cap.num_connectors\nbefore dereferencing the array.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63961": {
+                "cve_id": "CVE-2026-63961",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: altmodes/displayport: validate count before reading Status Update VDO\n\nA broken/malicious device can send the incorrect count for a status\nupdate VDO, which will cause the kernel to read uninitialized stack data\nand send it off elsewhere.\n\nFix this up by correctly verifying the count for the update object.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
@@ -75375,6 +75417,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: tcpm: bound altmode_desc[] per iteration in svdm_consume_modes()\n\nsvdm_consume_modes() checks pmdata->altmodes against the array size once\nbefore the loop over the count, but forgot to check the bound at every\npoint in the loop.\n\nIn the well-behaved SVDM discovery flow this is harmless because each of\nat most SVID_DISCOVERY_MAX SVIDs contributes at most MODE_DISCOVERY_MAX\nmodes, exactly filling altmode_desc[ALTMODE_DISCOVERY_MAX].  But the\nCMDT_RSP_ACK handler in tcpm_pd_svdm() does not correlate an incoming\nACK with any request the port actually sent.  Once port->partner is set,\nan unsolicited Discover Modes ACK is consumed unconditionally.  A broken\nor malicious port partner can therefore drive altmodes to\nALTMODE_DISCOVERY_MAX - 1 via the normal flow, and then send one extra\nDiscover Modes ACK with seven VDOs.  Because the pre-loop check passes,\nthe loop could then writes up to five entries past altmode_desc[].  For\nmode_data_prime the next field in struct tcpm_port is the\npartner_altmode[] pointer array, which then receives partner-chosen\nSVID/VDO bytes.\n\nMove the bound check inside the loop so the array can never be indexed\npast ALTMODE_DISCOVERY_MAX regardless of how many VDOs the partner\nsupplies or how the function was reached.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63963": {
+                "cve_id": "CVE-2026-63963",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: tcpm: validate VDO count in Discover Identity ACK handlers\n\nProperly validate the count passed from a device when calling\nsvdm_consume_identity() or svdm_consume_identity_sop_prime() as the\ndevice-controlled value could index off of the static arrays, which\ncould leak data.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -75400,11 +75459,11 @@
                     }
                 ]
             },
-            "CVE-2026-63967": {
-                "cve_id": "CVE-2026-63967",
+            "CVE-2026-63968": {
+                "cve_id": "CVE-2026-63968",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niio: imu: st_lsm6dsx: fix stack leak in tagged FIFO buffer\n\nThe tagged FIFO path declares iio_buff on the stack with __aligned(8)\nbut no initializer, but there is a hole in the structure, which will\nthen leak to userspace as ST_LSM6DSX_SAMPLE_SIZE bytes (6) will be\ncopied, but the space between that and the timestamp are not\ninitialized.\n\nCommit c14edb4d0bdc (\"iio:imu:st_lsm6dsx Fix alignment and data leak\nissues\") moved the untagged FIFO path to a kzalloc'd buffer in hw->scan,\nbut for the tagged path it only added the alignment qualifier and not\nthe initializer :(\n\nFix this by just zero-initializing the structure on the stack.",
-                "severity": "",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix possible infinite loop in fib6_select_path()\n\nFound while auditing the same pattern Sashiko reported in\nrt6_fill_node() [1]. Apply the same fix as\ncommit f8d8ce1b515a (\"ipv6: fix possible infinite loop in fib6_info_uses_dev()\").\n\nWriters holding tb6_lock can list_del_rcu(&first->fib6_siblings)\nwithout waiting for RCU readers; first->fib6_siblings.next then\nstill points into the old ring and this softirq-side walker never\nreaches &first->fib6_siblings as its terminator. fib6_purge_rt()\nalways WRITE_ONCE()s first->fib6_nsiblings to 0 before\nlist_del_rcu(), so an inside-loop check is a reliable detach signal.\n\n[1] https://sashiko.dev/#/patchset/20260526020227.4857-1-jiayuan.chen%40linux.dev",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -75413,11 +75472,11 @@
                     }
                 ]
             },
-            "CVE-2026-63968": {
-                "cve_id": "CVE-2026-63968",
+            "CVE-2026-63969": {
+                "cve_id": "CVE-2026-63969",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix possible infinite loop in fib6_select_path()\n\nFound while auditing the same pattern Sashiko reported in\nrt6_fill_node() [1]. Apply the same fix as\ncommit f8d8ce1b515a (\"ipv6: fix possible infinite loop in fib6_info_uses_dev()\").\n\nWriters holding tb6_lock can list_del_rcu(&first->fib6_siblings)\nwithout waiting for RCU readers; first->fib6_siblings.next then\nstill points into the old ring and this softirq-side walker never\nreaches &first->fib6_siblings as its terminator. fib6_purge_rt()\nalways WRITE_ONCE()s first->fib6_nsiblings to 0 before\nlist_del_rcu(), so an inside-loop check is a reliable detach signal.\n\n[1] https://sashiko.dev/#/patchset/20260526020227.4857-1-jiayuan.chen%40linux.dev",
-                "severity": "HIGH",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix possible infinite loop in rt6_fill_node()\n\nSashiko reported this issue [1]. Apply the same fix as\ncommit f8d8ce1b515a (\"ipv6: fix possible infinite loop in fib6_info_uses_dev()\").\n\nWriters holding tb6_lock can list_del_rcu(&rt->fib6_siblings)\nwithout waiting for RCU readers; rt->fib6_siblings.next then still\npoints into the old ring and this softirq-side walker never reaches\n&rt->fib6_siblings, causing a CPU stall. fib6_del_route() always\nWRITE_ONCE()s rt->fib6_nsiblings to 0 before list_del_rcu(), so an\ninside-loop check is a reliable detach signal.\n\n[1] https://sashiko.dev/#/patchset/20260526020227.4857-1-jiayuan.chen%40linux.dev",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -75645,13 +75704,17 @@
                     }
                 ]
             },
-            "CVE-2026-63989": {
-                "cve_id": "CVE-2026-63989",
+            "CVE-2026-63990": {
+                "cve_id": "CVE-2026-63990",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbridge: Fix sleep in atomic context in netlink path\n\nSince the introduction of the netlink configuration path for bridge\nports in commit 25c71c75ac87 (\"bridge: bridge port parameters over\nnetlink\"), br_setport() was always called with the bridge lock held\naround it. Back then this decision made sense: The bridge lock protects\nthe STP state of the bridge and its ports and at that time the function\nonly processed three STP related netlink attributes (cost, priority and\nstate).\n\nNowadays, br_setport() processes a lot more attributes and most of them\ndo not need the bridge lock:\n\n* Bridge flags: Only require RTNL. Read locklessly by the data path.\n  Annotations can be added in net-next.\n\n* FDB port flushing: Only requires the FDB lock.\n\n* Multicast attributes: Only require the multicast lock.\n\n* Group forward mask: Only requires RTNL. Read locklessly by the data\n  path. Annotations can be added in net-next.\n\n* Backup port and NHID: Only require RTNL. Read locklessly by the data\n  path.\n\nThis is a problem as the bridge calls dev_set_promiscuity() when certain\nbridge port flags change and this function can sleep since the commit\ncited below, resulting in a splat such as [1].\n\nFix this by reducing the scope of the bridge lock and only take it when\nprocessing the three STP related attributes that require it. This is\nconsistent with the multicast attributes where each attribute acquires\nthe multicast lock instead of having one critical section for all\nrelevant attributes.\n\n[1]\nBUG: sleeping function called from invalid context at net/core/dev_addr_lists.c:1262\nin_atomic(): 1, irqs_disabled(): 0, non_block: 0, pid: 356, name: bridge\npreempt_count: 201, expected: 0\nRCU nest depth: 0, expected: 0\n2 locks held by bridge/356:\n#0: ffffffff919473a0 (rtnl_mutex){+.+.}-{4:4}, at: rtnetlink_rcv_msg (net/core/rtnetlink.c:80 net/core/rtnetlink.c:7002)\n#1: ffff888115072d58 (&br->lock){+...}-{3:3}, at: br_setlink (./include/linux/spinlock.h:348 net/bridge/br_netlink.c:1117)\nPreemption disabled at:\n 0x0\nHardware name: Bochs Bochs, BIOS Bochs 01/01/2011\nCall Trace:\n<TASK>\ndump_stack_lvl (lib/dump_stack.c:94 lib/dump_stack.c:120)\n__might_resched.cold (kernel/sched/core.c:9163)\nnetif_rx_mode_run (net/core/dev_addr_lists.c:1262)\nnetif_rx_mode_sync (net/core/dev_addr_lists.c:1428)\ndev_set_promiscuity (net/core/dev_api.c:289)\nbr_manage_promisc (net/bridge/br_if.c:135 net/bridge/br_if.c:172)\nbr_port_flags_change (net/bridge/br_if.c:242 net/bridge/br_if.c:747)\nbr_setport (net/bridge/br_netlink.c:1000)\nbr_setlink (net/bridge/br_netlink.c:1118)\nrtnl_bridge_setlink (net/core/rtnetlink.c:5572)\nrtnetlink_rcv_msg (net/core/rtnetlink.c:7005)\nnetlink_rcv_skb (net/netlink/af_netlink.c:2550)\nnetlink_unicast (net/netlink/af_netlink.c:1318 net/netlink/af_netlink.c:1344)\nnetlink_sendmsg (net/netlink/af_netlink.c:1894)\n__sock_sendmsg (net/socket.c:787 (discriminator 4) net/socket.c:802 (discriminator 4))\n____sys_sendmsg (net/socket.c:2698)\n___sys_sendmsg (net/socket.c:2752)\n__sys_sendmsg (net/socket.c:2784)\ndo_syscall_64 (arch/x86/entry/syscall_64.c:63 arch/x86/entry/syscall_64.c:94)\nentry_SYSCALL_64_after_hwframe (arch/x86/entry/entry_64.S:121)",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbonding: refuse to enslave CAN devices\n\nsyzbot reported a kernel paging request crash in\ncan_rx_unregister() inside net/can/af_can.c. The crash occurs\nbecause a virtual CAN device (vxcan) is being enslaved to a\nbonding master.\n\nDuring the enslavement process, the bonding driver mutates\nand modifies the network device states to fit an Ethernet-like\naggregation model. However, CAN devices operate on a completely\ndifferent Layer 2 architecture, relying on the CAN mid-layer\nprivate data structure (can_ml_priv) instead of standard\nEthernet structures. Since bonding does not initialize or\nmaintain these CAN structures, subsequent operations on the\nhalf-enslaved interface (such as closing associated sockets\nvia isotp_release) lead to a null-pointer dereference when\naccessing the CAN receiver lists.\n\nBonding CAN interfaces is architecturally invalid as CAN lacks\nMAC addresses, ARP capabilities, and standard Ethernet\nlink-layer mechanisms. While generic loopback devices are\nblocked globally in net/core/dev.c, virtual CAN devices\nbypass this check because they do not carry the IFF_LOOPBACK\nflag, despite acting as local software-loopbacks.\n\nFix this by explicitly blocking network devices of type\nARPHRD_CAN from being enslaved at the very beginning of\nbond_enslave(). This prevents illegal state mutations,\neliminates the resulting KASAN crashes, and avoids potential\nmemory leaks from incomplete socket cleanups.\n\nAs the CAN support has been added a long time after bonding\nthe Fixes-tag points to the introduction of ARPHRD_CAN that\nwould have needed a specific handling in bonding_main.c.",
                 "severity": "LOW",
                 "status": "open",
                 "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    },
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
@@ -75739,10 +75802,6 @@
                 "status": "open",
                 "events": [
                     {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
-                    {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
                     }
@@ -75779,6 +75838,19 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: hsr: fix potential OOB access in supervision frame handling\n\nEnsure the entire TLV header is linearized before access by adding\nsizeof(struct hsr_sup_tlv) to the pskb_may_pull() calls. Without this,\na truncated frame could cause an out-of-bounds access.",
                 "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64001": {
+                "cve_id": "CVE-2026-64001",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: pcm: oss: Fix setup list UAF on proc write error\n\nsnd_pcm_oss_proc_write() links a newly allocated setup entry into the\nOSS setup list before duplicating the task name. If the task-name\nallocation fails, the error path frees the already linked entry and\nleaves setup_list pointing at freed memory.\n\nA later OSS device open can then walk the stale list entry in\nsnd_pcm_oss_look_for_setup() and dereference freed memory.\n\nAllocate the task name and initialize the setup entry before publishing\nthe entry on setup_list. Also fetch the initial proc read iterator only\nafter taking setup_mutex, so all setup_list traversal follows the same\nlist lifetime rules.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -75859,10 +75931,6 @@
                 "status": "open",
                 "events": [
                     {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
-                    {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
                     }
@@ -75902,17 +75970,13 @@
                     }
                 ]
             },
-            "CVE-2026-64012": {
-                "cve_id": "CVE-2026-64012",
+            "CVE-2026-64013": {
+                "cve_id": "CVE-2026-64013",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: sch_sfb: Replace direct dequeue call with peek and qdisc_dequeue_peeked\n\nWhen sfb has children (eg qfq qdisc) whose peek() callback is\nqdisc_peek_dequeued(), we could get a kernel panic. When the parent of such\nqdiscs (eg illustrated in patch #3 as tbf) wants to retrieve an skb from\nits child (sfb in this case), it will do the following:\n 1a. do a peek() - and when sensing there's an skb the child can offer, then\n     - the child in this case(sfb) calls its child's (qfq) peek.\n        qfq does the right thing and will return the gso_skb queue packet.\n        Note: if there wasnt a gso_skb entry then qfq will store it there.\n 1b. invoke a dequeue() on the child (sfb). And herein lies the problem.\n     - sfb will call the child's dequeue() which will essentially just\n       try to grab something of qfq's queue.\n\n[  127.594489][  T453] KASAN: null-ptr-deref in range [0x0000000000000048-0x000000000000004f]\n[  127.594741][  T453] CPU: 2 UID: 0 PID: 453 Comm: ping Not tainted 7.1.0-rc1-00035-gac961974495b-dirty #793 PREEMPT(full)\n[  127.595059][  T453] Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011\n[  127.595254][  T453] RIP: 0010:qfq_dequeue+0x35c/0x1650 [sch_qfq]\n[  127.595461][  T453] Code: 00 fc ff df 80 3c 02 00 0f 85 17 0e 00 00 4c 8d 73 48 48 89 9d b8 02 00 00 48 b8 00 00 00 00 00 fc ff df 4c 89 f2 48 c1 ea 03 <80> 3c 02 00 0f 85 76 0c 00 00 48 b8 00 00 00 00 00 fc ff df 4c 8b\n[  127.596081][  T453] RSP: 0018:ffff88810e5af440 EFLAGS: 00010216\n[  127.596337][  T453] RAX: dffffc0000000000 RBX: 0000000000000000 RCX: dffffc0000000000\n[  127.596623][  T453] RDX: 0000000000000009 RSI: 0000001880000000 RDI: ffff888104fd82b0\n[  127.596917][  T453] RBP: ffff888104fd8000 R08: ffff888104fd8280 R09: 1ffff110211893a3\n[  127.597165][  T453] R10: 1ffff110211893a6 R11: 1ffff110211893a7 R12: 0000001880000000\n[  127.597404][  T453] R13: ffff888104fd82b8 R14: 0000000000000048 R15: 0000000040000000\n[  127.597644][  T453] FS:  00007fc380cbfc40(0000) GS:ffff88816f2a8000(0000) knlGS:0000000000000000\n[  127.597956][  T453] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[  127.598160][  T453] CR2: 00005610aa9890a8 CR3: 000000010369e000 CR4: 0000000000750ef0\n[  127.598390][  T453] PKRU: 55555554\n[  127.598509][  T453] Call Trace:\n[  127.598629][  T453]  <TASK>\n[  127.598718][  T453]  ? mark_held_locks+0x40/0x70\n[  127.598890][  T453]  ? srso_alias_return_thunk+0x5/0xfbef5\n[  127.599053][  T453]  sfb_dequeue+0x88/0x4d0\n[  127.599174][  T453]  ? ktime_get+0x137/0x230\n[  127.599328][  T453]  ? srso_alias_return_thunk+0x5/0xfbef5\n[  127.599480][  T453]  ? qdisc_peek_dequeued+0x7b/0x350 [sch_qfq]\n[  127.599670][  T453]  ? srso_alias_return_thunk+0x5/0xfbef5\n[  127.599831][  T453]  tbf_dequeue+0x6b1/0x1098 [sch_tbf]\n[  127.599988][  T453]  __qdisc_run+0x169/0x1900\n\nThe right thing to do in #1b is to grab the skb off gso_skb queue.\nThis patchset fixes that issue by changing #1b to use qdisc_dequeue_peeked()\nmethod instead.",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nACPI: button: Fix ACPI GPE handler leak during removal\n\nCommit a7e23ec17fee (\"ACPI: button: Install notifier for system events\nas well\") changed the ACPI notify handler type for ACPI buttons to\nACPI_ALL_NOTIFY, but it forgot to update acpi_button_remove() to reflect\nthat change.  This leads to leaking the notify handler past driver\nremoval, which may cause a kernel crash to occur if ACPI notify on\nthe given device is triggered after removing the driver, and causes a\nsubsequent probe of the given device with the same driver to fail.\n\nAddress this by updating the acpi_remove_notify_handler() call in\nacpi_button_remove() as appropriate.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
@@ -76280,23 +76344,6 @@
                     }
                 ]
             },
-            "CVE-2026-64075": {
-                "cve_id": "CVE-2026-64075",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfprobe: Fix unregister_fprobe() to wait for RCU grace period\n\nCommit 4346ba1604093 (\"fprobe: Rewrite fprobe on function-graph tracer\")\nchanged fprobe to register struct fprobe to an rcu-hlist, but it forgot\nto wait for RCU GP. Thus there can be use-after-free if the fprobe is\nreleased right after unregistering. This can be happened on fprobe\nevent and sample module code.\n\nTo fix this issue, add synchronize_rcu() in unregister_fprobe().\n\nNote that BPF is OK because fprobe is used as a part of\nbpf_kprobe_multi_link. This unregisters its fprobe in\nbpf_kprobe_multi_link_release() and it is deallocated via\nbpf_kprobe_multi_link_dealloc(), which is invoked from\nbpf_link_defer_dealloc_rcu_gp() RCU callback.\n\nFor BPF, this also introduced unregister_fprobe_async() which does\nNOT wait for RCU grace priod.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64076": {
                 "cve_id": "CVE-2026-64076",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -76347,23 +76394,6 @@
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64103": {
-                "cve_id": "CVE-2026-64103",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: isci: Fix use-after-free in device removal path\n\nThe ISCI completion tasklet is initialized in isci_host_alloc()\n(drivers/scsi/isci/init.c:496) and scheduled from both MSI-X and legacy\ninterrupt handlers (drivers/scsi/isci/host.c:223,613).\n\nisci_host_deinit() stops the controller and waits for stop completion,\nbut it never kills completion_tasklet before teardown continues. A\ntop-of-function tasklet_kill() is not sufficient here: interrupts are\nonly disabled when isci_host_stop_complete() runs, so until\nwait_for_stop() returns the IRQ handlers can still requeue the\ntasklet. The tasklet callback also re-enables interrupts after draining\ncompletions, so killing the tasklet before the source is quiesced leaves\nthe same race open.\n\nOnce wait_for_stop() returns, no further IRQ-driven scheduling can\noccur. Kill completion_tasklet there so teardown cannot race a queued\ntasklet running on a dead ihost. On remove or unload, the stale callback\ncan otherwise dereference ihost and touch ihost->smu_registers after the\nhost lifetime ends.\n\nA UML + KASAN analogue reproduced the failure class both with no\ntasklet_kill() and with tasklet_kill() placed before source quiesce, and\nstayed clean once the kill happened after quiescing the scheduling\nsource.\n\nThis mirrors commit f6ab594672d4 (\"scsi: aic94xx: fix use-after-free in\ndevice removal path\"), but ISCI needs the kill after wait_for_stop().",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    },
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
@@ -102173,23 +102203,6 @@
                     }
                 ]
             },
-            "CVE-2026-31589": {
-                "cve_id": "CVE-2026-31589",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmm: call ->free_folio() directly in folio_unmap_invalidate()\n\nWe can only call filemap_free_folio() if we have a reference to (or hold a\nlock on) the mapping.  Otherwise, we've already removed the folio from the\nmapping so it no longer pins the mapping and the mapping can be removed,\ncausing a use-after-free when accessing mapping->a_ops.\n\nFollow the same pattern as __remove_mapping() and load the free_folio\nfunction pointer before dropping the lock on the mapping.  That lets us\nmake filemap_free_folio() static as this was the only caller outside\nfilemap.c.",
-                "severity": "CRITICAL",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-31590": {
                 "cve_id": "CVE-2026-31590",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -115779,23 +115792,6 @@
                     }
                 ]
             },
-            "CVE-2026-63861": {
-                "cve_id": "CVE-2026-63861",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nspi: mtk-snfi: unregister ECC engine on probe failure and remove() callback\n\nmtk_snand_probe() registers the on-host NAND ECC engine, but teardown was\nmissing from both probe unwind and remove-time cleanup. Add a devm cleanup\naction after successful registration so\nnand_ecc_unregister_on_host_hw_engine() runs automatically on probe\nfailures and during device removal.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-63867": {
                 "cve_id": "CVE-2026-63867",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -116068,6 +116064,23 @@
                     }
                 ]
             },
+            "CVE-2026-63890": {
+                "cve_id": "CVE-2026-63890",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: fcoe: Reject FIP descriptors with zero fip_dlen in CVL walker\n\ndrivers/scsi/fcoe/fcoe_ctlr.c::fcoe_ctlr_recv_clr_vlink() advanced the\ndescriptor cursor by an attacker-supplied fip_dlen without ever\nrequiring dlen >= sizeof(struct fip_desc) in the default branch.  The\nnamed descriptor cases (FIP_DT_MAC, FIP_DT_NAME, FIP_DT_VN_ID) checked\ntheir per-type minimum lengths, but a FIP_DT_NON_CRITICAL descriptor\n(fip_dtype >= 128, which the standard requires receivers to silently\nignore) skipped that check entirely.\n\nAn unauthenticated L2 peer on the FCoE control VLAN could hang\nfcoe_ctlr_recv_work on an fcoe, qedf, or bnx2fc initiator indefinitely\nby emitting one FIP CVL frame whose single descriptor had fip_dtype ==\nFIP_DT_NON_CRITICAL and fip_dlen == 0: the cursor advanced zero bytes\nper iteration and the loop condition rlen >= sizeof(*desc) stayed true\nforever, blocking every subsequent FIP frame on that controller.\n\nTighten the outer dlen guard to also reject dlen < sizeof(struct\nfip_desc), so a malformed descriptor whose length cannot even cover the\ndescriptor header is rejected before the switch.  This is the same\nlower-bound the named cases already apply and is the minimum scope that\ncloses the loop.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63897": {
                 "cve_id": "CVE-2026-63897",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -116174,6 +116187,23 @@
                 "cve_id": "CVE-2026-63903",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nUSB: serial: belkin_sa: validate interrupt status length\n\nThe Belkin interrupt callback treats interrupt data as a four-byte\nstatus report and reads LSR/MSR fields at offsets 2 and 3. The\ninterrupt-in buffer length is derived from endpoint wMaxPacketSize, and\nshort interrupt transfers may complete successfully with a smaller\nactual_length.\n\nCheck the completed interrupt packet length before parsing status\nfields so short interrupt endpoints and short successful packets are\nignored instead of causing out-of-bounds or stale status-byte reads.\n\nKASAN report as below:\n\nBUG: KASAN: slab-out-of-bounds in belkin_sa_read_int_callback()\nRead of size 1\nCall trace:\n  belkin_sa_read_int_callback() (drivers/usb/serial/belkin_sa.c:202)\n  __usb_hcd_giveback_urb() (drivers/usb/core/hcd.c:1630)\n  dummy_timer() (?:?)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63904": {
+                "cve_id": "CVE-2026-63904",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: usbtmc: check URB actual_length for interrupt-IN notifications\n\nUSBTMC devices can use an optional interrupt endpoint for notification\nmessages. These typically contain two-byte headers indicating the\npayload format, but the driver does not check if these headers are\npresent before accessing the data buffers. In cases where the URB\nactual_length is not enough to fit these headers, the driver will either\ncause an out-of-bounds read, or consume stale leftover data from a\nprevious notification.\n\nFix by checking if actual_data contains enough bytes for the headers,\notherwise resubmit URB to the interrupt endpoint.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -116425,40 +116455,6 @@
                     }
                 ]
             },
-            "CVE-2026-63931": {
-                "cve_id": "CVE-2026-63931",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niio: chemical: scd30: fix division by zero in write_raw\n\nAdd a zero check for val2 before using it as a divisor when setting the\nsampling frequency. A user writing a zero fractional part to the\nsampling_frequency sysfs attribute triggers a division by zero in the\nkernel.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-63934": {
-                "cve_id": "CVE-2026-63934",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niio: gyro: itg3200: fix i2c read into the wrong stack location\n\nitg3200_read_all_channels() takes `__be16 *buf' as a parameter and\nfills the i2c_msg destination as `(char *)&buf'. Since `buf' is the\nparameter (a pointer), `&buf' is the address of the local pointer\nslot on the stack of itg3200_read_all_channels(), not the address\nof the caller's scan buffer. The (char *) cast hides the type\nmismatch.\n\ni2c_transfer() therefore writes ITG3200_SCAN_ELEMENTS * sizeof(s16)\n= 8 bytes into the parameter's stack slot, which is discarded when\nthe function returns. The caller's scan buffer in\nitg3200_trigger_handler() is never written to, so\niio_push_to_buffers_with_timestamp() pushes uninitialised stack\ncontents to userspace via /dev/iio:deviceX every scan -- both a\nfunctional bug (no actual gyroscope or temperature data is\ndelivered through the triggered buffer) and an information leak.\n\nThe non-buffered read_raw() path is unaffected: it goes through\nitg3200_read_reg_s16() which uses `&out' on a local s16 value,\nwhere that is correct.\n\nDrop the spurious `&' so the i2c read writes into the caller's\nbuffer.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-63937": {
                 "cve_id": "CVE-2026-63937",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -116629,6 +116625,23 @@
                     }
                 ]
             },
+            "CVE-2026-63948": {
+                "cve_id": "CVE-2026-63948",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: L2CAP: fix chan ref leak in l2cap_chan_timeout() on !conn\n\n__set_chan_timer() takes a l2cap_chan reference via l2cap_chan_hold()\nbefore scheduling the delayed work.  The normal path in\nl2cap_chan_timeout() drops this reference with l2cap_chan_put() at the\nend, but the early return when chan->conn is NULL skips the put,\nleaking the reference.\n\nAdd the missing l2cap_chan_put() before the early return.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63952": {
                 "cve_id": "CVE-2026-63952",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -116663,11 +116676,45 @@
                     }
                 ]
             },
-            "CVE-2026-63959": {
-                "cve_id": "CVE-2026-63959",
+            "CVE-2026-63957": {
+                "cve_id": "CVE-2026-63957",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: tcpm/tcpci_maxim: validate header NDO against RX_BYTE_CNT\n\nA broken/malicious port can transmit a CRC-valid frame whose header\nadvertises up to seven data objects but whose body carries fewer than\nthat.  Check for this, and rightfully reject the message, instead of\nreading from uninitialized stack memory.",
-                "severity": "",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nUSB: serial: safe_serial: fix memory corruption with small endpoint\n\nMake sure that the bulk-out buffer size is at least eight bytes to avoid\nuser-controlled slab corruption in \"safe\" mode should a malicious device\nreport a smaller size.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63958": {
+                "cve_id": "CVE-2026-63958",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: ucsi: validate connector number in ucsi_connector_change()\n\nThe connector number in a UCSI CCI notification is a 7-bit field\nsupplied by the PPM.  ucsi_connector_change() uses it to index the\nucsi->connector[] array without checking it against the number of\nconnectors the PPM reported at init time, so a buggy or malicious PPM\n(EC firmware, or an I2C-attached UCSI controller on the ccg / stm32g0 /\nglink transports) can drive schedule_work() on memory past the end of\nthe array.\n\nReject connector numbers that are zero or exceed cap.num_connectors\nbefore dereferencing the array.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-63961": {
+                "cve_id": "CVE-2026-63961",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: altmodes/displayport: validate count before reading Status Update VDO\n\nA broken/malicious device can send the incorrect count for a status\nupdate VDO, which will cause the kernel to read uninitialized stack data\nand send it off elsewhere.\n\nFix this up by correctly verifying the count for the update object.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -116697,6 +116744,23 @@
                     }
                 ]
             },
+            "CVE-2026-63963": {
+                "cve_id": "CVE-2026-63963",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: tcpm: validate VDO count in Discover Identity ACK handlers\n\nProperly validate the count passed from a device when calling\nsvdm_consume_identity() or svdm_consume_identity_sop_prime() as the\ndevice-controlled value could index off of the static arrays, which\ncould leak data.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-63964": {
                 "cve_id": "CVE-2026-63964",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -116714,11 +116778,11 @@
                     }
                 ]
             },
-            "CVE-2026-63967": {
-                "cve_id": "CVE-2026-63967",
+            "CVE-2026-63968": {
+                "cve_id": "CVE-2026-63968",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niio: imu: st_lsm6dsx: fix stack leak in tagged FIFO buffer\n\nThe tagged FIFO path declares iio_buff on the stack with __aligned(8)\nbut no initializer, but there is a hole in the structure, which will\nthen leak to userspace as ST_LSM6DSX_SAMPLE_SIZE bytes (6) will be\ncopied, but the space between that and the timestamp are not\ninitialized.\n\nCommit c14edb4d0bdc (\"iio:imu:st_lsm6dsx Fix alignment and data leak\nissues\") moved the untagged FIFO path to a kzalloc'd buffer in hw->scan,\nbut for the tagged path it only added the alignment qualifier and not\nthe initializer :(\n\nFix this by just zero-initializing the structure on the stack.",
-                "severity": "",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix possible infinite loop in fib6_select_path()\n\nFound while auditing the same pattern Sashiko reported in\nrt6_fill_node() [1]. Apply the same fix as\ncommit f8d8ce1b515a (\"ipv6: fix possible infinite loop in fib6_info_uses_dev()\").\n\nWriters holding tb6_lock can list_del_rcu(&first->fib6_siblings)\nwithout waiting for RCU readers; first->fib6_siblings.next then\nstill points into the old ring and this softirq-side walker never\nreaches &first->fib6_siblings as its terminator. fib6_purge_rt()\nalways WRITE_ONCE()s first->fib6_nsiblings to 0 before\nlist_del_rcu(), so an inside-loop check is a reliable detach signal.\n\n[1] https://sashiko.dev/#/patchset/20260526020227.4857-1-jiayuan.chen%40linux.dev",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -116731,11 +116795,11 @@
                     }
                 ]
             },
-            "CVE-2026-63968": {
-                "cve_id": "CVE-2026-63968",
+            "CVE-2026-63969": {
+                "cve_id": "CVE-2026-63969",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix possible infinite loop in fib6_select_path()\n\nFound while auditing the same pattern Sashiko reported in\nrt6_fill_node() [1]. Apply the same fix as\ncommit f8d8ce1b515a (\"ipv6: fix possible infinite loop in fib6_info_uses_dev()\").\n\nWriters holding tb6_lock can list_del_rcu(&first->fib6_siblings)\nwithout waiting for RCU readers; first->fib6_siblings.next then\nstill points into the old ring and this softirq-side walker never\nreaches &first->fib6_siblings as its terminator. fib6_purge_rt()\nalways WRITE_ONCE()s first->fib6_nsiblings to 0 before\nlist_del_rcu(), so an inside-loop check is a reliable detach signal.\n\n[1] https://sashiko.dev/#/patchset/20260526020227.4857-1-jiayuan.chen%40linux.dev",
-                "severity": "HIGH",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix possible infinite loop in rt6_fill_node()\n\nSashiko reported this issue [1]. Apply the same fix as\ncommit f8d8ce1b515a (\"ipv6: fix possible infinite loop in fib6_info_uses_dev()\").\n\nWriters holding tb6_lock can list_del_rcu(&rt->fib6_siblings)\nwithout waiting for RCU readers; rt->fib6_siblings.next then still\npoints into the old ring and this softirq-side walker never reaches\n&rt->fib6_siblings, causing a CPU stall. fib6_del_route() always\nWRITE_ONCE()s rt->fib6_nsiblings to 0 before list_del_rcu(), so an\ninside-loop check is a reliable detach signal.\n\n[1] https://sashiko.dev/#/patchset/20260526020227.4857-1-jiayuan.chen%40linux.dev",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -117003,10 +117067,10 @@
                     }
                 ]
             },
-            "CVE-2026-63989": {
-                "cve_id": "CVE-2026-63989",
+            "CVE-2026-63990": {
+                "cve_id": "CVE-2026-63990",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbridge: Fix sleep in atomic context in netlink path\n\nSince the introduction of the netlink configuration path for bridge\nports in commit 25c71c75ac87 (\"bridge: bridge port parameters over\nnetlink\"), br_setport() was always called with the bridge lock held\naround it. Back then this decision made sense: The bridge lock protects\nthe STP state of the bridge and its ports and at that time the function\nonly processed three STP related netlink attributes (cost, priority and\nstate).\n\nNowadays, br_setport() processes a lot more attributes and most of them\ndo not need the bridge lock:\n\n* Bridge flags: Only require RTNL. Read locklessly by the data path.\n  Annotations can be added in net-next.\n\n* FDB port flushing: Only requires the FDB lock.\n\n* Multicast attributes: Only require the multicast lock.\n\n* Group forward mask: Only requires RTNL. Read locklessly by the data\n  path. Annotations can be added in net-next.\n\n* Backup port and NHID: Only require RTNL. Read locklessly by the data\n  path.\n\nThis is a problem as the bridge calls dev_set_promiscuity() when certain\nbridge port flags change and this function can sleep since the commit\ncited below, resulting in a splat such as [1].\n\nFix this by reducing the scope of the bridge lock and only take it when\nprocessing the three STP related attributes that require it. This is\nconsistent with the multicast attributes where each attribute acquires\nthe multicast lock instead of having one critical section for all\nrelevant attributes.\n\n[1]\nBUG: sleeping function called from invalid context at net/core/dev_addr_lists.c:1262\nin_atomic(): 1, irqs_disabled(): 0, non_block: 0, pid: 356, name: bridge\npreempt_count: 201, expected: 0\nRCU nest depth: 0, expected: 0\n2 locks held by bridge/356:\n#0: ffffffff919473a0 (rtnl_mutex){+.+.}-{4:4}, at: rtnetlink_rcv_msg (net/core/rtnetlink.c:80 net/core/rtnetlink.c:7002)\n#1: ffff888115072d58 (&br->lock){+...}-{3:3}, at: br_setlink (./include/linux/spinlock.h:348 net/bridge/br_netlink.c:1117)\nPreemption disabled at:\n 0x0\nHardware name: Bochs Bochs, BIOS Bochs 01/01/2011\nCall Trace:\n<TASK>\ndump_stack_lvl (lib/dump_stack.c:94 lib/dump_stack.c:120)\n__might_resched.cold (kernel/sched/core.c:9163)\nnetif_rx_mode_run (net/core/dev_addr_lists.c:1262)\nnetif_rx_mode_sync (net/core/dev_addr_lists.c:1428)\ndev_set_promiscuity (net/core/dev_api.c:289)\nbr_manage_promisc (net/bridge/br_if.c:135 net/bridge/br_if.c:172)\nbr_port_flags_change (net/bridge/br_if.c:242 net/bridge/br_if.c:747)\nbr_setport (net/bridge/br_netlink.c:1000)\nbr_setlink (net/bridge/br_netlink.c:1118)\nrtnl_bridge_setlink (net/core/rtnetlink.c:5572)\nrtnetlink_rcv_msg (net/core/rtnetlink.c:7005)\nnetlink_rcv_skb (net/netlink/af_netlink.c:2550)\nnetlink_unicast (net/netlink/af_netlink.c:1318 net/netlink/af_netlink.c:1344)\nnetlink_sendmsg (net/netlink/af_netlink.c:1894)\n__sock_sendmsg (net/socket.c:787 (discriminator 4) net/socket.c:802 (discriminator 4))\n____sys_sendmsg (net/socket.c:2698)\n___sys_sendmsg (net/socket.c:2752)\n__sys_sendmsg (net/socket.c:2784)\ndo_syscall_64 (arch/x86/entry/syscall_64.c:63 arch/x86/entry/syscall_64.c:94)\nentry_SYSCALL_64_after_hwframe (arch/x86/entry/entry_64.S:121)",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbonding: refuse to enslave CAN devices\n\nsyzbot reported a kernel paging request crash in\ncan_rx_unregister() inside net/can/af_can.c. The crash occurs\nbecause a virtual CAN device (vxcan) is being enslaved to a\nbonding master.\n\nDuring the enslavement process, the bonding driver mutates\nand modifies the network device states to fit an Ethernet-like\naggregation model. However, CAN devices operate on a completely\ndifferent Layer 2 architecture, relying on the CAN mid-layer\nprivate data structure (can_ml_priv) instead of standard\nEthernet structures. Since bonding does not initialize or\nmaintain these CAN structures, subsequent operations on the\nhalf-enslaved interface (such as closing associated sockets\nvia isotp_release) lead to a null-pointer dereference when\naccessing the CAN receiver lists.\n\nBonding CAN interfaces is architecturally invalid as CAN lacks\nMAC addresses, ARP capabilities, and standard Ethernet\nlink-layer mechanisms. While generic loopback devices are\nblocked globally in net/core/dev.c, virtual CAN devices\nbypass this check because they do not carry the IFF_LOOPBACK\nflag, despite acting as local software-loopbacks.\n\nFix this by explicitly blocking network devices of type\nARPHRD_CAN from being enslaved at the very beginning of\nbond_enslave(). This prevents illegal state mutations,\neliminates the resulting KASAN crashes, and avoids potential\nmemory leaks from incomplete socket cleanups.\n\nAs the CAN support has been added a long time after bonding\nthe Fixes-tag points to the introduction of ARPHRD_CAN that\nwould have needed a specific handling in bonding_main.c.",
                 "severity": "LOW",
                 "status": "open",
                 "events": [
@@ -117173,6 +117237,23 @@
                     }
                 ]
             },
+            "CVE-2026-64001": {
+                "cve_id": "CVE-2026-64001",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: pcm: oss: Fix setup list UAF on proc write error\n\nsnd_pcm_oss_proc_write() links a newly allocated setup entry into the\nOSS setup list before duplicating the task name. If the task-name\nallocation fails, the error path frees the already linked entry and\nleaves setup_list pointing at freed memory.\n\nA later OSS device open can then walk the stale list entry in\nsnd_pcm_oss_look_for_setup() and dereference freed memory.\n\nAllocate the task name and initialize the setup entry before publishing\nthe entry on setup_list. Also fetch the initial proc read iterator only\nafter taking setup_mutex, so all setup_list traversal follows the same\nlist lifetime rules.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-64002": {
                 "cve_id": "CVE-2026-64002",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -117292,10 +117373,10 @@
                     }
                 ]
             },
-            "CVE-2026-64012": {
-                "cve_id": "CVE-2026-64012",
+            "CVE-2026-64013": {
+                "cve_id": "CVE-2026-64013",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: sch_sfb: Replace direct dequeue call with peek and qdisc_dequeue_peeked\n\nWhen sfb has children (eg qfq qdisc) whose peek() callback is\nqdisc_peek_dequeued(), we could get a kernel panic. When the parent of such\nqdiscs (eg illustrated in patch #3 as tbf) wants to retrieve an skb from\nits child (sfb in this case), it will do the following:\n 1a. do a peek() - and when sensing there's an skb the child can offer, then\n     - the child in this case(sfb) calls its child's (qfq) peek.\n        qfq does the right thing and will return the gso_skb queue packet.\n        Note: if there wasnt a gso_skb entry then qfq will store it there.\n 1b. invoke a dequeue() on the child (sfb). And herein lies the problem.\n     - sfb will call the child's dequeue() which will essentially just\n       try to grab something of qfq's queue.\n\n[  127.594489][  T453] KASAN: null-ptr-deref in range [0x0000000000000048-0x000000000000004f]\n[  127.594741][  T453] CPU: 2 UID: 0 PID: 453 Comm: ping Not tainted 7.1.0-rc1-00035-gac961974495b-dirty #793 PREEMPT(full)\n[  127.595059][  T453] Hardware name: Bochs Bochs, BIOS Bochs 01/01/2011\n[  127.595254][  T453] RIP: 0010:qfq_dequeue+0x35c/0x1650 [sch_qfq]\n[  127.595461][  T453] Code: 00 fc ff df 80 3c 02 00 0f 85 17 0e 00 00 4c 8d 73 48 48 89 9d b8 02 00 00 48 b8 00 00 00 00 00 fc ff df 4c 89 f2 48 c1 ea 03 <80> 3c 02 00 0f 85 76 0c 00 00 48 b8 00 00 00 00 00 fc ff df 4c 8b\n[  127.596081][  T453] RSP: 0018:ffff88810e5af440 EFLAGS: 00010216\n[  127.596337][  T453] RAX: dffffc0000000000 RBX: 0000000000000000 RCX: dffffc0000000000\n[  127.596623][  T453] RDX: 0000000000000009 RSI: 0000001880000000 RDI: ffff888104fd82b0\n[  127.596917][  T453] RBP: ffff888104fd8000 R08: ffff888104fd8280 R09: 1ffff110211893a3\n[  127.597165][  T453] R10: 1ffff110211893a6 R11: 1ffff110211893a7 R12: 0000001880000000\n[  127.597404][  T453] R13: ffff888104fd82b8 R14: 0000000000000048 R15: 0000000040000000\n[  127.597644][  T453] FS:  00007fc380cbfc40(0000) GS:ffff88816f2a8000(0000) knlGS:0000000000000000\n[  127.597956][  T453] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[  127.598160][  T453] CR2: 00005610aa9890a8 CR3: 000000010369e000 CR4: 0000000000750ef0\n[  127.598390][  T453] PKRU: 55555554\n[  127.598509][  T453] Call Trace:\n[  127.598629][  T453]  <TASK>\n[  127.598718][  T453]  ? mark_held_locks+0x40/0x70\n[  127.598890][  T453]  ? srso_alias_return_thunk+0x5/0xfbef5\n[  127.599053][  T453]  sfb_dequeue+0x88/0x4d0\n[  127.599174][  T453]  ? ktime_get+0x137/0x230\n[  127.599328][  T453]  ? srso_alias_return_thunk+0x5/0xfbef5\n[  127.599480][  T453]  ? qdisc_peek_dequeued+0x7b/0x350 [sch_qfq]\n[  127.599670][  T453]  ? srso_alias_return_thunk+0x5/0xfbef5\n[  127.599831][  T453]  tbf_dequeue+0x6b1/0x1098 [sch_tbf]\n[  127.599988][  T453]  __qdisc_run+0x169/0x1900\n\nThe right thing to do in #1b is to grab the skb off gso_skb queue.\nThis patchset fixes that issue by changing #1b to use qdisc_dequeue_peeked()\nmethod instead.",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nACPI: button: Fix ACPI GPE handler leak during removal\n\nCommit a7e23ec17fee (\"ACPI: button: Install notifier for system events\nas well\") changed the ACPI notify handler type for ACPI buttons to\nACPI_ALL_NOTIFY, but it forgot to update acpi_button_remove() to reflect\nthat change.  This leads to leaking the notify handler past driver\nremoval, which may cause a kernel crash to occur if ACPI notify on\nthe given device is triggered after removing the driver, and causes a\nsubsequent probe of the given device with the same driver to fail.\n\nAddress this by updating the acpi_remove_notify_handler() call in\nacpi_button_remove() as appropriate.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -117734,23 +117815,6 @@
                     }
                 ]
             },
-            "CVE-2026-64075": {
-                "cve_id": "CVE-2026-64075",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfprobe: Fix unregister_fprobe() to wait for RCU grace period\n\nCommit 4346ba1604093 (\"fprobe: Rewrite fprobe on function-graph tracer\")\nchanged fprobe to register struct fprobe to an rcu-hlist, but it forgot\nto wait for RCU GP. Thus there can be use-after-free if the fprobe is\nreleased right after unregistering. This can be happened on fprobe\nevent and sample module code.\n\nTo fix this issue, add synchronize_rcu() in unregister_fprobe().\n\nNote that BPF is OK because fprobe is used as a part of\nbpf_kprobe_multi_link. This unregisters its fprobe in\nbpf_kprobe_multi_link_release() and it is deallocated via\nbpf_kprobe_multi_link_dealloc(), which is invoked from\nbpf_link_defer_dealloc_rcu_gp() RCU callback.\n\nFor BPF, this also introduced unregister_fprobe_async() which does\nNOT wait for RCU grace priod.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64076": {
                 "cve_id": "CVE-2026-64076",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -117807,23 +117871,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/virtio: use uninterruptible resv lock for plane updates\n\nvirtio_gpu_cursor_plane_update() and virtio_gpu_resource_flush() lock\nthe framebuffer BO's dma_resv via virtio_gpu_array_lock_resv() and\nignore its return value. The function can fail with -EINTR from\ndma_resv_lock_interruptible() (signal during lock wait) or with\n-ENOMEM from dma_resv_reserve_fences() (fence slot allocation),\nleaving the resv lock not held. The queue path then walks the object\narray and calls dma_resv_add_fence(), which requires the lock held;\nwith lockdep enabled this trips dma_resv_assert_held():\n\n  WARNING: drivers/dma-buf/dma-resv.c:296 at dma_resv_add_fence+0x71e/0x840\n  Call Trace:\n   virtio_gpu_array_add_fence\n   virtio_gpu_queue_ctrl_sgs\n   virtio_gpu_queue_fenced_ctrl_buffer\n   virtio_gpu_cursor_plane_update\n   drm_atomic_helper_commit_planes\n   drm_atomic_helper_commit_tail\n   commit_tail\n   drm_atomic_helper_commit\n   drm_atomic_commit\n   drm_atomic_helper_update_plane\n   __setplane_atomic\n   drm_mode_cursor_universal\n   drm_mode_cursor_common\n   drm_mode_cursor_ioctl\n   drm_ioctl\n   __x64_sys_ioctl\n\nBeyond the WARN, mutating the dma_resv fence list without the lock\nraces with concurrent readers/writers and can corrupt the list.\n\nBoth call sites run inside the .atomic_update plane callback, which\nDRM atomic helpers do not allow to fail (by the time it runs, the\ncommit has been signed off to userspace and there is no clean\nrollback path). Moving the lock acquisition to .prepare_fb was\nrejected because the broader lock scope deadlocks against other BO\nlocking paths in the same atomic commit.\n\nIntroduce virtio_gpu_lock_one_resv_uninterruptible() that uses\ndma_resv_lock() instead of dma_resv_lock_interruptible(). This\neliminates the -EINTR failure mode -- the realistic syzbot trigger\n-- without extending the lock hold across the commit. The helper\nlocks a single BO and rejects nents > 1 with -EINVAL; both fix\nsites lock exactly one BO.\n\nUse it from virtio_gpu_cursor_plane_update() and\nvirtio_gpu_resource_flush(); check the return value to handle the\nremaining -ENOMEM case from dma_resv_reserve_fences() by freeing\nthe objs and skipping the plane update for that frame. The\nframebuffer BOs touched here are not shared with other contexts\nand lock contention is expected to be brief, so the loss of\nsignal-interruptibility is acceptable.\n\nOther callers of virtio_gpu_array_lock_resv() (the ioctl paths)\ncontinue to use the interruptible variant.\n\nThe bug was reported by syzbot, triggered via fault injection\n(fail_nth) on the DRM_IOCTL_MODE_CURSOR path, which forces the\n-ENOMEM branch in dma_resv_reserve_fences().",
                 "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64103": {
-                "cve_id": "CVE-2026-64103",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: isci: Fix use-after-free in device removal path\n\nThe ISCI completion tasklet is initialized in isci_host_alloc()\n(drivers/scsi/isci/init.c:496) and scheduled from both MSI-X and legacy\ninterrupt handlers (drivers/scsi/isci/host.c:223,613).\n\nisci_host_deinit() stops the controller and waits for stop completion,\nbut it never kills completion_tasklet before teardown continues. A\ntop-of-function tasklet_kill() is not sufficient here: interrupts are\nonly disabled when isci_host_stop_complete() runs, so until\nwait_for_stop() returns the IRQ handlers can still requeue the\ntasklet. The tasklet callback also re-enables interrupts after draining\ncompletions, so killing the tasklet before the source is quiesced leaves\nthe same race open.\n\nOnce wait_for_stop() returns, no further IRQ-driven scheduling can\noccur. Kill completion_tasklet there so teardown cannot race a queued\ntasklet running on a dead ihost. On remove or unload, the stale callback\ncan otherwise dereference ihost and touch ihost->smu_registers after the\nhost lifetime ends.\n\nA UML + KASAN analogue reproduced the failure class both with no\ntasklet_kill() and with tasklet_kill() placed before source quiesce, and\nstayed clean once the kill happened after quiescing the scheduling\nsource.\n\nThis mirrors commit f6ab594672d4 (\"scsi: aic94xx: fix use-after-free in\ndevice removal path\"), but ISCI needs the kill after wait_for_stop().",
-                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
