@@ -39195,6 +39195,23 @@
                     }
                 ]
             },
+            "CVE-2026-64253": {
+                "cve_id": "CVE-2026-64253",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nkernel/fork: clear PF_BLOCK_TS in copy_process()\n\nPF_BLOCK_TS is only set in blk_time_get_ns() when current->plug is\nnon-NULL, and blk_finish_plug() clears it via __blk_flush_plug()\nbefore NULLing the plug pointer.  copy_process() breaks the\ninvariant by inheriting PF_BLOCK_TS from the parent while resetting\nthe child's plug to NULL.\n\nClear PF_BLOCK_TS alongside that assignment so callers can rely on\n\"PF_BLOCK_TS set implies current->plug != NULL\" and dereference\ncurrent->plug unguarded.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-64255": {
                 "cve_id": "CVE-2026-64255",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -39234,23 +39251,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfuse: re-lock request before returning from fuse_ref_folio()\n\nfuse_ref_folio() unlocks the request but does not re-lock it before\nreturning. fuse_chan_abort() can end the request and the async end\ncallback (eg fuse_writepage_free()) can free the args while the\nsubsequent copy chain logic after fuse_ref_folio() accesses them,\nleading to use-after-free issues.\n\nFix this by locking the request in fuse_ref_folio() before returning.",
                 "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64273": {
-                "cve_id": "CVE-2026-64273",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nInput: iforce - bound the device-reported force-feedback effect index\n\niforce_process_packet() handles a status report (packet id 0x02) by\ntaking a force-feedback effect index straight from the device wire and\nusing it to address the per-effect state array:\n\n\ti = data[1] & 0x7f;\n\tif (data[1] & 0x80) {\n\t\tif (!test_and_set_bit(FF_CORE_IS_PLAYED,\n\t\t\t\t      iforce->core_effects[i].flags))\n\t\t\t...\n\t} else if (test_and_clear_bit(FF_CORE_IS_PLAYED,\n\t\t\t\t      iforce->core_effects[i].flags)) {\n\t\t...\n\t}\n\nThe index is masked only with 0x7f, so it ranges 0..127, but\ncore_effects[] holds only IFORCE_EFFECTS_MAX (32) entries.  For an index\nof 32..127 the test_and_set_bit()/test_and_clear_bit() is an\nout-of-bounds single-bit read-modify-write past the array.  core_effects[]\nis the second-to-last member of struct iforce, so the write lands in the\ntrailing members and beyond the embedding kzalloc()'d iforce_serio /\niforce_usb object.\n\ndata[1] is unvalidated device payload on both transports (the USB\ninterrupt endpoint and serio), and the status path is not gated on force\nfeedback being present, so a malicious or counterfeit device can set or\nclear a bit at an attacker-chosen offset past the object.\n\nReject an out-of-range index instead of indexing with it.  Bound against\nthe array dimension IFORCE_EFFECTS_MAX rather than dev->ff->max_effects so\nthe check guarantees memory safety regardless of how many effects the\ndevice registered.  A legitimate \"effect started/stopped\" status always\ncarries an index below IFORCE_EFFECTS_MAX, so well-formed devices are\nunaffected; the neighbouring mark_core_as_ready() loop is already bounded\nand is left untouched.",
-                "severity": "",
                 "status": "open",
                 "events": [
                     {
@@ -39807,6 +39807,23 @@
                     }
                 ]
             },
+            "CVE-2026-64326": {
+                "cve_id": "CVE-2026-64326",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nblock: skip sync_blockdev() on surprise removal in bdev_mark_dead()\n\nbdev_mark_dead()'s @surprise == true means the device is already gone.\nThe filesystem callback fs_bdev_mark_dead() honours this and skips\nsync_filesystem(), but the bare block device path (no ->mark_dead op)\nlost its !surprise guard when the holder ->mark_dead callback was wired\nup (see Fixes), and now calls sync_blockdev() unconditionally, which can\nhang forever waiting on writeback that can no longer complete.\n\nsyzkaller hit this via nvme_reset_work()'s \"I/O queues lost\" path:\nnvme_mark_namespaces_dead() -> blk_mark_disk_dead() ->\nbdev_mark_dead(bdev, true) -> sync_blockdev() blocks in\nfolio_wait_writeback(), wedging the reset worker and every task waiting\non it.\n\nSkip the sync on surprise removal, matching fs_bdev_mark_dead();\ninvalidate_bdev() still runs. Orderly removal (surprise == false) is\nunchanged.\n\nFound by FuzzNvme(Syzkaller with FEMU fuzzing framework).",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-64329": {
                 "cve_id": "CVE-2026-64329",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -39829,6 +39846,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: tcpm: Validate SVID index in svdm_consume_modes()\n\nIn svdm_consume_modes(), the SVID value is read from pmdata->svids using\npmdata->svid_index as an array index without bounds validation:\n\n    paltmode->svid = pmdata->svids[pmdata->svid_index];\n\nIf pmdata->svid_index is driven beyond SVID_DISCOVERY_MAX (16), it results\nin an out-of-bounds read of the pmdata->svids array. Because pd_mode_data\nis embedded inside struct tcpm_port, indexing past svids reads into\nadjacent fields. In particular:\n- At index 16, it reads the altmodes count.\n- At index 18 and beyond, it reads into altmode_desc[], which contains\n  partner-supplied SVDM Discovery Modes VDOs.\n\nBy injecting a chosen SVID into altmode_desc[0].vdo and driving svid_index\nto 20, the partner can force paltmode->svid to be loaded with an arbitrary,\npartner- chosen SVID, which is then registered via\ntypec_partner_register_altmode().\n\nFix this by validating that pmdata->svid_index is non-negative and strictly\nless than pmdata->nsvids before accessing the pmdata->svids array inside\nsvdm_consume_modes().",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64332": {
+                "cve_id": "CVE-2026-64332",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nUSB: ulpi: fix memory leak on registration failure\n\nThe allocated device name is never freed on early ULPI device\nregistration failures.\n\nFix this by initialising the device structure earlier and releasing the\ninitial reference whenever registration fails.",
+                "severity": "LOW",
                 "status": "open",
                 "events": [
                     {
@@ -40203,6 +40237,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmm/slab: do not limit zeroing to orig_size when only red zoning is enabled\n\nWhen init (zeroing) on allocation is requested, for kmalloc() we\ngenerally have to zero the full object size even if a smaller size is\nrequested, in order to provide krealloc()'s __GFP_ZERO guarantees.\n\nBut if we track the requested size, krealloc() uses that information to\ndo the right thing, so we can zero only the requested size. With red\nzoning also enabled, any extra size became part of the red zone, so it\nmust not be zeroed and thus we must zero only the requested size.\n\nHowever the current check is imprecise, and will trigger also when only\nSLAB_RED_ZONE is enabled without SLAB_STORE_USER (which enables tracking\nthe requested size). This means enabling red zoning alone can compromise\nkrealloc()'s __GFP_ZERO contract.\n\nFix this by using slub_debug_orig_size() instead, which is the exact\ncheck for whether the requested size is tracked. We don't need to care\nif red zoning is also enabled or not. Also update and expand the\ncomment accordingly.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64369": {
+                "cve_id": "CVE-2026-64369",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ns390: Revert support for DCACHE_WORD_ACCESS\n\nload_unaligned_zeropad() reads eight bytes from unaligned addresses and may\ncross page boundaries. It handles exceptions which may happen if reading\nfrom the second page results in an exception.\n\nFor pages which are donated to the Ultravisor for secure execution purposes\nthe do_secure_storage_access() exception handler however does not handle\nsuch exceptions correctly. Such an exception may result in an endless\nexception loop which will never be resolved.\n\nAn attempt to fix this [1] turned out to be not sufficient. For now revert\nload_unaligned_zeropad() until this problem has been resolved in a proper\nway.\n\nNote that the implementation of load_unaligned_zeropad() itself is\ncorrect. The revert is just a temporary workaround until there is complete\nfix for secure storage access exceptions.\n\n[1] commit b00be77302d7 (\"s390/mm: Add missing secure storage access fixups for donated memory\")",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -41201,23 +41252,6 @@
                     }
                 ]
             },
-            "CVE-2026-64498": {
-                "cve_id": "CVE-2026-64498",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niio: buffer: hw-consumer: free scan_mask on buffer release\n\nThe scan_mask lifetime changed in commit 9a2e1233d38c (\"iio: buffer:\nhw-consumer: remove redundant scan_mask flexible array\").\n\nBefore that change, the scan mask storage was embedded in struct\nhw_consumer_buffer, so iio_hw_buf_release() could free the whole\nallocation with a single kfree(hw_buf).\n\nThat commit moved the scan mask to a separate bitmap_zalloc() allocation\nstored in buffer.scan_mask, but left iio_hw_buf_release() unchanged.\n\nFree the scan mask in iio_hw_buf_release() before freeing the buffer\nwrapper.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64507": {
                 "cve_id": "CVE-2026-64507",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -41980,6 +42014,29 @@
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-68480": {
+                "cve_id": "CVE-2026-68480",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nx86/bugs: Make Safe-RET robust against interrupt injection\n\nAn attacker injecting interrupts while the Safe-RET mitigation executes\non machines affected by SRSO can neutralize the safe return sequence,\npotentially leading to data leakage through speculative execution.\n\nFixup register state as if the Safe-RET sequence executed successfully\nby \"emulating\" it, in a manner of speaking, and avoid executing a RET\ninstruction after returning from the interrupt.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "fixed": "7.1.7-100.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "7.1.7-200.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
@@ -81202,6 +81259,23 @@
                     }
                 ]
             },
+            "CVE-2026-64253": {
+                "cve_id": "CVE-2026-64253",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nkernel/fork: clear PF_BLOCK_TS in copy_process()\n\nPF_BLOCK_TS is only set in blk_time_get_ns() when current->plug is\nnon-NULL, and blk_finish_plug() clears it via __blk_flush_plug()\nbefore NULLing the plug pointer.  copy_process() breaks the\ninvariant by inheriting PF_BLOCK_TS from the parent while resetting\nthe child's plug to NULL.\n\nClear PF_BLOCK_TS alongside that assignment so callers can rely on\n\"PF_BLOCK_TS set implies current->plug != NULL\" and dereference\ncurrent->plug unguarded.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-64255": {
                 "cve_id": "CVE-2026-64255",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -81241,23 +81315,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfuse: re-lock request before returning from fuse_ref_folio()\n\nfuse_ref_folio() unlocks the request but does not re-lock it before\nreturning. fuse_chan_abort() can end the request and the async end\ncallback (eg fuse_writepage_free()) can free the args while the\nsubsequent copy chain logic after fuse_ref_folio() accesses them,\nleading to use-after-free issues.\n\nFix this by locking the request in fuse_ref_folio() before returning.",
                 "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
-            "CVE-2026-64273": {
-                "cve_id": "CVE-2026-64273",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nInput: iforce - bound the device-reported force-feedback effect index\n\niforce_process_packet() handles a status report (packet id 0x02) by\ntaking a force-feedback effect index straight from the device wire and\nusing it to address the per-effect state array:\n\n\ti = data[1] & 0x7f;\n\tif (data[1] & 0x80) {\n\t\tif (!test_and_set_bit(FF_CORE_IS_PLAYED,\n\t\t\t\t      iforce->core_effects[i].flags))\n\t\t\t...\n\t} else if (test_and_clear_bit(FF_CORE_IS_PLAYED,\n\t\t\t\t      iforce->core_effects[i].flags)) {\n\t\t...\n\t}\n\nThe index is masked only with 0x7f, so it ranges 0..127, but\ncore_effects[] holds only IFORCE_EFFECTS_MAX (32) entries.  For an index\nof 32..127 the test_and_set_bit()/test_and_clear_bit() is an\nout-of-bounds single-bit read-modify-write past the array.  core_effects[]\nis the second-to-last member of struct iforce, so the write lands in the\ntrailing members and beyond the embedding kzalloc()'d iforce_serio /\niforce_usb object.\n\ndata[1] is unvalidated device payload on both transports (the USB\ninterrupt endpoint and serio), and the status path is not gated on force\nfeedback being present, so a malicious or counterfeit device can set or\nclear a bit at an attacker-chosen offset past the object.\n\nReject an out-of-range index instead of indexing with it.  Bound against\nthe array dimension IFORCE_EFFECTS_MAX rather than dev->ff->max_effects so\nthe check guarantees memory safety regardless of how many effects the\ndevice registered.  A legitimate \"effect started/stopped\" status always\ncarries an index below IFORCE_EFFECTS_MAX, so well-formed devices are\nunaffected; the neighbouring mark_core_as_ready() loop is already bounded\nand is left untouched.",
-                "severity": "",
                 "status": "open",
                 "events": [
                     {
@@ -81814,6 +81871,23 @@
                     }
                 ]
             },
+            "CVE-2026-64326": {
+                "cve_id": "CVE-2026-64326",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nblock: skip sync_blockdev() on surprise removal in bdev_mark_dead()\n\nbdev_mark_dead()'s @surprise == true means the device is already gone.\nThe filesystem callback fs_bdev_mark_dead() honours this and skips\nsync_filesystem(), but the bare block device path (no ->mark_dead op)\nlost its !surprise guard when the holder ->mark_dead callback was wired\nup (see Fixes), and now calls sync_blockdev() unconditionally, which can\nhang forever waiting on writeback that can no longer complete.\n\nsyzkaller hit this via nvme_reset_work()'s \"I/O queues lost\" path:\nnvme_mark_namespaces_dead() -> blk_mark_disk_dead() ->\nbdev_mark_dead(bdev, true) -> sync_blockdev() blocks in\nfolio_wait_writeback(), wedging the reset worker and every task waiting\non it.\n\nSkip the sync on surprise removal, matching fs_bdev_mark_dead();\ninvalidate_bdev() still runs. Orderly removal (surprise == false) is\nunchanged.\n\nFound by FuzzNvme(Syzkaller with FEMU fuzzing framework).",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-64329": {
                 "cve_id": "CVE-2026-64329",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -81836,6 +81910,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: typec: tcpm: Validate SVID index in svdm_consume_modes()\n\nIn svdm_consume_modes(), the SVID value is read from pmdata->svids using\npmdata->svid_index as an array index without bounds validation:\n\n    paltmode->svid = pmdata->svids[pmdata->svid_index];\n\nIf pmdata->svid_index is driven beyond SVID_DISCOVERY_MAX (16), it results\nin an out-of-bounds read of the pmdata->svids array. Because pd_mode_data\nis embedded inside struct tcpm_port, indexing past svids reads into\nadjacent fields. In particular:\n- At index 16, it reads the altmodes count.\n- At index 18 and beyond, it reads into altmode_desc[], which contains\n  partner-supplied SVDM Discovery Modes VDOs.\n\nBy injecting a chosen SVID into altmode_desc[0].vdo and driving svid_index\nto 20, the partner can force paltmode->svid to be loaded with an arbitrary,\npartner- chosen SVID, which is then registered via\ntypec_partner_register_altmode().\n\nFix this by validating that pmdata->svid_index is non-negative and strictly\nless than pmdata->nsvids before accessing the pmdata->svids array inside\nsvdm_consume_modes().",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64332": {
+                "cve_id": "CVE-2026-64332",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nUSB: ulpi: fix memory leak on registration failure\n\nThe allocated device name is never freed on early ULPI device\nregistration failures.\n\nFix this by initialising the device structure earlier and releasing the\ninitial reference whenever registration fails.",
+                "severity": "LOW",
                 "status": "open",
                 "events": [
                     {
@@ -82210,6 +82301,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmm/slab: do not limit zeroing to orig_size when only red zoning is enabled\n\nWhen init (zeroing) on allocation is requested, for kmalloc() we\ngenerally have to zero the full object size even if a smaller size is\nrequested, in order to provide krealloc()'s __GFP_ZERO guarantees.\n\nBut if we track the requested size, krealloc() uses that information to\ndo the right thing, so we can zero only the requested size. With red\nzoning also enabled, any extra size became part of the red zone, so it\nmust not be zeroed and thus we must zero only the requested size.\n\nHowever the current check is imprecise, and will trigger also when only\nSLAB_RED_ZONE is enabled without SLAB_STORE_USER (which enables tracking\nthe requested size). This means enabling red zoning alone can compromise\nkrealloc()'s __GFP_ZERO contract.\n\nFix this by using slub_debug_orig_size() instead, which is the exact\ncheck for whether the requested size is tracked. We don't need to care\nif red zoning is also enabled or not. Also update and expand the\ncomment accordingly.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64369": {
+                "cve_id": "CVE-2026-64369",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ns390: Revert support for DCACHE_WORD_ACCESS\n\nload_unaligned_zeropad() reads eight bytes from unaligned addresses and may\ncross page boundaries. It handles exceptions which may happen if reading\nfrom the second page results in an exception.\n\nFor pages which are donated to the Ultravisor for secure execution purposes\nthe do_secure_storage_access() exception handler however does not handle\nsuch exceptions correctly. Such an exception may result in an endless\nexception loop which will never be resolved.\n\nAn attempt to fix this [1] turned out to be not sufficient. For now revert\nload_unaligned_zeropad() until this problem has been resolved in a proper\nway.\n\nNote that the implementation of load_unaligned_zeropad() itself is\ncorrect. The revert is just a temporary workaround until there is complete\nfix for secure storage access exceptions.\n\n[1] commit b00be77302d7 (\"s390/mm: Add missing secure storage access fixups for donated memory\")",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -83208,23 +83316,6 @@
                     }
                 ]
             },
-            "CVE-2026-64498": {
-                "cve_id": "CVE-2026-64498",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niio: buffer: hw-consumer: free scan_mask on buffer release\n\nThe scan_mask lifetime changed in commit 9a2e1233d38c (\"iio: buffer:\nhw-consumer: remove redundant scan_mask flexible array\").\n\nBefore that change, the scan mask storage was embedded in struct\nhw_consumer_buffer, so iio_hw_buf_release() could free the whole\nallocation with a single kfree(hw_buf).\n\nThat commit moved the scan mask to a separate bitmap_zalloc() allocation\nstored in buffer.scan_mask, but left iio_hw_buf_release() unchanged.\n\nFree the scan mask in iio_hw_buf_release() before freeing the buffer\nwrapper.",
-                "severity": "",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-64507": {
                 "cve_id": "CVE-2026-64507",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -83987,6 +84078,29 @@
                     {
                         "introduced": "6.17.1-300.fc43",
                         "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-68480": {
+                "cve_id": "CVE-2026-68480",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nx86/bugs: Make Safe-RET robust against interrupt injection\n\nAn attacker injecting interrupts while the Safe-RET mitigation executes\non machines affected by SRSO can neutralize the safe return sequence,\npotentially leading to data leakage through speculative execution.\n\nFixup register state as if the Safe-RET sequence executed successfully\nby \"emulating\" it, in a manner of speaking, and avoid executing a RET\ninstruction after returning from the interrupt.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "fixed": "7.1.7-100.fc43",
+                        "identifier": "fc43"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "7.1.7-200.fc44",
+                        "identifier": "fc44"
                     }
                 ]
             },
