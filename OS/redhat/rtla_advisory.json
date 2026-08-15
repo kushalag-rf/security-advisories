@@ -43003,6 +43003,23 @@
                     }
                 ]
             },
+            "CVE-2026-68171": {
+                "cve_id": "CVE-2026-68171",
+                "title": "Rejected reason: This CVE ID has been rejected or withdrawn by it ...",
+                "description": "Rejected reason: This CVE ID has been rejected or withdrawn by its CVE Numbering Authority.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68175": {
                 "cve_id": "CVE-2026-68175",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -43109,7 +43126,7 @@
                 "cve_id": "CVE-2026-68188",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: RFCOMM: Fix session UAF in set_termios\n\nrfcomm_tty_set_termios() tests dlc->session without rfcomm_mutex and\nlater passes the pointer to rfcomm_send_rpn(). The latter dereferences\nboth session->initiator and session->sock. Meanwhile, krfcommd can\nunlink the DLC and free the session while holding rfcomm_mutex.\n\nThe race can proceed as follows:\n\n  TTY ioctl task                 krfcommd\n  --------------                 --------\n  load dlc->session\n  enter rfcomm_send_rpn()\n                                 lock rfcomm_mutex\n                                 clear dlc->session\n                                 free session\n                                 unlock rfcomm_mutex\n  read session->initiator\n\nKASAN reported:\n\n  BUG: KASAN: slab-use-after-free in rfcomm_send_rpn+0x297/0x2a0\n  Read of size 4 at addr ffff88810012a850 by task poc/92\n\n  Call Trace:\n   rfcomm_send_rpn+0x297/0x2a0\n   rfcomm_tty_set_termios+0x50d/0x850\n   tty_set_termios+0x596/0x950\n   set_termios+0x46a/0x6e0\n   tty_mode_ioctl+0x152/0xbd0\n   tty_ioctl+0x915/0x1240\n   __x64_sys_ioctl+0x134/0x1c0\n\n  Allocated by task 92:\n   rfcomm_session_add+0x9e/0x2e0\n   rfcomm_dlc_open+0x8b1/0xe00\n   rfcomm_dev_activate+0x85/0x1a0\n   rfcomm_tty_open+0x90/0x280\n\n  Freed by task 68:\n   kfree+0x131/0x3c0\n   rfcomm_session_del+0x119/0x180\n   rfcomm_run+0x737/0x4710\n\nAdd rfcomm_dlc_send_rpn(), which holds rfcomm_mutex while it verifies\nthat the DLC is still attached and sends the RPN frame. Have the TTY\npath use the helper and drop its unlocked session check. This keeps the\nsession valid through both the frame construction and socket send.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -43343,23 +43360,6 @@
                     }
                 ]
             },
-            "CVE-2026-68233": {
-                "cve_id": "CVE-2026-68233",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/vc4: Shut down BO cache timer before teardown\n\nThe BO cache timer callback schedules time_work, and time_work can rearm\nthe timer through vc4_bo_cache_free_old().\n\nvc4_bo_cache_destroy() deletes the timer and then cancels the work, which\ndoes not break that cycle: the work being cancelled can rearm the timer,\nand the timer then queues work again after teardown.\n\nUse timer_shutdown_sync() instead, so the timer cannot be rearmed and the\ncycle ends with cancel_work_sync().",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-68234": {
                 "cve_id": "CVE-2026-68234",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -43530,6 +43530,23 @@
                     }
                 ]
             },
+            "CVE-2026-68244": {
+                "cve_id": "CVE-2026-68244",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/gem: Do not leak siblings[] on proto context error\n\nAfter a successful BALANCE/PARALLEL_SUBMIT extension on context\ncreation, error during processing of next user extension leaks\nthe siblings[] array. Fix that.\n\nDiscovered using AI-assisted static analysis confirmed by\nIntel Product Security.\n\n(cherry picked from commit aa65e0a4b51b3b54b53e4142aaa2d997aa1061ff)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68245": {
                 "cve_id": "CVE-2026-68245",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -43564,6 +43581,23 @@
                     }
                 ]
             },
+            "CVE-2026-68247": {
+                "cve_id": "CVE-2026-68247",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/bios: range check LFP Data Block panel_type2\n\nWhile the panel_type from LFP Data Block is range checked, panel_type2\nis not. Add a few helpers for range checking, and use them to not only\ncheck panel_type2, but also improve clarity and correctness in the panel\ntype selection.\n\nDiscovered using AI-assisted static analysis confirmed by Intel Product\nSecurity.\n\nv2:\n- Fix commit message typo (Micha\u0142)\n- Add is_panel_type_pnp() (Ville)\n\n(cherry picked from commit c9ebe5d2f25729d6cfbbb1235d640bf67f9275df)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68248": {
                 "cve_id": "CVE-2026-68248",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -43585,6 +43619,23 @@
                 "cve_id": "CVE-2026-68249",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/sdma5.0: replace BUG_ON() with WARN_ON()\n\nThere's no need to crash the kernel for these cases.\n\n(cherry picked from commit 8d144a0eb09537055841af48c9e7c2d4cd48e84d)",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-68250": {
+                "cve_id": "CVE-2026-68250",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/sdma5.2: replace BUG_ON() with WARN_ON()\n\nThere's no need to crash the kernel for these cases.\n\n(cherry picked from commit ae658afc7f47f6147371ec42cc6b1a793dfdb5af)",
                 "severity": "LOW",
                 "status": "open",
                 "events": [
@@ -43853,6 +43904,23 @@
                     }
                 ]
             },
+            "CVE-2026-68270": {
+                "cve_id": "CVE-2026-68270",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/sysfb: Avoid possible truncation with calculating visible size\n\nCalculating the visible size of the system framebuffer can result in\ntruncation of the result. The calculation uses 32-bit arithmetics,\nwhich can overflow if the values for height and stride are large. Fix\nthe issue by multiplying with mul_u32_u32().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68271": {
                 "cve_id": "CVE-2026-68271",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -44095,7 +44163,7 @@
                 "cve_id": "CVE-2026-68291",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nidpf: fix max_vport related crash on allocation error during init\n\nSet adapter->max_vports only after successful allocation of vports, netdevs\nand  vport_config buffers. This fixes possible crashes on reset or rmmod,\nfollowing failed allocation on init\n\n[  305.981402] idpf 0000:83:00.0: enabling device (0100 -> 0102)\n[  305.994464] idpf 0000:83:00.0: Device HW Reset initiated\n[  320.416872] BUG: kernel NULL pointer dereference, address: 0000000000000000\n[  320.416918] #PF: supervisor read access in kernel mode\n[  320.416942] #PF: error_code(0x0000) - not-present page\n[  320.416963] PGD 2099657067 P4D 0\n[  320.416983] Oops: Oops: 0000 [#1] SMP NOPTI\n...\n[  320.417093] RIP: 0010:idpf_remove+0x118/0x200 [idpf]\n[  320.417130] Code: 8b bb 98 09 00 00 e8 17 0f 5b e5 48 8b bb e8 08 00 00 e8 0b 0f 5b e5 66 83 bb 28 06 00 00 00 48 8b bb 20 06 00 00 74 49 31 ed <48> 8b 04 ef 48 85 c0 74 2f 48 8b 78 20 e8 66 58 91 e5 48 8b 83 20\n[  320.417183] RSP: 0018:ff7322212903fdb8 EFLAGS: 00010246\n[  320.417205] RAX: 0000000000000000 RBX: ff4463de40300000 RCX: ff7322212903fd4c\n[  320.417228] RDX: 0000000000000001 RSI: ffffffffa7f7d100 RDI: 0000000000000000\n[  320.417250] RBP: 0000000000000000 R08: 0000000000000001 R09: 0000000000000000\n[  320.417272] R10: 0000000000000001 R11: ff4463de3a638f58 R12: ff4463be89ac7000\n[  320.417294] R13: ff4463be89ac7198 R14: ff4463be94fc7198 R15: ffffffffc0f10f20\n[  320.417317] FS:  00007f963c0e6740(0000) GS:ff4463fdd65d8000(0000) knlGS:0000000000000000\n[  320.417342] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[  320.417362] CR2: 0000000000000000 CR3: 00000020ba674002 CR4: 0000000000773ef0\n[  320.417385] PKRU: 55555554\n[  320.417398] Call Trace:\n[  320.417412]  <TASK>\n[  320.417429]  pci_device_remove+0x42/0xb0\n[  320.417459]  device_release_driver_internal+0x1a9/0x210\n[  320.417492]  driver_detach+0x4b/0x90\n[  320.417516]  bus_remove_driver+0x70/0x100\n[  320.417539]  pci_unregister_driver+0x2e/0xb0\n[  320.417564]  __do_sys_delete_module.constprop.0+0x190/0x2f0\n[  320.417592]  ? kmem_cache_free+0x31e/0x550\n[  320.417619]  ? lockdep_hardirqs_on_prepare+0xde/0x190\n[  320.417644]  ? do_syscall_64+0x38/0x6b0\n[  320.417665]  do_syscall_64+0xc8/0x6b0\n[  320.417683]  ? clear_bhb_loop+0x30/0x80\n[  320.417706]  entry_SYSCALL_64_after_hwframe+0x76/0x7e\n[  320.417727] RIP: 0033:0x7f963bb30beb",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -44537,7 +44605,7 @@
                 "cve_id": "CVE-2026-68337",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: Reject redirect helpers without a bpf_net_context\n\nThe bpf_redirect*() helpers and skb_do_redirect() obtain the per-task\nbpf_redirect_info via bpf_net_ctx_get_ri(), which dereferences the\ncurrent->bpf_net_context unconditionally. That context is established\non the paths that run tc BPF such as sch_handle_{ingress,egress}(),\n*except* for the case where {cls,act}_bpf was attached to a proper\nqdisc. A program running from there reaches the NULL deref in two ways:\n\n* It calls bpf_redirect() directly, which dereferences the context at\n  the top of the helper:\n\n     tc qdisc add dev eth0 root handle 1: red limit 1MB min 10KB max 20KB \\\n        avpkt 1000 burst 100 qevent early_drop block 10\n     tc filter add block 10 pref 1 bpf obj redirect.o\n\n* It simply returns TC_ACT_REDIRECT without helper call: tcf_qevent_handle()\n  then dispatches to skb_do_redirect(), which dereferences the context\n\nRather than extending bpf_net_context management into the qdisc path,\nmake the redirect helpers refuse to operate when no context exists, and\nhave tcf_qevent_handle() drop a TC_ACT_REDIRECT verdict instead of\ncalling skb_do_redirect(). Previous behaviour was a crash, so nothing\nregresses by not supporting it.",
-                "severity": "HIGH",
+                "severity": "LOW",
                 "status": "open",
                 "events": [
                     {
@@ -44707,7 +44775,7 @@
                 "cve_id": "CVE-2026-68363",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath9k: hif_usb: don't dereference hif_dev after re-arming firmware request\n\nath9k_hif_request_firmware() re-arms an asynchronous firmware load via\nrequest_firmware_nowait(), passing hif_dev as the completion context, and\nthen still dereferences hif_dev:\n\n\tdev_info(&hif_dev->udev->dev, \"ath9k_htc: Firmware %s requested\\n\",\n\t\t hif_dev->fw_name);\n\nThe re-armed callback ath9k_hif_usb_firmware_cb() runs on the \"events\"\nworkqueue and, when the firmware is missing, walks the retry chain into\nath9k_hif_usb_firmware_fail() -> complete_all(&hif_dev->fw_done). That\nreleases the wait_for_completion(&hif_dev->fw_done) in a concurrent\nath9k_hif_usb_disconnect(), which then kfree()s hif_dev. The trailing\ndev_info() in the frame that re-armed the request can therefore read freed\nmemory (hif_dev->udev, the first field of struct hif_device_usb):\n\n  BUG: KASAN: slab-use-after-free in ath9k_hif_request_firmware\n  Read of size 8 ... by task kworker/...\n   ath9k_hif_request_firmware\n   ath9k_hif_usb_firmware_cb           drivers/net/wireless/ath/ath9k/hif_usb.c:1247\n   request_firmware_work_func\n  Allocated by ...:\n   ath9k_hif_usb_probe                 drivers/net/wireless/ath/ath9k/hif_usb.c\n  Freed by ...:\n   ath9k_hif_usb_disconnect -> kfree   drivers/net/wireless/ath/ath9k/hif_usb.c\n\nThe fw_done barrier only makes disconnect wait for the firmware chain to\n*terminate*; it does not protect the outer ath9k_hif_request_firmware()\nframe that re-armed the request and keeps touching hif_dev afterwards.\n\nDrop the post-request dev_info(): it is the only use of hif_dev after the\nasync request is armed, and it is purely informational (the dev_err() on the\nfailure path runs only when request_firmware_nowait() did not arm a callback,\nso hif_dev is still alive there).\n\nThis was first reported by syzbot as a single, non-reproduced crash that was\nlater auto-obsoleted, and was independently rediscovered by the reFuzz fuzzer,\nwhich produced a C reproducer (USB-gadget connect/disconnect of an ath9k_htc\ndevice whose firmware download fails). The vulnerable code is unchanged and\nstill present in v7.1-rc6, where the slab-use-after-free reproduces under KASAN\nonce the (sub-microsecond) race window is widened.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -88688,6 +88756,23 @@
                     }
                 ]
             },
+            "CVE-2026-68171": {
+                "cve_id": "CVE-2026-68171",
+                "title": "Rejected reason: This CVE ID has been rejected or withdrawn by it ...",
+                "description": "Rejected reason: This CVE ID has been rejected or withdrawn by its CVE Numbering Authority.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68175": {
                 "cve_id": "CVE-2026-68175",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -88794,7 +88879,7 @@
                 "cve_id": "CVE-2026-68188",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: RFCOMM: Fix session UAF in set_termios\n\nrfcomm_tty_set_termios() tests dlc->session without rfcomm_mutex and\nlater passes the pointer to rfcomm_send_rpn(). The latter dereferences\nboth session->initiator and session->sock. Meanwhile, krfcommd can\nunlink the DLC and free the session while holding rfcomm_mutex.\n\nThe race can proceed as follows:\n\n  TTY ioctl task                 krfcommd\n  --------------                 --------\n  load dlc->session\n  enter rfcomm_send_rpn()\n                                 lock rfcomm_mutex\n                                 clear dlc->session\n                                 free session\n                                 unlock rfcomm_mutex\n  read session->initiator\n\nKASAN reported:\n\n  BUG: KASAN: slab-use-after-free in rfcomm_send_rpn+0x297/0x2a0\n  Read of size 4 at addr ffff88810012a850 by task poc/92\n\n  Call Trace:\n   rfcomm_send_rpn+0x297/0x2a0\n   rfcomm_tty_set_termios+0x50d/0x850\n   tty_set_termios+0x596/0x950\n   set_termios+0x46a/0x6e0\n   tty_mode_ioctl+0x152/0xbd0\n   tty_ioctl+0x915/0x1240\n   __x64_sys_ioctl+0x134/0x1c0\n\n  Allocated by task 92:\n   rfcomm_session_add+0x9e/0x2e0\n   rfcomm_dlc_open+0x8b1/0xe00\n   rfcomm_dev_activate+0x85/0x1a0\n   rfcomm_tty_open+0x90/0x280\n\n  Freed by task 68:\n   kfree+0x131/0x3c0\n   rfcomm_session_del+0x119/0x180\n   rfcomm_run+0x737/0x4710\n\nAdd rfcomm_dlc_send_rpn(), which holds rfcomm_mutex while it verifies\nthat the DLC is still attached and sends the RPN frame. Have the TTY\npath use the helper and drop its unlocked session check. This keeps the\nsession valid through both the frame construction and socket send.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -89028,23 +89113,6 @@
                     }
                 ]
             },
-            "CVE-2026-68233": {
-                "cve_id": "CVE-2026-68233",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/vc4: Shut down BO cache timer before teardown\n\nThe BO cache timer callback schedules time_work, and time_work can rearm\nthe timer through vc4_bo_cache_free_old().\n\nvc4_bo_cache_destroy() deletes the timer and then cancels the work, which\ndoes not break that cycle: the work being cancelled can rearm the timer,\nand the timer then queues work again after teardown.\n\nUse timer_shutdown_sync() instead, so the timer cannot be rearmed and the\ncycle ends with cancel_work_sync().",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-68234": {
                 "cve_id": "CVE-2026-68234",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -89215,6 +89283,23 @@
                     }
                 ]
             },
+            "CVE-2026-68244": {
+                "cve_id": "CVE-2026-68244",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/gem: Do not leak siblings[] on proto context error\n\nAfter a successful BALANCE/PARALLEL_SUBMIT extension on context\ncreation, error during processing of next user extension leaks\nthe siblings[] array. Fix that.\n\nDiscovered using AI-assisted static analysis confirmed by\nIntel Product Security.\n\n(cherry picked from commit aa65e0a4b51b3b54b53e4142aaa2d997aa1061ff)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68245": {
                 "cve_id": "CVE-2026-68245",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -89249,6 +89334,23 @@
                     }
                 ]
             },
+            "CVE-2026-68247": {
+                "cve_id": "CVE-2026-68247",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/bios: range check LFP Data Block panel_type2\n\nWhile the panel_type from LFP Data Block is range checked, panel_type2\nis not. Add a few helpers for range checking, and use them to not only\ncheck panel_type2, but also improve clarity and correctness in the panel\ntype selection.\n\nDiscovered using AI-assisted static analysis confirmed by Intel Product\nSecurity.\n\nv2:\n- Fix commit message typo (Micha\u0142)\n- Add is_panel_type_pnp() (Ville)\n\n(cherry picked from commit c9ebe5d2f25729d6cfbbb1235d640bf67f9275df)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68248": {
                 "cve_id": "CVE-2026-68248",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -89270,6 +89372,23 @@
                 "cve_id": "CVE-2026-68249",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/sdma5.0: replace BUG_ON() with WARN_ON()\n\nThere's no need to crash the kernel for these cases.\n\n(cherry picked from commit 8d144a0eb09537055841af48c9e7c2d4cd48e84d)",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-68250": {
+                "cve_id": "CVE-2026-68250",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/sdma5.2: replace BUG_ON() with WARN_ON()\n\nThere's no need to crash the kernel for these cases.\n\n(cherry picked from commit ae658afc7f47f6147371ec42cc6b1a793dfdb5af)",
                 "severity": "LOW",
                 "status": "open",
                 "events": [
@@ -89538,6 +89657,23 @@
                     }
                 ]
             },
+            "CVE-2026-68270": {
+                "cve_id": "CVE-2026-68270",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/sysfb: Avoid possible truncation with calculating visible size\n\nCalculating the visible size of the system framebuffer can result in\ntruncation of the result. The calculation uses 32-bit arithmetics,\nwhich can overflow if the values for height and stride are large. Fix\nthe issue by multiplying with mul_u32_u32().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68271": {
                 "cve_id": "CVE-2026-68271",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -89780,7 +89916,7 @@
                 "cve_id": "CVE-2026-68291",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nidpf: fix max_vport related crash on allocation error during init\n\nSet adapter->max_vports only after successful allocation of vports, netdevs\nand  vport_config buffers. This fixes possible crashes on reset or rmmod,\nfollowing failed allocation on init\n\n[  305.981402] idpf 0000:83:00.0: enabling device (0100 -> 0102)\n[  305.994464] idpf 0000:83:00.0: Device HW Reset initiated\n[  320.416872] BUG: kernel NULL pointer dereference, address: 0000000000000000\n[  320.416918] #PF: supervisor read access in kernel mode\n[  320.416942] #PF: error_code(0x0000) - not-present page\n[  320.416963] PGD 2099657067 P4D 0\n[  320.416983] Oops: Oops: 0000 [#1] SMP NOPTI\n...\n[  320.417093] RIP: 0010:idpf_remove+0x118/0x200 [idpf]\n[  320.417130] Code: 8b bb 98 09 00 00 e8 17 0f 5b e5 48 8b bb e8 08 00 00 e8 0b 0f 5b e5 66 83 bb 28 06 00 00 00 48 8b bb 20 06 00 00 74 49 31 ed <48> 8b 04 ef 48 85 c0 74 2f 48 8b 78 20 e8 66 58 91 e5 48 8b 83 20\n[  320.417183] RSP: 0018:ff7322212903fdb8 EFLAGS: 00010246\n[  320.417205] RAX: 0000000000000000 RBX: ff4463de40300000 RCX: ff7322212903fd4c\n[  320.417228] RDX: 0000000000000001 RSI: ffffffffa7f7d100 RDI: 0000000000000000\n[  320.417250] RBP: 0000000000000000 R08: 0000000000000001 R09: 0000000000000000\n[  320.417272] R10: 0000000000000001 R11: ff4463de3a638f58 R12: ff4463be89ac7000\n[  320.417294] R13: ff4463be89ac7198 R14: ff4463be94fc7198 R15: ffffffffc0f10f20\n[  320.417317] FS:  00007f963c0e6740(0000) GS:ff4463fdd65d8000(0000) knlGS:0000000000000000\n[  320.417342] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[  320.417362] CR2: 0000000000000000 CR3: 00000020ba674002 CR4: 0000000000773ef0\n[  320.417385] PKRU: 55555554\n[  320.417398] Call Trace:\n[  320.417412]  <TASK>\n[  320.417429]  pci_device_remove+0x42/0xb0\n[  320.417459]  device_release_driver_internal+0x1a9/0x210\n[  320.417492]  driver_detach+0x4b/0x90\n[  320.417516]  bus_remove_driver+0x70/0x100\n[  320.417539]  pci_unregister_driver+0x2e/0xb0\n[  320.417564]  __do_sys_delete_module.constprop.0+0x190/0x2f0\n[  320.417592]  ? kmem_cache_free+0x31e/0x550\n[  320.417619]  ? lockdep_hardirqs_on_prepare+0xde/0x190\n[  320.417644]  ? do_syscall_64+0x38/0x6b0\n[  320.417665]  do_syscall_64+0xc8/0x6b0\n[  320.417683]  ? clear_bhb_loop+0x30/0x80\n[  320.417706]  entry_SYSCALL_64_after_hwframe+0x76/0x7e\n[  320.417727] RIP: 0033:0x7f963bb30beb",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -90222,7 +90358,7 @@
                 "cve_id": "CVE-2026-68337",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: Reject redirect helpers without a bpf_net_context\n\nThe bpf_redirect*() helpers and skb_do_redirect() obtain the per-task\nbpf_redirect_info via bpf_net_ctx_get_ri(), which dereferences the\ncurrent->bpf_net_context unconditionally. That context is established\non the paths that run tc BPF such as sch_handle_{ingress,egress}(),\n*except* for the case where {cls,act}_bpf was attached to a proper\nqdisc. A program running from there reaches the NULL deref in two ways:\n\n* It calls bpf_redirect() directly, which dereferences the context at\n  the top of the helper:\n\n     tc qdisc add dev eth0 root handle 1: red limit 1MB min 10KB max 20KB \\\n        avpkt 1000 burst 100 qevent early_drop block 10\n     tc filter add block 10 pref 1 bpf obj redirect.o\n\n* It simply returns TC_ACT_REDIRECT without helper call: tcf_qevent_handle()\n  then dispatches to skb_do_redirect(), which dereferences the context\n\nRather than extending bpf_net_context management into the qdisc path,\nmake the redirect helpers refuse to operate when no context exists, and\nhave tcf_qevent_handle() drop a TC_ACT_REDIRECT verdict instead of\ncalling skb_do_redirect(). Previous behaviour was a crash, so nothing\nregresses by not supporting it.",
-                "severity": "HIGH",
+                "severity": "LOW",
                 "status": "open",
                 "events": [
                     {
@@ -90392,7 +90528,7 @@
                 "cve_id": "CVE-2026-68363",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath9k: hif_usb: don't dereference hif_dev after re-arming firmware request\n\nath9k_hif_request_firmware() re-arms an asynchronous firmware load via\nrequest_firmware_nowait(), passing hif_dev as the completion context, and\nthen still dereferences hif_dev:\n\n\tdev_info(&hif_dev->udev->dev, \"ath9k_htc: Firmware %s requested\\n\",\n\t\t hif_dev->fw_name);\n\nThe re-armed callback ath9k_hif_usb_firmware_cb() runs on the \"events\"\nworkqueue and, when the firmware is missing, walks the retry chain into\nath9k_hif_usb_firmware_fail() -> complete_all(&hif_dev->fw_done). That\nreleases the wait_for_completion(&hif_dev->fw_done) in a concurrent\nath9k_hif_usb_disconnect(), which then kfree()s hif_dev. The trailing\ndev_info() in the frame that re-armed the request can therefore read freed\nmemory (hif_dev->udev, the first field of struct hif_device_usb):\n\n  BUG: KASAN: slab-use-after-free in ath9k_hif_request_firmware\n  Read of size 8 ... by task kworker/...\n   ath9k_hif_request_firmware\n   ath9k_hif_usb_firmware_cb           drivers/net/wireless/ath/ath9k/hif_usb.c:1247\n   request_firmware_work_func\n  Allocated by ...:\n   ath9k_hif_usb_probe                 drivers/net/wireless/ath/ath9k/hif_usb.c\n  Freed by ...:\n   ath9k_hif_usb_disconnect -> kfree   drivers/net/wireless/ath/ath9k/hif_usb.c\n\nThe fw_done barrier only makes disconnect wait for the firmware chain to\n*terminate*; it does not protect the outer ath9k_hif_request_firmware()\nframe that re-armed the request and keeps touching hif_dev afterwards.\n\nDrop the post-request dev_info(): it is the only use of hif_dev after the\nasync request is armed, and it is purely informational (the dev_err() on the\nfailure path runs only when request_firmware_nowait() did not arm a callback,\nso hif_dev is still alive there).\n\nThis was first reported by syzbot as a single, non-reproduced crash that was\nlater auto-obsoleted, and was independently rediscovered by the reFuzz fuzzer,\nwhich produced a C reproducer (USB-gadget connect/disconnect of an ath9k_htc\ndevice whose firmware download fails). The vulnerable code is unchanged and\nstill present in v7.1-rc6, where the slab-use-after-free reproduces under KASAN\nonce the (sub-microsecond) race window is widened.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {

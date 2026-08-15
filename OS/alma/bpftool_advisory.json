@@ -59195,7 +59195,7 @@
                 "cve_id": "CVE-2026-68188",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: RFCOMM: Fix session UAF in set_termios\n\nrfcomm_tty_set_termios() tests dlc->session without rfcomm_mutex and\nlater passes the pointer to rfcomm_send_rpn(). The latter dereferences\nboth session->initiator and session->sock. Meanwhile, krfcommd can\nunlink the DLC and free the session while holding rfcomm_mutex.\n\nThe race can proceed as follows:\n\n  TTY ioctl task                 krfcommd\n  --------------                 --------\n  load dlc->session\n  enter rfcomm_send_rpn()\n                                 lock rfcomm_mutex\n                                 clear dlc->session\n                                 free session\n                                 unlock rfcomm_mutex\n  read session->initiator\n\nKASAN reported:\n\n  BUG: KASAN: slab-use-after-free in rfcomm_send_rpn+0x297/0x2a0\n  Read of size 4 at addr ffff88810012a850 by task poc/92\n\n  Call Trace:\n   rfcomm_send_rpn+0x297/0x2a0\n   rfcomm_tty_set_termios+0x50d/0x850\n   tty_set_termios+0x596/0x950\n   set_termios+0x46a/0x6e0\n   tty_mode_ioctl+0x152/0xbd0\n   tty_ioctl+0x915/0x1240\n   __x64_sys_ioctl+0x134/0x1c0\n\n  Allocated by task 92:\n   rfcomm_session_add+0x9e/0x2e0\n   rfcomm_dlc_open+0x8b1/0xe00\n   rfcomm_dev_activate+0x85/0x1a0\n   rfcomm_tty_open+0x90/0x280\n\n  Freed by task 68:\n   kfree+0x131/0x3c0\n   rfcomm_session_del+0x119/0x180\n   rfcomm_run+0x737/0x4710\n\nAdd rfcomm_dlc_send_rpn(), which holds rfcomm_mutex while it verifies\nthat the DLC is still attached and sends the RPN frame. Have the TTY\npath use the helper and drop its unlocked session check. This keeps the\nsession valid through both the frame construction and socket send.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -59334,63 +59334,11 @@
                     }
                 ]
             },
-            "CVE-2026-68204": {
-                "cve_id": "CVE-2026-68204",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: vivid: check for vb2_is_busy() when toggling caps\n\nThe vivid_update_format_cap/out() functions must only be called if the\ncapture/output queue are not busy. But for the controls that select\nthe CROP/COMPOSE/SCALE capability that is not checked.\n\nOnly when streaming starts will they be set to 'grabbed' and it is\nimpossible to change the control, but between REQBUFS and STREAMON you\nare still allowed to set these controls. Since vivid_update_format_cap/out\nwill change the format, this can cause unexpected results.\n\nBesides adding these checks, also add a WARN_ON in\nvivid_update_format_cap/out() if the queue is busy.\n\nI'm 90% certain that this is the cause of this syzbot bug:\n\nhttps://syzkaller.appspot.com/bug?extid=dac8f5eaa46837e97b89\n\nBut since we never have reproducers, it is hard to be certain. In any case,\nthese checks are needed regardless.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
             "CVE-2026-68206": {
                 "cve_id": "CVE-2026-68206",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: v4l2-ctrls: validate HEVC active reference counts\n\nHEVC slice parameters are shared stateless V4L2 controls, but the common\nvalidation path does not verify the active L0/L1 reference counts before\ndriver-specific code consumes them.\n\nThe original report came from Cedrus, but the active count bounds are\nnot Cedrus-specific. Validate them in the common HEVC slice control path\nso stateless HEVC drivers get the same basic guarantees as soon as the\ncontrol is queued.\n\nDo not reject ref_idx_l0/ref_idx_l1 entries here. Existing userspace may\nuse out-of-range sentinel values such as 0xff for missing references, and\nsome hardware can use that information for concealment. Keep this common\ncheck limited to the active reference counts.",
                 "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
-            "CVE-2026-68210": {
-                "cve_id": "CVE-2026-68210",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: stm32: dcmi: unregister notifier on probe failure\n\ndcmi_graph_init() registers the async notifier before dcmi_probe() toggles\nthe reset line. If reset_control_assert() or reset_control_deassert()\nfails afterwards, probe returns through err_cleanup and the driver core\nwill not call dcmi_remove().\n\nUnregister the notifier before cleaning it up on that error path,\nmatching the successful remove path and the V4L2 async notifier lifetime\nrules.\n\n[hverkuil: added Fixes tag]",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
-            "CVE-2026-68214": {
-                "cve_id": "CVE-2026-68214",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: rtl2832: fix use-after-free in rtl2832_remove()\n\ncancel_delayed_work_sync() is called before i2c_mux_del_adapters()\nin rtl2832_remove(). While the cancel waits for any running instance\nof i2c_gate_work to finish, it does not prevent the timer from being\nrescheduled by a concurrent thread.\n\nDuring probe, the r820t_attach() call attempts I2C transfers through\nthe mux adapter. These transfers go through i2c_mux_master_xfer(),\nwhich calls rtl2832_deselect() after the transfer completes,\nrescheduling i2c_gate_work via schedule_delayed_work(). If this\ntransfer is still in flight when rtl2832_remove() runs,\nrtl2832_deselect() can reschedule i2c_gate_work after it has been\ncancelled, causing a use-after-free when kfree(dev) is called.\n\nFix this by calling i2c_mux_del_adapters() before\ncancel_delayed_work_sync(). Once the mux adapter is unregistered, no\nnew I2C transfers can go through it, so rtl2832_deselect() can no\nlonger reschedule i2c_gate_work. The subsequent\ncancel_delayed_work_sync() is then guaranteed to be final.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
-            "CVE-2026-68215": {
-                "cve_id": "CVE-2026-68215",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: radio-si476x: Unregister v4l2_device on probe failure\n\nsi476x_radio_probe() registers radio->v4l2dev before allocating the V4L2\ncontrols and before registering the video device. If any of those later\nsteps fails, probe returns through the exit label after freeing only the\ncontrol handler.\n\nA failed probe does not call si476x_radio_remove(), so the\nv4l2_device_unregister() there is not reached. This leaves the parent\ndevice reference taken by v4l2_device_register() behind on the error path.\n\nUnregister the V4L2 device in the probe error path after freeing the\ncontrols.",
-                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -59425,19 +59373,6 @@
                     }
                 ]
             },
-            "CVE-2026-68222": {
-                "cve_id": "CVE-2026-68222",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: msi2500: Return queued buffers on start_streaming() failure\n\nThe vb2 framework hands buffers to the driver via buf_queue() before\ncalling start_streaming().  If start_streaming() returns an error\nwithout first returning those buffers via vb2_buffer_done(),\nvb2_start_streaming() fires WARN_ON(owned_by_drv_count) and the queued\nbuffers leak.\n\nmsi2500_start_streaming() had five error paths that all hit this trap\nand were further tangled by ret-overwriting between calls:\n\n  - -ENODEV when the USB device was already disconnected\n  - -ERESTARTSYS when mutex_lock_interruptible() was interrupted\n  - msi2500_set_usb_adc() failure: ret was silently overwritten by\n    the next call (msi2500_isoc_init), so the error was lost entirely\n  - msi2500_isoc_init() failure: cleanup_queued_bufs was called, but\n    the function then fell through to msi2500_ctrl_msg() and again\n    masked the original error by overwriting ret\n  - msi2500_ctrl_msg(CMD_START_STREAMING) failure: no cleanup at all,\n    leaving isoc URBs submitted with no way for the driver to consume\n    them\n\nConsolidate the error paths into a small goto chain.  Every failure\nnow stops the function, drains the queued-buffer list, and returns\nthe real error code.  The ctrl_msg failure path also rolls back the\npreceding msi2500_isoc_init() via msi2500_isoc_cleanup() before\nunlocking and draining.\n\nThe cleanup helper takes a vb2_buffer_state argument so that the\nstart_streaming error paths can pass VB2_BUF_STATE_QUEUED (as\nexpected by userspace on start_streaming failure) while stop_streaming\nkeeps its existing VB2_BUF_STATE_ERROR semantics.\n\nThis mirrors the uvcvideo fix in commit 4cf3b6fd54eb (\"media: uvcvideo:\nReturn queued buffers on start_streaming() failure\").",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
             "CVE-2026-68227": {
                 "cve_id": "CVE-2026-68227",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -59451,37 +59386,11 @@
                     }
                 ]
             },
-            "CVE-2026-68231": {
-                "cve_id": "CVE-2026-68231",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: airspy: Return queued buffers on start_streaming() failure\n\nThe vb2 framework hands buffers to the driver via buf_queue() before\ncalling start_streaming().  If start_streaming() returns an error\nwithout first returning those buffers via vb2_buffer_done(),\nvb2_start_streaming() fires WARN_ON(owned_by_drv_count) and the queued\nbuffers leak.\n\nairspy_start_streaming() returned -ENODEV early when the USB device had\nbeen disconnected (s->udev == NULL) without returning any buffers that\nbuf_queue() had already accepted.  Take v4l2_lock first and jump to the\nexisting err_clear_bit label, which already drains s->queued_bufs via\nvb2_buffer_done(..., VB2_BUF_STATE_QUEUED) before unlocking.\n\nThis mirrors the uvcvideo fix in commit 4cf3b6fd54eb (\"media: uvcvideo:\nReturn queued buffers on start_streaming() failure\").",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
             "CVE-2026-68232": {
                 "cve_id": "CVE-2026-68232",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/gpusvm: Fix MM reference leak in drm_gpusvm_range_evict\n\nIf kvmalloc_array() fails in drm_gpusvm_range_evict(), the MM\nreference acquired earlier is not released, resulting in a reference\nleak.\n\nFix this by dropping the MM reference on the kvmalloc_array()\nfailure path.",
                 "severity": "LOW",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
-            "CVE-2026-68233": {
-                "cve_id": "CVE-2026-68233",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/vc4: Shut down BO cache timer before teardown\n\nThe BO cache timer callback schedules time_work, and time_work can rearm\nthe timer through vc4_bo_cache_free_old().\n\nvc4_bo_cache_destroy() deletes the timer and then cancels the work, which\ndoes not break that cycle: the work being cancelled can rearm the timer,\nand the timer then queues work again after teardown.\n\nUse timer_shutdown_sync() instead, so the timer cannot be rearmed and the\ncycle ends with cancel_work_sync().",
-                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -59620,6 +59529,19 @@
                     }
                 ]
             },
+            "CVE-2026-68244": {
+                "cve_id": "CVE-2026-68244",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/gem: Do not leak siblings[] on proto context error\n\nAfter a successful BALANCE/PARALLEL_SUBMIT extension on context\ncreation, error during processing of next user extension leaks\nthe siblings[] array. Fix that.\n\nDiscovered using AI-assisted static analysis confirmed by\nIntel Product Security.\n\n(cherry picked from commit aa65e0a4b51b3b54b53e4142aaa2d997aa1061ff)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
             "CVE-2026-68245": {
                 "cve_id": "CVE-2026-68245",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -59637,6 +59559,19 @@
                 "cve_id": "CVE-2026-68246",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/gfx11: replace BUG_ON() with WARN_ON()\n\nThere's no need to crash the kernel for these cases.\n\n(cherry picked from commit daa62107452d2451787c4248ca38fa2d1a0cbefd)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-68247": {
+                "cve_id": "CVE-2026-68247",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/bios: range check LFP Data Block panel_type2\n\nWhile the panel_type from LFP Data Block is range checked, panel_type2\nis not. Add a few helpers for range checking, and use them to not only\ncheck panel_type2, but also improve clarity and correctness in the panel\ntype selection.\n\nDiscovered using AI-assisted static analysis confirmed by Intel Product\nSecurity.\n\nv2:\n- Fix commit message typo (Micha\u0142)\n- Add is_panel_type_pnp() (Ville)\n\n(cherry picked from commit c9ebe5d2f25729d6cfbbb1235d640bf67f9275df)",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -59880,6 +59815,19 @@
                     }
                 ]
             },
+            "CVE-2026-68270": {
+                "cve_id": "CVE-2026-68270",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/sysfb: Avoid possible truncation with calculating visible size\n\nCalculating the visible size of the system framebuffer can result in\ntruncation of the result. The calculation uses 32-bit arithmetics,\nwhich can overflow if the values for height and stride are large. Fix\nthe issue by multiplying with mul_u32_u32().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
             "CVE-2026-68271": {
                 "cve_id": "CVE-2026-68271",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -60079,7 +60027,7 @@
                 "cve_id": "CVE-2026-68291",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nidpf: fix max_vport related crash on allocation error during init\n\nSet adapter->max_vports only after successful allocation of vports, netdevs\nand  vport_config buffers. This fixes possible crashes on reset or rmmod,\nfollowing failed allocation on init\n\n[  305.981402] idpf 0000:83:00.0: enabling device (0100 -> 0102)\n[  305.994464] idpf 0000:83:00.0: Device HW Reset initiated\n[  320.416872] BUG: kernel NULL pointer dereference, address: 0000000000000000\n[  320.416918] #PF: supervisor read access in kernel mode\n[  320.416942] #PF: error_code(0x0000) - not-present page\n[  320.416963] PGD 2099657067 P4D 0\n[  320.416983] Oops: Oops: 0000 [#1] SMP NOPTI\n...\n[  320.417093] RIP: 0010:idpf_remove+0x118/0x200 [idpf]\n[  320.417130] Code: 8b bb 98 09 00 00 e8 17 0f 5b e5 48 8b bb e8 08 00 00 e8 0b 0f 5b e5 66 83 bb 28 06 00 00 00 48 8b bb 20 06 00 00 74 49 31 ed <48> 8b 04 ef 48 85 c0 74 2f 48 8b 78 20 e8 66 58 91 e5 48 8b 83 20\n[  320.417183] RSP: 0018:ff7322212903fdb8 EFLAGS: 00010246\n[  320.417205] RAX: 0000000000000000 RBX: ff4463de40300000 RCX: ff7322212903fd4c\n[  320.417228] RDX: 0000000000000001 RSI: ffffffffa7f7d100 RDI: 0000000000000000\n[  320.417250] RBP: 0000000000000000 R08: 0000000000000001 R09: 0000000000000000\n[  320.417272] R10: 0000000000000001 R11: ff4463de3a638f58 R12: ff4463be89ac7000\n[  320.417294] R13: ff4463be89ac7198 R14: ff4463be94fc7198 R15: ffffffffc0f10f20\n[  320.417317] FS:  00007f963c0e6740(0000) GS:ff4463fdd65d8000(0000) knlGS:0000000000000000\n[  320.417342] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[  320.417362] CR2: 0000000000000000 CR3: 00000020ba674002 CR4: 0000000000773ef0\n[  320.417385] PKRU: 55555554\n[  320.417398] Call Trace:\n[  320.417412]  <TASK>\n[  320.417429]  pci_device_remove+0x42/0xb0\n[  320.417459]  device_release_driver_internal+0x1a9/0x210\n[  320.417492]  driver_detach+0x4b/0x90\n[  320.417516]  bus_remove_driver+0x70/0x100\n[  320.417539]  pci_unregister_driver+0x2e/0xb0\n[  320.417564]  __do_sys_delete_module.constprop.0+0x190/0x2f0\n[  320.417592]  ? kmem_cache_free+0x31e/0x550\n[  320.417619]  ? lockdep_hardirqs_on_prepare+0xde/0x190\n[  320.417644]  ? do_syscall_64+0x38/0x6b0\n[  320.417665]  do_syscall_64+0xc8/0x6b0\n[  320.417683]  ? clear_bhb_loop+0x30/0x80\n[  320.417706]  entry_SYSCALL_64_after_hwframe+0x76/0x7e\n[  320.417727] RIP: 0033:0x7f963bb30beb",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -60456,7 +60404,7 @@
                 "cve_id": "CVE-2026-68337",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: Reject redirect helpers without a bpf_net_context\n\nThe bpf_redirect*() helpers and skb_do_redirect() obtain the per-task\nbpf_redirect_info via bpf_net_ctx_get_ri(), which dereferences the\ncurrent->bpf_net_context unconditionally. That context is established\non the paths that run tc BPF such as sch_handle_{ingress,egress}(),\n*except* for the case where {cls,act}_bpf was attached to a proper\nqdisc. A program running from there reaches the NULL deref in two ways:\n\n* It calls bpf_redirect() directly, which dereferences the context at\n  the top of the helper:\n\n     tc qdisc add dev eth0 root handle 1: red limit 1MB min 10KB max 20KB \\\n        avpkt 1000 burst 100 qevent early_drop block 10\n     tc filter add block 10 pref 1 bpf obj redirect.o\n\n* It simply returns TC_ACT_REDIRECT without helper call: tcf_qevent_handle()\n  then dispatches to skb_do_redirect(), which dereferences the context\n\nRather than extending bpf_net_context management into the qdisc path,\nmake the redirect helpers refuse to operate when no context exists, and\nhave tcf_qevent_handle() drop a TC_ACT_REDIRECT verdict instead of\ncalling skb_do_redirect(). Previous behaviour was a crash, so nothing\nregresses by not supporting it.",
-                "severity": "HIGH",
+                "severity": "LOW",
                 "status": "open",
                 "events": [
                     {
@@ -60560,7 +60508,7 @@
                 "cve_id": "CVE-2026-68350",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: carl9170: fix OOB read from off-by-two in TX status handler\n\nThe bounds check in carl9170_tx_process_status() uses\n`i > ((cmd->hdr.len / 2) + 1)` which is off by two, allowing\n2 extra iterations past valid _tx_status entries when the firmware-\ncontrolled hdr.ext exceeds hdr.len/2. Fix by using the correct\ncomparison `i >= (cmd->hdr.len / 2)`.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -60651,7 +60599,7 @@
                 "cve_id": "CVE-2026-68363",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath9k: hif_usb: don't dereference hif_dev after re-arming firmware request\n\nath9k_hif_request_firmware() re-arms an asynchronous firmware load via\nrequest_firmware_nowait(), passing hif_dev as the completion context, and\nthen still dereferences hif_dev:\n\n\tdev_info(&hif_dev->udev->dev, \"ath9k_htc: Firmware %s requested\\n\",\n\t\t hif_dev->fw_name);\n\nThe re-armed callback ath9k_hif_usb_firmware_cb() runs on the \"events\"\nworkqueue and, when the firmware is missing, walks the retry chain into\nath9k_hif_usb_firmware_fail() -> complete_all(&hif_dev->fw_done). That\nreleases the wait_for_completion(&hif_dev->fw_done) in a concurrent\nath9k_hif_usb_disconnect(), which then kfree()s hif_dev. The trailing\ndev_info() in the frame that re-armed the request can therefore read freed\nmemory (hif_dev->udev, the first field of struct hif_device_usb):\n\n  BUG: KASAN: slab-use-after-free in ath9k_hif_request_firmware\n  Read of size 8 ... by task kworker/...\n   ath9k_hif_request_firmware\n   ath9k_hif_usb_firmware_cb           drivers/net/wireless/ath/ath9k/hif_usb.c:1247\n   request_firmware_work_func\n  Allocated by ...:\n   ath9k_hif_usb_probe                 drivers/net/wireless/ath/ath9k/hif_usb.c\n  Freed by ...:\n   ath9k_hif_usb_disconnect -> kfree   drivers/net/wireless/ath/ath9k/hif_usb.c\n\nThe fw_done barrier only makes disconnect wait for the firmware chain to\n*terminate*; it does not protect the outer ath9k_hif_request_firmware()\nframe that re-armed the request and keeps touching hif_dev afterwards.\n\nDrop the post-request dev_info(): it is the only use of hif_dev after the\nasync request is armed, and it is purely informational (the dev_err() on the\nfailure path runs only when request_firmware_nowait() did not arm a callback,\nso hif_dev is still alive there).\n\nThis was first reported by syzbot as a single, non-reproduced crash that was\nlater auto-obsoleted, and was independently rediscovered by the reFuzz fuzzer,\nwhich produced a C reproducer (USB-gadget connect/disconnect of an ath9k_htc\ndevice whose firmware download fails). The vulnerable code is unchanged and\nstill present in v7.1-rc6, where the slab-use-after-free reproduces under KASAN\nonce the (sub-microsecond) race window is widened.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -60691,19 +60639,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nusb: core: port: Deattach Type-C connector on component unbind\n\nconnector_unbind() is the mirror of connector_bind(), but it is missing\nthe symmetric call to typec_deattach() that connector_bind() makes via:\n\n    if (port_dev->child)\n        typec_attach(port_dev->connector, &port_dev->child->dev);\n\nWhen a Thunderbolt dock is unplugged, two teardown paths race:\n\n1. The component framework calls connector_unbind() first, which sets\n   port_dev->connector = NULL without calling typec_deattach().  This\n   leaves port->usb2_dev/port->usb3_dev in struct typec_port pointing at\n   the USB device that is about to be freed.\n\n2. usb_disconnect() then calls typec_deattach(port_dev->connector, ...),\n   but port_dev->connector is already NULL, so the call is a no-op and\n   port->usb2_dev is never cleared.\n\n3. Concurrently, UCSI detects a PD partner-disconnect event and calls\n   typec_unregister_partner(), which reads port->usb2_dev (now a dangling\n   pointer to freed memory) and passes it to typec_partner_unlink_device()\n   -> sysfs_remove_link() -> dev_name() on the freed device, corrupting\n   the typec/UCSI partner state.\n\nThis corruption leaves the Thunderbolt tunnel in an inconsistent state on\nthe next dock hot-plug.  On affected hardware the dock's I225/igc NIC fails\nto enumerate: AER fires a slot reset while the igc driver is still\ninitialising (\"PCIe link lost\"), and the subsequent igc_reset attempt hits\nigc_rd32 on an already-detached device:\n\n    igc 0000:2e:00.0 eth0: PCIe link lost, device now detached\n    igc: Failed to read reg 0x0!\n    WARNING: CPU: 9 PID: 129 at drivers/net/ethernet/intel/igc/igc_main.c:7005\n             igc_rd32+0xa4/0xc0 [igc]\n    Call Trace:\n     igc_disable_pcie_master+0x16/0xa0 [igc]\n     igc_reset_hw_base+0x14/0x170 [igc]\n     igc_reset+0x63/0x110 [igc]\n     igc_io_slot_reset+0x9e/0xd0 [igc]\n     report_slot_reset+0x5d/0xc0\n     pcie_do_recovery+0x209/0x400\n     aer_isr_one_error_type+0x235/0x430\n     aer_isr+0x4e/0x80\n     irq_thread+0xf4/0x1f0\n\n4. UCSI later handles the PD partner-disconnect and calls\n   typec_unregister_partner(), which still sees the stale port->usb2_dev\n   and tries to remove its sysfs link a second time:\n\n   kernfs: can not remove 'typec', no directory\n   WARNING: CPU: 6 PID: 55 at fs/kernfs/dir.c:1706 kernfs_remove_by_name_ns+0xe9/0xf0\n   Workqueue: events ucsi_handle_connector_change [typec_ucsi]\n   Call Trace:\n    sysfs_remove_link+0x19/0x50\n    typec_unregister_partner+0x6e/0x120 [typec]\n    ucsi_unregister_partner+0x107/0x150 [typec_ucsi]\n    ucsi_handle_connector_change+0x3ec/0x490 [typec_ucsi]\n    process_one_work+0x18e/0x3e0\n    worker_thread+0x2e3/0x420\n    kthread+0x10a/0x230\n    ret_from_fork+0x121/0x140\n    ret_from_fork_asm+0x1a/0x30\n\n   With worse timing the same stale pointer is dereferenced after the\n   backing memory is freed, turning the warning into a use-after-free.\n\nFix the asymmetry: call typec_deattach() before clearing\nport_dev->connector, matching what connector_bind() does on the bind side.\ntypec_partner_deattach() is already protected by port->partner_link_lock,\nso it serialises safely with the concurrent typec_unregister_partner() path.",
                 "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
-            "CVE-2026-68373": {
-                "cve_id": "CVE-2026-68373",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: at76c50x-usb: avoid length underflow in at76_guess_freq()\n\nat76_guess_freq() checks only that the received frame is at least a bare\n802.11 header (24 bytes) before subtracting the fixed management-body\noffset:\n\n\tlen -= el_off;\n\nFor both beacon and probe response frames, el_off is 36. If the frame is\nshorter than el_off, subtracting it causes the calculated IE length to\nwrap. The length is eventually passed to cfg80211_find_elem_match() as a\nvery large unsigned value, so the element walk runs beyond the RX skb.\n\nThis path is reached from at76_rx_tasklet() while scanning. If the device\ndelivers a truncated beacon or probe response, the oversized IE length\ncauses an out-of-bounds read during scanning.\n\nSkip the IE lookup if the frame does not reach the variable elements,\nbefore subtracting el_off.",
-                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -95090,7 +95025,7 @@
                 "cve_id": "CVE-2026-68188",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: RFCOMM: Fix session UAF in set_termios\n\nrfcomm_tty_set_termios() tests dlc->session without rfcomm_mutex and\nlater passes the pointer to rfcomm_send_rpn(). The latter dereferences\nboth session->initiator and session->sock. Meanwhile, krfcommd can\nunlink the DLC and free the session while holding rfcomm_mutex.\n\nThe race can proceed as follows:\n\n  TTY ioctl task                 krfcommd\n  --------------                 --------\n  load dlc->session\n  enter rfcomm_send_rpn()\n                                 lock rfcomm_mutex\n                                 clear dlc->session\n                                 free session\n                                 unlock rfcomm_mutex\n  read session->initiator\n\nKASAN reported:\n\n  BUG: KASAN: slab-use-after-free in rfcomm_send_rpn+0x297/0x2a0\n  Read of size 4 at addr ffff88810012a850 by task poc/92\n\n  Call Trace:\n   rfcomm_send_rpn+0x297/0x2a0\n   rfcomm_tty_set_termios+0x50d/0x850\n   tty_set_termios+0x596/0x950\n   set_termios+0x46a/0x6e0\n   tty_mode_ioctl+0x152/0xbd0\n   tty_ioctl+0x915/0x1240\n   __x64_sys_ioctl+0x134/0x1c0\n\n  Allocated by task 92:\n   rfcomm_session_add+0x9e/0x2e0\n   rfcomm_dlc_open+0x8b1/0xe00\n   rfcomm_dev_activate+0x85/0x1a0\n   rfcomm_tty_open+0x90/0x280\n\n  Freed by task 68:\n   kfree+0x131/0x3c0\n   rfcomm_session_del+0x119/0x180\n   rfcomm_run+0x737/0x4710\n\nAdd rfcomm_dlc_send_rpn(), which holds rfcomm_mutex while it verifies\nthat the DLC is still attached and sends the RPN frame. Have the TTY\npath use the helper and drop its unlocked session check. This keeps the\nsession valid through both the frame construction and socket send.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -95177,45 +95112,6 @@
                     }
                 ]
             },
-            "CVE-2026-68204": {
-                "cve_id": "CVE-2026-68204",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: vivid: check for vb2_is_busy() when toggling caps\n\nThe vivid_update_format_cap/out() functions must only be called if the\ncapture/output queue are not busy. But for the controls that select\nthe CROP/COMPOSE/SCALE capability that is not checked.\n\nOnly when streaming starts will they be set to 'grabbed' and it is\nimpossible to change the control, but between REQBUFS and STREAMON you\nare still allowed to set these controls. Since vivid_update_format_cap/out\nwill change the format, this can cause unexpected results.\n\nBesides adding these checks, also add a WARN_ON in\nvivid_update_format_cap/out() if the queue is busy.\n\nI'm 90% certain that this is the cause of this syzbot bug:\n\nhttps://syzkaller.appspot.com/bug?extid=dac8f5eaa46837e97b89\n\nBut since we never have reproducers, it is hard to be certain. In any case,\nthese checks are needed regardless.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    }
-                ]
-            },
-            "CVE-2026-68214": {
-                "cve_id": "CVE-2026-68214",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: rtl2832: fix use-after-free in rtl2832_remove()\n\ncancel_delayed_work_sync() is called before i2c_mux_del_adapters()\nin rtl2832_remove(). While the cancel waits for any running instance\nof i2c_gate_work to finish, it does not prevent the timer from being\nrescheduled by a concurrent thread.\n\nDuring probe, the r820t_attach() call attempts I2C transfers through\nthe mux adapter. These transfers go through i2c_mux_master_xfer(),\nwhich calls rtl2832_deselect() after the transfer completes,\nrescheduling i2c_gate_work via schedule_delayed_work(). If this\ntransfer is still in flight when rtl2832_remove() runs,\nrtl2832_deselect() can reschedule i2c_gate_work after it has been\ncancelled, causing a use-after-free when kfree(dev) is called.\n\nFix this by calling i2c_mux_del_adapters() before\ncancel_delayed_work_sync(). Once the mux adapter is unregistered, no\nnew I2C transfers can go through it, so rtl2832_deselect() can no\nlonger reschedule i2c_gate_work. The subsequent\ncancel_delayed_work_sync() is then guaranteed to be final.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    }
-                ]
-            },
-            "CVE-2026-68215": {
-                "cve_id": "CVE-2026-68215",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: radio-si476x: Unregister v4l2_device on probe failure\n\nsi476x_radio_probe() registers radio->v4l2dev before allocating the V4L2\ncontrols and before registering the video device. If any of those later\nsteps fails, probe returns through the exit label after freeing only the\ncontrol handler.\n\nA failed probe does not call si476x_radio_remove(), so the\nv4l2_device_unregister() there is not reached. This leaves the parent\ndevice reference taken by v4l2_device_register() behind on the error path.\n\nUnregister the V4L2 device in the probe error path after freeing the\ncontrols.",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    }
-                ]
-            },
             "CVE-2026-68216": {
                 "cve_id": "CVE-2026-68216",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -95242,50 +95138,11 @@
                     }
                 ]
             },
-            "CVE-2026-68222": {
-                "cve_id": "CVE-2026-68222",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: msi2500: Return queued buffers on start_streaming() failure\n\nThe vb2 framework hands buffers to the driver via buf_queue() before\ncalling start_streaming().  If start_streaming() returns an error\nwithout first returning those buffers via vb2_buffer_done(),\nvb2_start_streaming() fires WARN_ON(owned_by_drv_count) and the queued\nbuffers leak.\n\nmsi2500_start_streaming() had five error paths that all hit this trap\nand were further tangled by ret-overwriting between calls:\n\n  - -ENODEV when the USB device was already disconnected\n  - -ERESTARTSYS when mutex_lock_interruptible() was interrupted\n  - msi2500_set_usb_adc() failure: ret was silently overwritten by\n    the next call (msi2500_isoc_init), so the error was lost entirely\n  - msi2500_isoc_init() failure: cleanup_queued_bufs was called, but\n    the function then fell through to msi2500_ctrl_msg() and again\n    masked the original error by overwriting ret\n  - msi2500_ctrl_msg(CMD_START_STREAMING) failure: no cleanup at all,\n    leaving isoc URBs submitted with no way for the driver to consume\n    them\n\nConsolidate the error paths into a small goto chain.  Every failure\nnow stops the function, drains the queued-buffer list, and returns\nthe real error code.  The ctrl_msg failure path also rolls back the\npreceding msi2500_isoc_init() via msi2500_isoc_cleanup() before\nunlocking and draining.\n\nThe cleanup helper takes a vb2_buffer_state argument so that the\nstart_streaming error paths can pass VB2_BUF_STATE_QUEUED (as\nexpected by userspace on start_streaming failure) while stop_streaming\nkeeps its existing VB2_BUF_STATE_ERROR semantics.\n\nThis mirrors the uvcvideo fix in commit 4cf3b6fd54eb (\"media: uvcvideo:\nReturn queued buffers on start_streaming() failure\").",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    }
-                ]
-            },
             "CVE-2026-68227": {
                 "cve_id": "CVE-2026-68227",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: cx231xx: fix devres lifetime\n\nUSB drivers bind to USB interfaces and any device managed resources\nshould have their lifetime tied to the interface rather than parent USB\ndevice. This avoids issues like memory leaks when drivers are unbound\nwithout their devices being physically disconnected (e.g. on probe\ndeferral or configuration changes).\n\nFix the driver state lifetime so that it is released on driver unbind.",
                 "severity": "LOW",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    }
-                ]
-            },
-            "CVE-2026-68231": {
-                "cve_id": "CVE-2026-68231",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmedia: airspy: Return queued buffers on start_streaming() failure\n\nThe vb2 framework hands buffers to the driver via buf_queue() before\ncalling start_streaming().  If start_streaming() returns an error\nwithout first returning those buffers via vb2_buffer_done(),\nvb2_start_streaming() fires WARN_ON(owned_by_drv_count) and the queued\nbuffers leak.\n\nairspy_start_streaming() returned -ENODEV early when the USB device had\nbeen disconnected (s->udev == NULL) without returning any buffers that\nbuf_queue() had already accepted.  Take v4l2_lock first and jump to the\nexisting err_clear_bit label, which already drains s->queued_bufs via\nvb2_buffer_done(..., VB2_BUF_STATE_QUEUED) before unlocking.\n\nThis mirrors the uvcvideo fix in commit 4cf3b6fd54eb (\"media: uvcvideo:\nReturn queued buffers on start_streaming() failure\").",
-                "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    }
-                ]
-            },
-            "CVE-2026-68233": {
-                "cve_id": "CVE-2026-68233",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/vc4: Shut down BO cache timer before teardown\n\nThe BO cache timer callback schedules time_work, and time_work can rearm\nthe timer through vc4_bo_cache_free_old().\n\nvc4_bo_cache_destroy() deletes the timer and then cancels the work, which\ndoes not break that cycle: the work being cancelled can rearm the timer,\nand the timer then queues work again after teardown.\n\nUse timer_shutdown_sync() instead, so the timer cannot be rearmed and the\ncycle ends with cancel_work_sync().",
-                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -95385,6 +95242,19 @@
                     }
                 ]
             },
+            "CVE-2026-68244": {
+                "cve_id": "CVE-2026-68244",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/gem: Do not leak siblings[] on proto context error\n\nAfter a successful BALANCE/PARALLEL_SUBMIT extension on context\ncreation, error during processing of next user extension leaks\nthe siblings[] array. Fix that.\n\nDiscovered using AI-assisted static analysis confirmed by\nIntel Product Security.\n\n(cherry picked from commit aa65e0a4b51b3b54b53e4142aaa2d997aa1061ff)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
             "CVE-2026-68245": {
                 "cve_id": "CVE-2026-68245",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -95402,6 +95272,19 @@
                 "cve_id": "CVE-2026-68246",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amdgpu/gfx11: replace BUG_ON() with WARN_ON()\n\nThere's no need to crash the kernel for these cases.\n\n(cherry picked from commit daa62107452d2451787c4248ca38fa2d1a0cbefd)",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
+            "CVE-2026-68247": {
+                "cve_id": "CVE-2026-68247",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/i915/bios: range check LFP Data Block panel_type2\n\nWhile the panel_type from LFP Data Block is range checked, panel_type2\nis not. Add a few helpers for range checking, and use them to not only\ncheck panel_type2, but also improve clarity and correctness in the panel\ntype selection.\n\nDiscovered using AI-assisted static analysis confirmed by Intel Product\nSecurity.\n\nv2:\n- Fix commit message typo (Micha\u0142)\n- Add is_panel_type_pnp() (Ville)\n\n(cherry picked from commit c9ebe5d2f25729d6cfbbb1235d640bf67f9275df)",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -95688,7 +95571,7 @@
                 "cve_id": "CVE-2026-68291",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nidpf: fix max_vport related crash on allocation error during init\n\nSet adapter->max_vports only after successful allocation of vports, netdevs\nand  vport_config buffers. This fixes possible crashes on reset or rmmod,\nfollowing failed allocation on init\n\n[  305.981402] idpf 0000:83:00.0: enabling device (0100 -> 0102)\n[  305.994464] idpf 0000:83:00.0: Device HW Reset initiated\n[  320.416872] BUG: kernel NULL pointer dereference, address: 0000000000000000\n[  320.416918] #PF: supervisor read access in kernel mode\n[  320.416942] #PF: error_code(0x0000) - not-present page\n[  320.416963] PGD 2099657067 P4D 0\n[  320.416983] Oops: Oops: 0000 [#1] SMP NOPTI\n...\n[  320.417093] RIP: 0010:idpf_remove+0x118/0x200 [idpf]\n[  320.417130] Code: 8b bb 98 09 00 00 e8 17 0f 5b e5 48 8b bb e8 08 00 00 e8 0b 0f 5b e5 66 83 bb 28 06 00 00 00 48 8b bb 20 06 00 00 74 49 31 ed <48> 8b 04 ef 48 85 c0 74 2f 48 8b 78 20 e8 66 58 91 e5 48 8b 83 20\n[  320.417183] RSP: 0018:ff7322212903fdb8 EFLAGS: 00010246\n[  320.417205] RAX: 0000000000000000 RBX: ff4463de40300000 RCX: ff7322212903fd4c\n[  320.417228] RDX: 0000000000000001 RSI: ffffffffa7f7d100 RDI: 0000000000000000\n[  320.417250] RBP: 0000000000000000 R08: 0000000000000001 R09: 0000000000000000\n[  320.417272] R10: 0000000000000001 R11: ff4463de3a638f58 R12: ff4463be89ac7000\n[  320.417294] R13: ff4463be89ac7198 R14: ff4463be94fc7198 R15: ffffffffc0f10f20\n[  320.417317] FS:  00007f963c0e6740(0000) GS:ff4463fdd65d8000(0000) knlGS:0000000000000000\n[  320.417342] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033\n[  320.417362] CR2: 0000000000000000 CR3: 00000020ba674002 CR4: 0000000000773ef0\n[  320.417385] PKRU: 55555554\n[  320.417398] Call Trace:\n[  320.417412]  <TASK>\n[  320.417429]  pci_device_remove+0x42/0xb0\n[  320.417459]  device_release_driver_internal+0x1a9/0x210\n[  320.417492]  driver_detach+0x4b/0x90\n[  320.417516]  bus_remove_driver+0x70/0x100\n[  320.417539]  pci_unregister_driver+0x2e/0xb0\n[  320.417564]  __do_sys_delete_module.constprop.0+0x190/0x2f0\n[  320.417592]  ? kmem_cache_free+0x31e/0x550\n[  320.417619]  ? lockdep_hardirqs_on_prepare+0xde/0x190\n[  320.417644]  ? do_syscall_64+0x38/0x6b0\n[  320.417665]  do_syscall_64+0xc8/0x6b0\n[  320.417683]  ? clear_bhb_loop+0x30/0x80\n[  320.417706]  entry_SYSCALL_64_after_hwframe+0x76/0x7e\n[  320.417727] RIP: 0033:0x7f963bb30beb",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -95922,7 +95805,7 @@
                 "cve_id": "CVE-2026-68337",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: Reject redirect helpers without a bpf_net_context\n\nThe bpf_redirect*() helpers and skb_do_redirect() obtain the per-task\nbpf_redirect_info via bpf_net_ctx_get_ri(), which dereferences the\ncurrent->bpf_net_context unconditionally. That context is established\non the paths that run tc BPF such as sch_handle_{ingress,egress}(),\n*except* for the case where {cls,act}_bpf was attached to a proper\nqdisc. A program running from there reaches the NULL deref in two ways:\n\n* It calls bpf_redirect() directly, which dereferences the context at\n  the top of the helper:\n\n     tc qdisc add dev eth0 root handle 1: red limit 1MB min 10KB max 20KB \\\n        avpkt 1000 burst 100 qevent early_drop block 10\n     tc filter add block 10 pref 1 bpf obj redirect.o\n\n* It simply returns TC_ACT_REDIRECT without helper call: tcf_qevent_handle()\n  then dispatches to skb_do_redirect(), which dereferences the context\n\nRather than extending bpf_net_context management into the qdisc path,\nmake the redirect helpers refuse to operate when no context exists, and\nhave tcf_qevent_handle() drop a TC_ACT_REDIRECT verdict instead of\ncalling skb_do_redirect(). Previous behaviour was a crash, so nothing\nregresses by not supporting it.",
-                "severity": "HIGH",
+                "severity": "LOW",
                 "status": "open",
                 "events": [
                     {
@@ -95974,7 +95857,7 @@
                 "cve_id": "CVE-2026-68350",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: carl9170: fix OOB read from off-by-two in TX status handler\n\nThe bounds check in carl9170_tx_process_status() uses\n`i > ((cmd->hdr.len / 2) + 1)` which is off by two, allowing\n2 extra iterations past valid _tx_status entries when the firmware-\ncontrolled hdr.ext exceeds hdr.len/2. Fix by using the correct\ncomparison `i >= (cmd->hdr.len / 2)`.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -96052,7 +95935,7 @@
                 "cve_id": "CVE-2026-68363",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ath9k: hif_usb: don't dereference hif_dev after re-arming firmware request\n\nath9k_hif_request_firmware() re-arms an asynchronous firmware load via\nrequest_firmware_nowait(), passing hif_dev as the completion context, and\nthen still dereferences hif_dev:\n\n\tdev_info(&hif_dev->udev->dev, \"ath9k_htc: Firmware %s requested\\n\",\n\t\t hif_dev->fw_name);\n\nThe re-armed callback ath9k_hif_usb_firmware_cb() runs on the \"events\"\nworkqueue and, when the firmware is missing, walks the retry chain into\nath9k_hif_usb_firmware_fail() -> complete_all(&hif_dev->fw_done). That\nreleases the wait_for_completion(&hif_dev->fw_done) in a concurrent\nath9k_hif_usb_disconnect(), which then kfree()s hif_dev. The trailing\ndev_info() in the frame that re-armed the request can therefore read freed\nmemory (hif_dev->udev, the first field of struct hif_device_usb):\n\n  BUG: KASAN: slab-use-after-free in ath9k_hif_request_firmware\n  Read of size 8 ... by task kworker/...\n   ath9k_hif_request_firmware\n   ath9k_hif_usb_firmware_cb           drivers/net/wireless/ath/ath9k/hif_usb.c:1247\n   request_firmware_work_func\n  Allocated by ...:\n   ath9k_hif_usb_probe                 drivers/net/wireless/ath/ath9k/hif_usb.c\n  Freed by ...:\n   ath9k_hif_usb_disconnect -> kfree   drivers/net/wireless/ath/ath9k/hif_usb.c\n\nThe fw_done barrier only makes disconnect wait for the firmware chain to\n*terminate*; it does not protect the outer ath9k_hif_request_firmware()\nframe that re-armed the request and keeps touching hif_dev afterwards.\n\nDrop the post-request dev_info(): it is the only use of hif_dev after the\nasync request is armed, and it is purely informational (the dev_err() on the\nfailure path runs only when request_firmware_nowait() did not arm a callback,\nso hif_dev is still alive there).\n\nThis was first reported by syzbot as a single, non-reproduced crash that was\nlater auto-obsoleted, and was independently rediscovered by the reFuzz fuzzer,\nwhich produced a C reproducer (USB-gadget connect/disconnect of an ath9k_htc\ndevice whose firmware download fails). The vulnerable code is unchanged and\nstill present in v7.1-rc6, where the slab-use-after-free reproduces under KASAN\nonce the (sub-microsecond) race window is widened.",
-                "severity": "HIGH",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -96079,19 +95962,6 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nUSB: serial: io_edgeport: cap received transmit credits\n\nThe interrupt-status packet reports transmit credits returned by the\ndevice. edge_interrupt_callback() adds the 16-bit value to txCredits\nwithout checking maxTxCredits.\n\nedge_write() uses txCredits minus the software FIFO count as the amount\nof data that fits. Since the FIFO is allocated with maxTxCredits bytes,\ntxCredits exceeding maxTxCredits can cause OOB write in ring buffer.\n\nCap accumulated credits at maxTxCredits. Conforming devices should never\nhit the cap.",
                 "severity": "MEDIUM",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el8"
-                    }
-                ]
-            },
-            "CVE-2026-68373": {
-                "cve_id": "CVE-2026-68373",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: at76c50x-usb: avoid length underflow in at76_guess_freq()\n\nat76_guess_freq() checks only that the received frame is at least a bare\n802.11 header (24 bytes) before subtracting the fixed management-body\noffset:\n\n\tlen -= el_off;\n\nFor both beacon and probe response frames, el_off is 36. If the frame is\nshorter than el_off, subtracting it causes the calculated IE length to\nwrap. The length is eventually passed to cfg80211_find_elem_match() as a\nvery large unsigned value, so the element walk runs beyond the RX skb.\n\nThis path is reached from at76_rx_tasklet() while scanning. If the device\ndelivers a truncated beacon or probe response, the oversized IE length\ncauses an out-of-bounds read during scanning.\n\nSkip the IE lookup if the frame does not reach the variable elements,\nbefore subtracting el_off.",
-                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
