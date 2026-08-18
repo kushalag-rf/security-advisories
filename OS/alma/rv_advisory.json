@@ -48011,6 +48011,23 @@
                     }
                 ]
             },
+            "CVE-2026-72036": {
+                "cve_id": "CVE-2026-72036",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: sch_multiq: Replace direct dequeue call with peek and qdisc_dequeue_peeked\n\nmultiq_dequeue() takes a packet from a band's child with a direct\n->dequeue() call after multiq_peek() peeked it. When the child is\nnon-work-conserving the peek stashes the skb in the child's gso_skb, so\nthe direct dequeue returns a different skb and orphans the stash,\ndesyncing the child's qlen/backlog. With a qfq child reached through a\npeeking parent (e.g. tbf) this re-enters the child on an emptied list and\ndereferences NULL, panicking the kernel from softirq on ordinary egress.\n\nTake the packet through qdisc_dequeue_peeked(), as sch_prio already does\nand as sch_red and sch_sfb were just fixed to do. The helper is a no-op\nwhen the child has no stash, so a work-conserving child is unaffected.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72041": {
                 "cve_id": "CVE-2026-72041",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -48827,11 +48844,130 @@
                     }
                 ]
             },
+            "CVE-2026-72218": {
+                "cve_id": "CVE-2026-72218",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nlockd: Plug nlm_file refcount leak on cached nlm_do_fopen() failure\n\nThe cached-file path in nlm_lookup_file() reaches the found: label\nunconditionally, even when nlm_do_fopen() fails. At that label\n*result and file->f_count are updated before the error is returned.\nThe wrappers nlm3svc_lookup_file() and nlm4svc_lookup_file() then\nbail out of their switch without copying *result back to their\ncaller, so the proc handler's local nlm_file pointer remains NULL\nand the cleanup path skips nlm_release_file(). The f_count\nincrement is never released, and nlm_traverse_files() can no\nlonger reap the file because its refcount never returns to zero\nbetween requests.\n\nShort-circuit the cached path so neither *result nor f_count is\ntouched when nlm_do_fopen() fails on a hashed nlm_file.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72236": {
+                "cve_id": "CVE-2026-72236",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ns390/perf_cpum_cf: Add missing array_index_nospec() to __hw_perf_event_init()\n\nev variable is userspace controlled via event->attr.config and used\nas an array index after bounds checking, but without speculation\nbarriers.\n\nAdd the missing array_index_nospec() call to prevent speculative\nexecution.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72237": {
+                "cve_id": "CVE-2026-72237",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nperf/x86/amd/brs: Fix kernel address leakage\n\nA user-only branch stack can contain branches that originate from\nthe kernel. As a result, kernel addresses are exposed to user space\neven when PERF_SAMPLE_BRANCH_USER is requested. On AMD processors\nsupporting X86_FEATURE_BRS (Zen 3 only), perf can still report entries\nsuch as SYSRET/interrupt returns for which the branch-from addresses\nare in the kernel.\n\nE.g.\n\n  $ perf record -j any,u -c 4000 -e branch-brs -o - -- \\\n        perf bench syscall basic --loop 1000 | \\\n        perf script -i - -F brstack|tr ' ' '\\n'| \\\n        grep -E '0x[89a-f][0-9a-f]{15}'\n\n  ...\n  0xffffffff810001c4/0x72e2e32955eb/-/-/-/0//-\n  0xffffffff810001c4/0x72e2d94a9821/-/-/-/0//-\n  0xffffffff810001c4/0x72e2d94ffa1b/-/-/-/0//-\n  ...\n\nBRS provides no hardware branch filtering, so privilege level\nfiltering is performed entirely in software. However, amd_brs_match_plm()\nonly validates the branch-to address against the requested privilege\nlevels. For branches from the kernel to user space, the branch-from\naddress is left unchecked and is leaked. Extend the software filter to\nalso validate the branch-from address, so that any branch record whose\nbranch-from address is in the kernel is dropped when\nPERF_SAMPLE_BRANCH_USER is requested.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72242": {
+                "cve_id": "CVE-2026-72242",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nselinux: avoid sk_socket dereference in selinux_sctp_bind_connect()\n\nselinux_sctp_bind_connect() dereferences sk->sk_socket to pass a\nstruct socket * to selinux_socket_bind() and\nselinux_socket_connect_helper().  However, when the hook is invoked\nfrom the ASCONF softirq path (sctp_process_asconf), there is no file\nreference guaranteeing that sk->sk_socket is non-NULL.  The setsockopt\ncallers (bindx, connectx, set_primary, sendmsg connect) hold a file\nreference and are not affected.\n\nBoth selinux_socket_bind() and selinux_socket_connect_helper()\nimmediately resolve sock->sk, never using the struct socket * for\nanything else.  Refactor the inner logic into helpers that take a\nstruct sock * directly so that selinux_sctp_bind_connect() never needs\nto touch sk->sk_socket at all.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72247": {
                 "cve_id": "CVE-2026-72247",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_conncount: fix zone comparison in tuple dedup\n\nThe \"already exists\" dedup logic in __nf_conncount_add() decides\nwhether a connection has already been counted and can be skipped instead\nof incrementing the connlimit count.  It compares the conntrack zone of a\nlist entry with the zone of the connection being added using\nnf_ct_zone_id() and nf_ct_zone_equal(), passing conn->zone.dir or\nzone->dir as the direction argument.\n\nThose helpers take enum ip_conntrack_dir values: IP_CT_DIR_ORIGINAL is 0\nand IP_CT_DIR_REPLY is 1.  However, zone->dir is a u8 bitmask:\nNF_CT_ZONE_DIR_ORIG is 1, NF_CT_ZONE_DIR_REPL is 2 and\nNF_CT_DEFAULT_ZONE_DIR is 3.  Passing that bitmask as the enum direction\nshifts the meaning of every non-zero value.  An ORIG-only zone passes 1\nand is tested as REPLY, while REPL-only and default zones pass 2 or 3 and\ntest bits beyond the valid direction range.  In those cases\nnf_ct_zone_id() can fall back to NF_CT_DEFAULT_ZONE_ID instead of using\nthe real zone id, so different zones can be treated as equal and dedup\ncollapses to tuple equality alone.\n\nnf_conncount stores and compares the original-direction tuple for a\nconnection.  If an skb already has an attached conntrack entry,\nget_ct_or_tuple_from_skb() explicitly copies\nct->tuplehash[IP_CT_DIR_ORIGINAL].tuple, regardless of the packet's\nctinfo.  Therefore the zone comparison in the tuple dedup path must use\nIP_CT_DIR_ORIGINAL as well; the zone direction bitmask describes where a\nzone id applies, not which direction this conncount tuple represents.\n\nFix the two dedup comparisons by passing IP_CT_DIR_ORIGINAL directly.\nDo not special-case NF_CT_DEFAULT_ZONE_DIR and do not compare raw zone\nids: using the existing helpers with IP_CT_DIR_ORIGINAL preserves the\ndirection-aware NF_CT_DEFAULT_ZONE_ID fallback.  A default bidirectional\nzone contains the ORIG bit, so it naturally returns the real zone id;\nreply-only zones continue to fall back for original-direction tuple\ncomparisons.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72280": {
+                "cve_id": "CVE-2026-72280",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: arm64: nv: Drop bogus WARN for write to ZCR_EL2\n\nIt is entirely possible for a guest to write to the ZCR_EL2 sysreg alias\nwhile in a nested context, as it is expected if FEAT_NV2 is advertised\nto the L1 hypervisor.\n\nGet rid of the bogus WARN which, since the hyp vectors were installed at\nthis point, has the effect of a hyp_panic...",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72290": {
+                "cve_id": "CVE-2026-72290",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: s390: pci: Fix GISC refcount leak on AIF enable failure\n\nkvm_s390_gisc_register() registers the guest ISC before pinning\nthe guest interrupt forwarding pages and allocating the AISB bit.\nIf any of the later setup steps fails, the function unwinds the\npinned pages and other local state, but does not unregister the\nGISC reference. Add the missing kvm_s390_gisc_unregister() to the\nerror unwind path.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72300": {
+                "cve_id": "CVE-2026-72300",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SOF: topology: validate vendor array size before parsing\n\nsof_parse_token_sets() reads array->size while iterating over topology\nprivate data. The loop condition only checks that some data remains, so a\nmalformed topology with a truncated trailing vendor array can make the\nparser read the size field before a full vendor-array header is available.\n\nValidate that the remaining private data contains a complete\nsnd_soc_tplg_vendor_array header before reading array->size.\n\nThe declared array size check also needs to remain signed. asize is an int,\nbut sizeof(*array) has type size_t, so comparing them directly promotes\nnegative asize values to unsigned and lets them pass the check,\nas reported in the stable review thread reference below.\n\nCast sizeof(*array) to int when validating the declared array size. This\nrejects negative, zero and otherwise too-small sizes before the parser\ndispatches to the tuple-specific code.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -48929,6 +49065,57 @@
                     }
                 ]
             },
+            "CVE-2026-72376": {
+                "cve_id": "CVE-2026-72376",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nafs: Fix misplaced inc of net->cells_outstanding\n\nFix net->cells_outstanding being incremented before the check for failure\nof idr_alloc_cyclic(), leaving the count incremented on error.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72379": {
+                "cve_id": "CVE-2026-72379",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfs: refuse O_TMPFILE creation with an unmapped fsuid or fsgid\n\nvfs_tmpfile() never checked that the caller's fsuid and fsgid map into\nthe filesystem.  On an idmapped mount whose idmapping does not cover the\ncaller's fs{u,g}id, the ->tmpfile() instance initializes the new inode\nthrough inode_init_owner(), where mapped_fsuid()/mapped_fsgid() return\nINVALID_UID/INVALID_GID, and the tmpfile ends up owned by (uid_t)-1.\n\nEvery other creation path already refuses this: may_o_create() (O_CREAT)\nand may_create_dentry() (mkdir, mknod, symlink, link) bail out with\n-EOVERFLOW via fsuidgid_has_mapping() precisely so that an object cannot\nbe created with an owner the filesystem cannot represent.  An O_TMPFILE\nis no exception: it is created I_LINKABLE and linkat(2) can splice it\ninto the namespace afterwards, so the same guarantee must hold.\n\nAdd the missing fsuidgid_has_mapping() check to vfs_tmpfile().  On a\nnon-idmapped mount the caller's fs{u,g}id always map in the superblock's\nuser namespace, so this is a no-op there and only takes effect on an\nidmapped mount that does not map the caller.  It applies to every\nfilesystem that sets FS_ALLOW_IDMAP and implements ->tmpfile() (tmpfs,\next4, btrfs, xfs, f2fs, ...), and to overlayfs, whose upper-layer\ntmpfile creation funnels through vfs_tmpfile() via backing_tmpfile_open().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72402": {
+                "cve_id": "CVE-2026-72402",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: Mask pseudo pointer values in verifier logs\n\nprint_bpf_insn() masks ldimm64 immediates for pointer-bearing pseudo\nsources when pointer leaks are not allowed, but the mask only covers\nBPF_PSEUDO_MAP_FD and BPF_PSEUDO_MAP_VALUE.\n\nBPF_PSEUDO_MAP_IDX, BPF_PSEUDO_MAP_IDX_VALUE, and BPF_PSEUDO_BTF_ID can\nalso be resolved to kernel pointer values before the verifier log prints\nthe instruction. Include them in the existing pointer classification so\nthe log prints 0x0 instead of the rewritten address.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72428": {
                 "cve_id": "CVE-2026-72428",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -48951,6 +49138,57 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: act_ct: fix nf_connlabels leak on two error paths\n\ntcf_ct_fill_params() calls nf_connlabels_get() (setting put_labels) when\nTCA_CT_LABELS is present, but two later error sites use a bare return\ninstead of \"goto err\", skipping the err: nf_connlabels_put() cleanup.\nThey also precede the \"p->put_labels = put_labels\" assignment, so the\ntcf_ct_params_free() fallback does not release the count either. Each\nfailed RTM_NEWACTION on these paths leaks one nf_connlabels reference:\nnet->ct.labels_used is incremented and never released. The action is\nreachable with CAP_NET_ADMIN over the netns, i.e. from an unprivileged\nuser namespace on default-userns kernels.\n\nImpact: an unprivileged user with CAP_NET_ADMIN over a network namespace\n(e.g. via user namespaces) leaks one nf_connlabels reference per failed\nRTM_NEWACTION on the two error paths; net->ct.labels_used is never\nreleased.\n\nThe err: label is safe to reach from both sites: p->tmpl is still NULL\nthere (kzalloc'd, not yet assigned) and nf_ct_put(NULL) is a no-op, so\nno inline release is needed.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72433": {
+                "cve_id": "CVE-2026-72433",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nft_meta_bridge: fix NFT_META_BRI_IIFPVID stack leak\n\nThis needs to test for nonzero retval.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72436": {
+                "cve_id": "CVE-2026-72436",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: ipset: Don't use test_bit() in lockless RCU readers in hash types\n\nSashiko pointed out that there are a few lockless RCU readers\nusing test_bit() which is a relaxed atomic operation and\nprovides no memory barrier guarantees. Use test_bit_acquire()\ninstead where the operation may run parallel with add/del/gc,\ni.e. is not one from the next cases\n\n- protected by region lock\n- in a set destroy phase\n- in a new/temporary set creation phase",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72438": {
+                "cve_id": "CVE-2026-72438",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmd/raid10: fix writes_pending and barrier reference leaks on discard failures\n\nraid10_make_request() acquires a writes_pending reference with\nmd_write_start() before calling raid10_handle_discard(). Several failure\npaths in raid10_handle_discard() complete the bio and return without\nreleasing the corresponding reference, causing md_write_end() to be\nskipped.\n\nCall md_write_end() before returning from these failure paths to keep\nwrites_pending accounting balanced.\n\nAdditionally, discard split allocation failures can occur after\nwait_barrier() succeeds. Those paths return without calling\nallow_barrier(), leaking the associated barrier reference.\n\nRelease the barrier before returning from those paths.",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -57111,11 +57349,115 @@
                     }
                 ]
             },
+            "CVE-2026-72285": {
+                "cve_id": "CVE-2026-72285",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: TDX: Reject concurrent change to CPUID entry count\n\nReject KVM_TDX_INIT_VM if userspace changes cpuid.nent between the\ninitial read and the subsequent copy of the initialization data.\n\ntdx_td_init() first reads user_data->cpuid.nent to size the flexible\nkvm_tdx_init_vm copy.  The copied structure also contains cpuid.nent,\nand that field can differ from the value used to size the allocation if\nuserspace modifies the input concurrently.  setup_tdparams_cpuids() later\npasses init_vm->cpuid.nent to kvm_find_cpuid_entry2(), which uses it as\nthe array bound for the copied entries.\n\nRequire the copied count to match the value used to size the allocation\nso that CPUID parsing cannot access beyond the entries actually copied.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    }
+                ]
+            },
             "CVE-2026-72287": {
                 "cve_id": "CVE-2026-72287",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: nVMX: Move vTPR vs. TPR Threshold consistency check into \"normal\" checks\n\nMove the off-by-default consistency check for vmcs12.tpr_threshold vs.\nthe virtual APIC vTPR into the \"normal\" controls checks, as waiting until\nKVM has loaded some amount of state is unnecessary and actively dangerous.\nSpecifically, failure to unwind vmcs01.GUEST_CR3 to KVM's value when EPT\nis disabled results in KVM running L1 with an L1-controlled CR3, not with\nKVM's CR3!\n\nAlternatively, KVM could simply reset the MMU to force a reload of\nvmcs01.GUEST_CR3, but the _only_ reason the check was shoved into a \"late\"\nflow was to wait until the vmcs12 pages were retrieved.  Rather than build\nup more crusty code, simply access vTPR using a regular guest memory access\n(performance isn't a concern).  To circumvent the restrictions that led to\nKVM deferring nested_get_vmcs12_pages(), (a) use a VM-scoped API to read\nguest memory so that it always hits non-SMM memslots (for RSM), and (b)\nskip the check (since its off-by-default anyways) when the vCPU doesn't\nwant to run, i.e. when userspace is restoring/stuffing state.\n\nIf reading guest memory fails, simply skip the consistency check, as KVM's\nde facto ABI is that VMX instruction accesses to non-existent memory get\nPCI Bus Error semantics, where reads return 0xFFs.  And if vTPR=0xFF, then\nthe vTPR is guaranteed to be greater than or equal to TPR_THRESHOLD.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    }
+                ]
+            },
+            "CVE-2026-72356": {
+                "cve_id": "CVE-2026-72356",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncifs: Fix missing credit release on failure in cifs_issue_read()\n\nFix missing release of credits in the failure path in cifs_issue_read()\nlest retrying the subreq just overwrites the credits value.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    }
+                ]
+            },
+            "CVE-2026-72370": {
+                "cve_id": "CVE-2026-72370",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niomap: release pages on atomic dio size mismatch\n\nIf bio_iov_iter_get_pages() or the bounce helper succeeds but builds a\nshort bio, the REQ_ATOMIC size check rejects it before submission.  The\nold error path only dropped the bio reference, leaving any pages already\nattached to the bio unreleased.\n\nRelease or unbounce the pages before falling through to out_put_bio on\nthis error path.\n\nThis bug was reported by sashiko:\nhttps://sashiko.dev/#/patchset/20260608073134.95964-1-changfengnan%40bytedance.com",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    }
+                ]
+            },
+            "CVE-2026-72377": {
+                "cve_id": "CVE-2026-72377",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nafs: Remove setting of AS_RELEASE_ALWAYS for symlinks and mountpoints\n\nRegular AFS files correctly use afs_file_aops which have release_folio\nset as netfs_release_folio, so AS_RELEASE_ALWAYS is valid for them\nwhen fscache is enabled (set via afs_vnode_set_cache()).\nSymlinks and mountpoints in AFS use afs_dir_aops, which does not provide\na release_folio callback. However, afs_apply_status() unconditionally\ncalls mapping_set_release_always() for these.\n\nIn such case when memory management code attempts to release folios,\nfilemap_release_folio() checks folio_needs_release() which\nreturns true due to AS_RELEASE_ALWAYS being set. Since there is no\nrelease_folio callback, it falls through to try_to_free_buffers(),\nwhich at present expects buffer_heads to be not null. For symlinks\nand mountpoints without buffer_heads, this causes pointer dereference.\n\n[dh: Added more bits that were missed]",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    }
+                ]
+            },
+            "CVE-2026-72381": {
+                "cve_id": "CVE-2026-72381",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nksmbd: fix use-after-free of fp->owner.name in durable handle owner check\n\nTwo concurrent SMB2 durable reconnects (DH2C/DHnC) on the same\npersistent_id race the fp->owner.name compare-read in\nksmbd_vfs_compare_durable_owner() against the kfree() in\nksmbd_reopen_durable_fd()'s reopen-success path. fp->owner.name is a\nstandalone kstrdup() buffer whose lifetime is independent of the fp\nrefcount, and the two sites share no lock: the compare reads the buffer\nwhile the reopen frees it, so the strcmp() can dereference freed memory.\n\nCommit 7ce4fc40018d (\"ksmbd: fix durable reconnect double-bind race in\nksmbd_reopen_durable_fd\") made the fp->conn claim atomic under\nglobal_ft.lock (closing the owner.name double-free and the ksmbd_file\nwrite-UAF), but the compare-read versus reopen-free pair was left\nunserialized.\n\n  BUG: KASAN: slab-use-after-free in strcmp+0x2c/0x80\n  Read of size 1 by task kworker\n    strcmp\n    ksmbd_vfs_compare_durable_owner\n    smb2_check_durable_oplock\n    smb2_open\n  Freed by task kworker:\n    kfree\n    ksmbd_reopen_durable_fd\n    smb2_open\n  Allocated by task kworker:\n    kstrdup\n    session_fd_check\n    smb2_session_logoff\n  The buggy address belongs to the cache kmalloc-8\n\nSerialize both sides of the race with fp->f_lock.  The global durable\nfile-table lock still protects the durable reconnect claim, but\nfp->owner.name is per-open state and does not need to block unrelated\ndurable table lookups or reconnects.  The teardown is left at its\nexisting location after the reopen-success point so that an __open_id()\nrollback still retains owner.name for a later legitimate reconnect to\nverify.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    }
+                ]
+            },
+            "CVE-2026-72382": {
+                "cve_id": "CVE-2026-72382",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nksmbd: reject undersized DACLs before parsing ACEs\n\nparse_dacl() limits the attacker-controlled ACE count by comparing it\nwith the number of minimal ACEs that fit in the DACL size. The DACL size\nfield is 16 bits, but the expression subtracts sizeof(struct smb_acl).\nBecause sizeof() is unsigned, a DACL size smaller than the ACL header\nunderflows to a large size_t.\n\nA malicious client can reach this with:\n\nSMB2_SET_INFO (InfoType=SMB2_O_INFO_SECURITY)\n  -> smb2_set_info_sec()\n  -> set_info_sec()\n  -> parse_sec_desc()\n  -> parse_dacl()\n     -> init_acl_state(..., 0xffff)\n     -> init_acl_state(..., 0xffff)\n     -> kmalloc_objs(..., 0xffff)\n\nThus a malformed security descriptor can make num_aces pass the guard\nand drive large temporary ACL state and pointer-array allocations.\n\nReject DACLs smaller than struct smb_acl before doing the subtraction,\nso the ACE count check cannot be bypassed by the underflow.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    }
+                ]
+            },
+            "CVE-2026-72418": {
+                "cve_id": "CVE-2026-72418",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_conncount: prevent connlimit drops for early confirmed ct\n\nCommit 69894e5b4c5e (\"netfilter: nft_connlimit: update the count if add\nwas skipped\") introduced a regression where packets for valid\nconnections are dropped when using connlimit for soft-limiting\nscenarios.\n\nThe issue occurs when a new connection reuses a socket currently in\nthe TIME_WAIT state. In this scenario, the connection tracking entry\nis evaluated as already confirmed. Previously, __nf_conncount_add()\nassumed that if a connection was confirmed and did not originate from\nthe loopback interface, it should skip the addition and return -EEXIST.\n\nSkipping the addition triggers a garbage collection run that cleans up\nthe TIME_WAIT connection. Consequently, the active connection count\ndrops to 0, which xt_connlimit mishandles, leading to the false rejection\nof the perfectly valid new connection.\n\nFix this by replacing the interface check with protocol-agnostic state\nchecks. We now skip the tree insertion and preserve the lockless garbage\ncollection optimization only if the connection is IPS_ASSURED. This\nallows early-confirmed setup packets (such as reused TIME_WAIT sockets\nor locally generated SYN-ACKs) to be properly evaluated and counted\nwithout falsely dropping. The goto check_connections path is maintained\nto ensure these setup packets are deduplicated correctly.\n\nThis has been tested with slowhttptest and HTTP server configured\nlocally to ensure we are not breaking soft-limiting scenarios for local\nor external connections. In addition, it was tested with a OVS zone\nlimit too.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    }
+                ]
+            },
+            "CVE-2026-72422": {
+                "cve_id": "CVE-2026-72422",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nksmbd: fix use-after-free of conn->preauth_info in concurrent SMB2 NEGOTIATE\n\nconn->preauth_info is shared connection state (struct\npreauth_integrity_info, kmalloc-96) that is allocated and freed by the\nSMB2 NEGOTIATE handler and read by the response send path.\n\nsmb2_handle_negotiate() allocates conn->preauth_info, and on a\ndeassemble_neg_contexts() failure kfrees it and sets it to NULL. Both the\nallocation and the free/NULL happen under ksmbd_conn_lock(conn) (the\nconnection srv_mutex), which is held across the whole handler body.\n\nThe response send path smb3_preauth_hash_rsp(), called from the send:\nblock of __handle_ksmbd_work(), reads conn->preauth_info and dereferences\nconn->preauth_info->Preauth_HashValue (via\nksmbd_gen_preauth_integrity_hash()) without taking conn_lock. When a\nclient drives two SMB2 NEGOTIATE requests on the same connection, one\nworker can free conn->preauth_info on the failing-negotiate path while a\nconcurrent send-path worker is reading it, producing a slab\nuse-after-free read (KASAN-confirmed).\n\nThe send-path read tested conn->preauth_info for NULL but raced with the\nfree that occurs between the NULL check and the dereference, so the NULL\nguard alone does not close the window.\n\nSerialize the NEGOTIATE-branch read in smb3_preauth_hash_rsp() under\nksmbd_conn_lock(conn) and re-check conn->preauth_info inside the lock.\nBecause the negotiate handler holds conn_lock across its kfree + NULL\nassignment, a reader that also takes conn_lock either runs fully before\nthe allocation or fully after the NULL store, and can never observe the\nfreed-but-not-yet-NULLed pointer. ksmbd_gen_preauth_integrity_hash()\ntakes no locks itself (it only computes a SHA-512 over the buffer), so\nno lock-ordering inversion is introduced, and conn_lock is a sleepable\nmutex which is safe on this send path (it already performs network I/O).",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -105846,6 +106188,23 @@
                     }
                 ]
             },
+            "CVE-2026-72036": {
+                "cve_id": "CVE-2026-72036",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: sch_multiq: Replace direct dequeue call with peek and qdisc_dequeue_peeked\n\nmultiq_dequeue() takes a packet from a band's child with a direct\n->dequeue() call after multiq_peek() peeked it. When the child is\nnon-work-conserving the peek stashes the skb in the child's gso_skb, so\nthe direct dequeue returns a different skb and orphans the stash,\ndesyncing the child's qlen/backlog. With a qfq child reached through a\npeeking parent (e.g. tbf) this re-enters the child on an emptied list and\ndereferences NULL, panicking the kernel from softirq on ordinary egress.\n\nTake the packet through qdisc_dequeue_peeked(), as sch_prio already does\nand as sch_red and sch_sfb were just fixed to do. The helper is a no-op\nwhen the child has no stash, so a work-conserving child is unaffected.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72041": {
                 "cve_id": "CVE-2026-72041",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -106662,11 +107021,130 @@
                     }
                 ]
             },
+            "CVE-2026-72218": {
+                "cve_id": "CVE-2026-72218",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nlockd: Plug nlm_file refcount leak on cached nlm_do_fopen() failure\n\nThe cached-file path in nlm_lookup_file() reaches the found: label\nunconditionally, even when nlm_do_fopen() fails. At that label\n*result and file->f_count are updated before the error is returned.\nThe wrappers nlm3svc_lookup_file() and nlm4svc_lookup_file() then\nbail out of their switch without copying *result back to their\ncaller, so the proc handler's local nlm_file pointer remains NULL\nand the cleanup path skips nlm_release_file(). The f_count\nincrement is never released, and nlm_traverse_files() can no\nlonger reap the file because its refcount never returns to zero\nbetween requests.\n\nShort-circuit the cached path so neither *result nor f_count is\ntouched when nlm_do_fopen() fails on a hashed nlm_file.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72236": {
+                "cve_id": "CVE-2026-72236",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ns390/perf_cpum_cf: Add missing array_index_nospec() to __hw_perf_event_init()\n\nev variable is userspace controlled via event->attr.config and used\nas an array index after bounds checking, but without speculation\nbarriers.\n\nAdd the missing array_index_nospec() call to prevent speculative\nexecution.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72237": {
+                "cve_id": "CVE-2026-72237",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nperf/x86/amd/brs: Fix kernel address leakage\n\nA user-only branch stack can contain branches that originate from\nthe kernel. As a result, kernel addresses are exposed to user space\neven when PERF_SAMPLE_BRANCH_USER is requested. On AMD processors\nsupporting X86_FEATURE_BRS (Zen 3 only), perf can still report entries\nsuch as SYSRET/interrupt returns for which the branch-from addresses\nare in the kernel.\n\nE.g.\n\n  $ perf record -j any,u -c 4000 -e branch-brs -o - -- \\\n        perf bench syscall basic --loop 1000 | \\\n        perf script -i - -F brstack|tr ' ' '\\n'| \\\n        grep -E '0x[89a-f][0-9a-f]{15}'\n\n  ...\n  0xffffffff810001c4/0x72e2e32955eb/-/-/-/0//-\n  0xffffffff810001c4/0x72e2d94a9821/-/-/-/0//-\n  0xffffffff810001c4/0x72e2d94ffa1b/-/-/-/0//-\n  ...\n\nBRS provides no hardware branch filtering, so privilege level\nfiltering is performed entirely in software. However, amd_brs_match_plm()\nonly validates the branch-to address against the requested privilege\nlevels. For branches from the kernel to user space, the branch-from\naddress is left unchecked and is leaked. Extend the software filter to\nalso validate the branch-from address, so that any branch record whose\nbranch-from address is in the kernel is dropped when\nPERF_SAMPLE_BRANCH_USER is requested.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72242": {
+                "cve_id": "CVE-2026-72242",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nselinux: avoid sk_socket dereference in selinux_sctp_bind_connect()\n\nselinux_sctp_bind_connect() dereferences sk->sk_socket to pass a\nstruct socket * to selinux_socket_bind() and\nselinux_socket_connect_helper().  However, when the hook is invoked\nfrom the ASCONF softirq path (sctp_process_asconf), there is no file\nreference guaranteeing that sk->sk_socket is non-NULL.  The setsockopt\ncallers (bindx, connectx, set_primary, sendmsg connect) hold a file\nreference and are not affected.\n\nBoth selinux_socket_bind() and selinux_socket_connect_helper()\nimmediately resolve sock->sk, never using the struct socket * for\nanything else.  Refactor the inner logic into helpers that take a\nstruct sock * directly so that selinux_sctp_bind_connect() never needs\nto touch sk->sk_socket at all.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72247": {
                 "cve_id": "CVE-2026-72247",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_conncount: fix zone comparison in tuple dedup\n\nThe \"already exists\" dedup logic in __nf_conncount_add() decides\nwhether a connection has already been counted and can be skipped instead\nof incrementing the connlimit count.  It compares the conntrack zone of a\nlist entry with the zone of the connection being added using\nnf_ct_zone_id() and nf_ct_zone_equal(), passing conn->zone.dir or\nzone->dir as the direction argument.\n\nThose helpers take enum ip_conntrack_dir values: IP_CT_DIR_ORIGINAL is 0\nand IP_CT_DIR_REPLY is 1.  However, zone->dir is a u8 bitmask:\nNF_CT_ZONE_DIR_ORIG is 1, NF_CT_ZONE_DIR_REPL is 2 and\nNF_CT_DEFAULT_ZONE_DIR is 3.  Passing that bitmask as the enum direction\nshifts the meaning of every non-zero value.  An ORIG-only zone passes 1\nand is tested as REPLY, while REPL-only and default zones pass 2 or 3 and\ntest bits beyond the valid direction range.  In those cases\nnf_ct_zone_id() can fall back to NF_CT_DEFAULT_ZONE_ID instead of using\nthe real zone id, so different zones can be treated as equal and dedup\ncollapses to tuple equality alone.\n\nnf_conncount stores and compares the original-direction tuple for a\nconnection.  If an skb already has an attached conntrack entry,\nget_ct_or_tuple_from_skb() explicitly copies\nct->tuplehash[IP_CT_DIR_ORIGINAL].tuple, regardless of the packet's\nctinfo.  Therefore the zone comparison in the tuple dedup path must use\nIP_CT_DIR_ORIGINAL as well; the zone direction bitmask describes where a\nzone id applies, not which direction this conncount tuple represents.\n\nFix the two dedup comparisons by passing IP_CT_DIR_ORIGINAL directly.\nDo not special-case NF_CT_DEFAULT_ZONE_DIR and do not compare raw zone\nids: using the existing helpers with IP_CT_DIR_ORIGINAL preserves the\ndirection-aware NF_CT_DEFAULT_ZONE_ID fallback.  A default bidirectional\nzone contains the ORIG bit, so it naturally returns the real zone id;\nreply-only zones continue to fall back for original-direction tuple\ncomparisons.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72280": {
+                "cve_id": "CVE-2026-72280",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: arm64: nv: Drop bogus WARN for write to ZCR_EL2\n\nIt is entirely possible for a guest to write to the ZCR_EL2 sysreg alias\nwhile in a nested context, as it is expected if FEAT_NV2 is advertised\nto the L1 hypervisor.\n\nGet rid of the bogus WARN which, since the hyp vectors were installed at\nthis point, has the effect of a hyp_panic...",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72290": {
+                "cve_id": "CVE-2026-72290",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: s390: pci: Fix GISC refcount leak on AIF enable failure\n\nkvm_s390_gisc_register() registers the guest ISC before pinning\nthe guest interrupt forwarding pages and allocating the AISB bit.\nIf any of the later setup steps fails, the function unwinds the\npinned pages and other local state, but does not unregister the\nGISC reference. Add the missing kvm_s390_gisc_unregister() to the\nerror unwind path.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72300": {
+                "cve_id": "CVE-2026-72300",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SOF: topology: validate vendor array size before parsing\n\nsof_parse_token_sets() reads array->size while iterating over topology\nprivate data. The loop condition only checks that some data remains, so a\nmalformed topology with a truncated trailing vendor array can make the\nparser read the size field before a full vendor-array header is available.\n\nValidate that the remaining private data contains a complete\nsnd_soc_tplg_vendor_array header before reading array->size.\n\nThe declared array size check also needs to remain signed. asize is an int,\nbut sizeof(*array) has type size_t, so comparing them directly promotes\nnegative asize values to unsigned and lets them pass the check,\nas reported in the stable review thread reference below.\n\nCast sizeof(*array) to int when validating the declared array size. This\nrejects negative, zero and otherwise too-small sizes before the parser\ndispatches to the tuple-specific code.",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -106764,6 +107242,57 @@
                     }
                 ]
             },
+            "CVE-2026-72376": {
+                "cve_id": "CVE-2026-72376",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nafs: Fix misplaced inc of net->cells_outstanding\n\nFix net->cells_outstanding being incremented before the check for failure\nof idr_alloc_cyclic(), leaving the count incremented on error.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72379": {
+                "cve_id": "CVE-2026-72379",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfs: refuse O_TMPFILE creation with an unmapped fsuid or fsgid\n\nvfs_tmpfile() never checked that the caller's fsuid and fsgid map into\nthe filesystem.  On an idmapped mount whose idmapping does not cover the\ncaller's fs{u,g}id, the ->tmpfile() instance initializes the new inode\nthrough inode_init_owner(), where mapped_fsuid()/mapped_fsgid() return\nINVALID_UID/INVALID_GID, and the tmpfile ends up owned by (uid_t)-1.\n\nEvery other creation path already refuses this: may_o_create() (O_CREAT)\nand may_create_dentry() (mkdir, mknod, symlink, link) bail out with\n-EOVERFLOW via fsuidgid_has_mapping() precisely so that an object cannot\nbe created with an owner the filesystem cannot represent.  An O_TMPFILE\nis no exception: it is created I_LINKABLE and linkat(2) can splice it\ninto the namespace afterwards, so the same guarantee must hold.\n\nAdd the missing fsuidgid_has_mapping() check to vfs_tmpfile().  On a\nnon-idmapped mount the caller's fs{u,g}id always map in the superblock's\nuser namespace, so this is a no-op there and only takes effect on an\nidmapped mount that does not map the caller.  It applies to every\nfilesystem that sets FS_ALLOW_IDMAP and implements ->tmpfile() (tmpfs,\next4, btrfs, xfs, f2fs, ...), and to overlayfs, whose upper-layer\ntmpfile creation funnels through vfs_tmpfile() via backing_tmpfile_open().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72402": {
+                "cve_id": "CVE-2026-72402",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: Mask pseudo pointer values in verifier logs\n\nprint_bpf_insn() masks ldimm64 immediates for pointer-bearing pseudo\nsources when pointer leaks are not allowed, but the mask only covers\nBPF_PSEUDO_MAP_FD and BPF_PSEUDO_MAP_VALUE.\n\nBPF_PSEUDO_MAP_IDX, BPF_PSEUDO_MAP_IDX_VALUE, and BPF_PSEUDO_BTF_ID can\nalso be resolved to kernel pointer values before the verifier log prints\nthe instruction. Include them in the existing pointer classification so\nthe log prints 0x0 instead of the rewritten address.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72428": {
                 "cve_id": "CVE-2026-72428",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -106786,6 +107315,57 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: act_ct: fix nf_connlabels leak on two error paths\n\ntcf_ct_fill_params() calls nf_connlabels_get() (setting put_labels) when\nTCA_CT_LABELS is present, but two later error sites use a bare return\ninstead of \"goto err\", skipping the err: nf_connlabels_put() cleanup.\nThey also precede the \"p->put_labels = put_labels\" assignment, so the\ntcf_ct_params_free() fallback does not release the count either. Each\nfailed RTM_NEWACTION on these paths leaks one nf_connlabels reference:\nnet->ct.labels_used is incremented and never released. The action is\nreachable with CAP_NET_ADMIN over the netns, i.e. from an unprivileged\nuser namespace on default-userns kernels.\n\nImpact: an unprivileged user with CAP_NET_ADMIN over a network namespace\n(e.g. via user namespaces) leaks one nf_connlabels reference per failed\nRTM_NEWACTION on the two error paths; net->ct.labels_used is never\nreleased.\n\nThe err: label is safe to reach from both sites: p->tmpl is still NULL\nthere (kzalloc'd, not yet assigned) and nf_ct_put(NULL) is a no-op, so\nno inline release is needed.",
                 "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72433": {
+                "cve_id": "CVE-2026-72433",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nft_meta_bridge: fix NFT_META_BRI_IIFPVID stack leak\n\nThis needs to test for nonzero retval.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72436": {
+                "cve_id": "CVE-2026-72436",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: ipset: Don't use test_bit() in lockless RCU readers in hash types\n\nSashiko pointed out that there are a few lockless RCU readers\nusing test_bit() which is a relaxed atomic operation and\nprovides no memory barrier guarantees. Use test_bit_acquire()\ninstead where the operation may run parallel with add/del/gc,\ni.e. is not one from the next cases\n\n- protected by region lock\n- in a set destroy phase\n- in a new/temporary set creation phase",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72438": {
+                "cve_id": "CVE-2026-72438",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmd/raid10: fix writes_pending and barrier reference leaks on discard failures\n\nraid10_make_request() acquires a writes_pending reference with\nmd_write_start() before calling raid10_handle_discard(). Several failure\npaths in raid10_handle_discard() complete the bio and return without\nreleasing the corresponding reference, causing md_write_end() to be\nskipped.\n\nCall md_write_end() before returning from these failure paths to keep\nwrites_pending accounting balanced.\n\nAdditionally, discard split allocation failures can occur after\nwait_barrier() succeeds. Those paths return without calling\nallow_barrier(), leaking the associated barrier reference.\n\nRelease the barrier before returning from those paths.",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -133979,19 +134559,6 @@
                     }
                 ]
             },
-            "CVE-2026-68099": {
-                "cve_id": "CVE-2026-68099",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nksmbd: restore DACL size on check_add_overflow() to avoid malformed ACL\n\ncheck_add_overflow() unconditionally writes the truncated sum into *d\neven on overflow, per its contract in include/linux/overflow.h.\nThe four check_add_overflow() guards in set_posix_acl_entries_dacl()\nand set_ntacl_dacl() break out of the ACE-building loops on overflow,\nbut the truncated *size is then consumed downstream at the end of\nset_ntacl_dacl():\n\n    pndacl->size = cpu_to_le16(le16_to_cpu(pndacl->size) + size);\n\nThis produces an on-wire NT ACL whose pndacl->size under-reports the\nbytes actually written by the preceding fill_ace_for_sid()/memcpy()\ncalls, yielding a malformed ACL that can trigger out-of-bounds reads\nwhen re-parsed by clients or ksmbd itself.\n\nRestore *size to its pre-addition value on each overflow branch (via\n`*size -= ace_sz` / `size -= nt_ace_size`) so that after the break,\n*size once again holds the cumulative size of the successfully-written\nACEs. The committed ACL is then truncated-but-self-consistent rather\nthan malformed.\n\nThe ksmbd DACL builders are the only check_add_overflow() sites found\nwhere an overflow path breaks out of a loop and the destination value\nis consumed afterward. The other nearby break-style cases either\nreturn -EINVAL on overflow (transport_ipc.c) or break without\nconsuming the overflowed destination value afterward (buildid.c).",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
             "CVE-2026-68127": {
                 "cve_id": "CVE-2026-68127",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -134243,6 +134810,32 @@
                 "cve_id": "CVE-2026-72183",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nlandlock: Fix LANDLOCK_SCOPE_SIGNAL bypass on the SIGIO path\n\nLANDLOCK_SCOPE_SIGNAL must prevent a sandboxed process from signaling\nprocesses outside its Landlock domain.  It can be bypassed through the\nasynchronous SIGIO delivery path.\n\nA sandboxed process that owns any file or socket can arm it with\nfcntl(fd, F_SETOWN, -pgid), fcntl(fd, F_SETSIG, SIGKILL) and O_ASYNC, so\nthat an I/O event makes the kernel deliver the chosen signal to the\nwhole process group.  As the head of its process group's task list (the\ndefault position right after fork()) that group can also hold the\nnon-sandboxed process that launched it, e.g. a supervisor or a security\nmonitor.  The sandbox can thus kill or signal the processes\nLANDLOCK_SCOPE_SIGNAL is meant to protect from it.\n\nThe scope is enforced in hook_file_send_sigiotask() against the Landlock\ndomain recorded at F_SETOWN time, not the live domain of the sender.\ncontrol_current_fowner() decides whether to record that domain and skips\nrecording it when the fowner target is in the caller's thread group,\nwhich is safe only for a single-task target (PIDTYPE_PID, PIDTYPE_TGID).\nFor a process group (PIDTYPE_PGID) pid_task() returns only one member;\nrecording is skipped whenever that member shares the caller's thread\ngroup, and hook_file_send_sigiotask() then lets the signal fan out to\nthe whole group unchecked.\n\nRecord the domain for every non single-process target so the scope is\nenforced against each group member at delivery time.\n\nThat recording is necessary but not sufficient on its own: the kernel\nsignals a process group through its members' thread-group leaders, and\nthe leader of the registrant's own process can carry a different\nLandlock domain than the sibling thread that armed the owner.\ndomain_is_scoped() would then deny that leader, even though commit\n18eb75f3af40 (\"landlock: Always allow signals between threads of the\nsame process\") requires same-process delivery to be allowed.\nhook_task_kill() avoids this by evaluating same_thread_group() live, per\nrecipient; the SIGIO path instead delegates the whole decision to a\nsingle registration-time check, which a process-group fan-out cannot\nhonor.\n\nSo also record the registrant's thread group next to its domain and\nexempt it at delivery: hook_file_send_sigiotask() allows the signal\nwhenever the recipient belongs to the registrant's own process,\nrestoring the same-process guarantee while keeping out-of-domain group\nmembers blocked.  The direct kill() path (hook_task_kill) already\nevaluates the live domain and is unaffected.\n\n[mic: Check pid_type earlier and improve comment, fix commit message,\nfix comment formatting]",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-72263": {
+                "cve_id": "CVE-2026-72263",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SOF: topology: fix memory leak in snd_sof_load_topology\n\nWhen the topology filename contains \"dummy\" and tplg_cnt is 0, the\nfunction returns -EINVAL directly without freeing the tplg_files\nallocated by kcalloc() at line 2497. This leaks memory on every\nsuch topology load attempt.\n\nFix this by setting ret = -EINVAL and jumping to the out: label,\nwhich already handles the kfree(tplg_files) cleanup.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-72423": {
+                "cve_id": "CVE-2026-72423",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: Guard conntrack opts error writes\n\nThe conntrack lookup and allocation kfuncs take an opts pointer\ntogether with an opts__sz argument. The verifier checks only the memory\nrange described by opts__sz, but the wrappers unconditionally write\nopts->error whenever the internal lookup or allocation helper returns an\nerror.\n\nFor an invalid size smaller than the end of opts->error, that write can\nland outside the verifier-checked range. Keep returning NULL for invalid\narguments, but only report the error through opts->error when the\nsupplied size includes the field.\n\nThis preserves error reporting for the supported 12-byte and 16-byte\nlayouts, and for other invalid sizes that still include opts->error.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
