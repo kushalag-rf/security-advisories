@@ -31832,23 +31832,6 @@
                     }
                 ]
             },
-            "CVE-2026-53000": {
-                "cve_id": "CVE-2026-53000",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nat: use kfree_rcu to release ops\n\nFlorian Westphal says:\n\n\"Historically this is not an issue, even for normal base hooks: the data\npath doesn't use the original nf_hook_ops that are used to register the\ncallbacks.\n\nHowever, in v5.14 I added the ability to dump the active netfilter\nhooks from userspace.\n\nThis code will peek back into the nf_hook_ops that are available\nat the tail of the pointer-array blob used by the datapath.\n\nThe nat hooks are special, because they are called indirectly from\nthe central nat dispatcher hook. They are currently invisible to\nthe nfnl hook dump subsystem though.\n\nBut once that changes the nat ops structures have to be deferred too.\"\n\nUpdate nf_nat_register_fn() to deal with partial exposition of the hooks\nfrom error path which can be also an issue for nfnetlink_hook.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-53001": {
                 "cve_id": "CVE-2026-53001",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -45349,6 +45332,23 @@
                     }
                 ]
             },
+            "CVE-2026-68413": {
+                "cve_id": "CVE-2026-68413",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ipw2100: fix potential memory leak in ipw2100_pci_init_one()\n\nThe memory allocated in the ipw2100_alloc_device() function is not freed\nin some of the error paths in ipw2100_pci_init_one(). Fix that by\nconverting the direct return into a goto to the error path return.\n\nThe error path when pci_enable_device() fails cannot jump to fail, since\nat this point priv is not set, so perform error handling inline.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68414": {
                 "cve_id": "CVE-2026-68414",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -45723,6 +45723,23 @@
                     }
                 ]
             },
+            "CVE-2026-68470": {
+                "cve_id": "CVE-2026-68470",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: mac80211: validate extension-frame layout before RX\n\nExtension frames only have the extension header at the regular 802.11\nheader offset. The generic RX path can still reach helpers and interface\ndispatch code that read regular header address fields before unsupported\nextension subtypes are dropped.\n\nmac80211 currently only handles S1G beacon extension frames. Drop other\nextension subtypes before they can reach regular-header RX processing.\nFor S1G beacons, linearize the SKB with the management-frame path and\nrequire the fixed S1G beacon header, including optional fixed fields\nindicated by frame control, before generic RX dispatch.\n\nRoute S1G beacons through the station/default-link RX path without\nregular-header station lookup. Avoid regular-header address reads in the\nmac80211 RX paths that process S1G extension beacons, including\naccept-frame, duplicate-detection, address-copy, and MLO\naddress-translation paths.\n\nAlso make ieee80211_get_bssid() length-safe before returning the S1G\nsource-address pointer.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68480": {
                 "cve_id": "CVE-2026-68480",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -45743,6 +45760,431 @@
                         "introduced": "0",
                         "fixed": "7.1.7-200.fc44",
                         "identifier": "fc44"
+                    }
+                ]
+            },
+            "CVE-2026-72011": {
+                "cve_id": "CVE-2026-72011",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ns390/diag: Add missing array_index_nospec() call to memtop_get_page_count()\n\n'level' is user space controlled and used to read from an array. Add the\nmissing array_index_nospec() call to prevent speculative execution.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72019": {
+                "cve_id": "CVE-2026-72019",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmacsec: don't read an unset MAC header in macsec_encrypt()\n\nmacsec_encrypt() reads the Ethernet header via eth_hdr(skb)\n(skb->head + skb->mac_header) to memmove() the 12 source/destination MAC\nbytes forward and make room for the SecTAG.\n\nOn the AF_PACKET SOCK_RAW + PACKET_QDISC_BYPASS transmit path the skb\nreaches the macsec ndo_start_xmit() with the MAC header unset, so\neth_hdr(skb) resolves to skb->head + (u16)~0 and the read is out of\nbounds: a 12-byte heap over-read that is also emitted on the wire as the\nframe's outer source/destination MAC. KASAN reports a slab-out-of-bounds\nread in macsec_start_xmit() on 6.0; on current mainline a CONFIG_DEBUG_NET\nbuild flags it as an unset mac header in skb_mac_header().\n\nOn the TX path the L2 header is at skb->data, so use skb_eth_hdr(), added\nby commit 96cc4b69581d (\"macvlan: do not assume mac_header is set in\nmacvlan_broadcast()\") for exactly this purpose.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72025": {
+                "cve_id": "CVE-2026-72025",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ns390/monwriter: Reject buffer reuse with different data length\n\nWhen data buffers are reused, e.g. for interval sample records, the\nfirst record determines the data length, and the size of the buffer for\nuser copy. Current monwriter code does not check if the data length was\nchanged for subsequent records, which also would never happen for valid\nuser programs.\n\nHowever, a malicious user could change the data length, resulting in out\nof bounds user copy to the kernel buffer, and memory corruption. By\ndefault, the monwriter misc device is created with root-only permissions,\nso practical impact is typically low.\n\nFix this by checking for changed data length and rejecting such records.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72069": {
+                "cve_id": "CVE-2026-72069",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nlocking/rt: Fix the incorrect RCU protection in rt_spin_unlock()\n\nrt_spin_unlock() releases the RCU protection before unlocking the\nlock. That opens the door for the following UAF scenario:\n\n T1\t\t\t\t\tT2\n spin_lock(&p->lock);\t\trcu_read_lock();\n invalidate(p);\t\t\tp = rcu_dereference(ptr);\n rcu_assign_pointer(ptr, NULL);\tif (!p) return;\n spin_unlock(&p->lock);\t\tspin_lock(&p->lock)\n \t\t\t\t   lock(&lock->lock);\n\t\t\t\t   rcu_read_lock();\n kfree_rcu(p);\t\t\trcu_read_unlock();\n\t\t\t\t....\n\t\t\t\tspin_unlock(&p->lock)\n\t\t\t\t  rcu_read_unlock(); // Ends grace period\n rcu_do_batch()\n   kfree(p);\n\t\t\t    UAF ->\t  rt_mutex_cmpxchg_release(&lock->lock...)\n\nRegular spinlocks keep preemption disabled accross the unlock operation,\nwhich provides full RCU protection, but the RT substitution fails to\nresemble that. Same applies for the rwlock substitution.\n\nMove the rcu_read_unlock() invocation past the unlock operations to match\nthe non-RT semantics. This makes it asymmetric vs. rt_xxx_lock(), but\nthat's harmless as the caller needs to hold RCU read lock across the lock\noperation. The migrate_enable() call stays before the unlock operation\nbecause there is no per CPU operation in the unlock path which would\nrequire migration to be kept disabled.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72088": {
+                "cve_id": "CVE-2026-72088",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: hpsa: Fix DMA mapping leak on IOACCEL2 reset path\n\nIf phys_disk->in_reset is set, the function returns directly without\nundoing the resources acquired for the command. Add the missing error\ncleanup by unmapping the IOACCEL2 SG chain block when needed, unmapping\nthe SCSI command, and dropping the outstanding IOACCEL command count\nbefore returning.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72305": {
+                "cve_id": "CVE-2026-72305",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nVDUSE: avoid leaking information to userspace\n\nThe bounceing is not necessarily page aligned, so current VDUSE can\nleak kernel information through mapping bounce pages to\nuserspace. Allocate bounce pages with __GFP_ZERO to avoid leaking\ninformation to userspace.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72310": {
+                "cve_id": "CVE-2026-72310",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: fix overflow in passthrough ioctl bounds check\n\nsmb2_ioctl_query_info() validates the PASSTHRU_FSCTL response payload\nbefore copying it to userspace.\n\nThe payload offset and length both come from 32-bit fields. The bounds\ncheck currently adds OutputOffset and qi.input_buffer_length directly, so\nthe addition can wrap in 32-bit arithmetic before the result is compared\nagainst the response buffer length.\n\nA malicious server can use a large OutputOffset and a small OutputCount\nto make the wrapped sum pass the bounds check. The later copy_to_user()\nthen reads from io_rsp + OutputOffset, outside the response buffer.\n\nUse size_add() for the offset plus length check so overflow is treated as\nout of bounds.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72373": {
+                "cve_id": "CVE-2026-72373",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nafs: Fix missing NULL pointer check in afs_break_some_callbacks()\n\nFix afs_break_some_callbacks() to check to see if afs_lookup_volume_rcu()\nreturned NULL (e.g. the specified volume is unknown).",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72428": {
+                "cve_id": "CVE-2026-72428",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: Fix stack slot index in nospec checks\n\ncheck_stack_write_fixed_off() computes the byte slot for a fixed-offset\nstack write as -off - 1, and records each written byte in slot_type[] with\n(slot - i) % BPF_REG_SIZE.\n\nThe Spectre v4 sanitization pre-check uses slot_type[i] instead. For a\n4-byte write at fp-8 after the lower half of fp-8 has been zeroed, the\npre-check scans bytes 0..3 and sees STACK_ZERO while the actual write updates\nbytes 7..4. That can leave the second half-slot write without nospec_result\neven though the bytes being overwritten still require sanitization.\n\nUse the same slot index in the sanitization pre-check that the write path uses\nwhen updating slot_type[].",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74440": {
+                "cve_id": "CVE-2026-74440",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe: Wait on external BO kernel fences in exec IOCTL\n\nBefore arming a user job, xe_exec_ioctl() only added the VM's\ndma-resv KERNEL slot as a dependency. That slot covers rebinds and\nthe kernel operations of the VM's private BOs, but not external BOs\n(bo->vm == NULL), which carry their kernel operations (evictions,\nmoves, ...) in their own dma-resv KERNEL slot.\n\nThe DMA_RESV_USAGE_KERNEL slot is the cross-driver contract for\nmemory management operations that must complete before the BO or its\nbacking store may be used: any accessor is required to wait on the\nKERNEL fences before touching the resv. By skipping the external BOs'\nKERNEL slots, the exec path violated that contract and could schedule\na user job while a kernel operation on an external BO mapped by the VM\nwas still in flight, racing against it and potentially reading or\nwriting memory that was being moved.\n\nReplace the VM-only dependency with an iteration over every object\nlocked by the exec, adding each object's KERNEL slot as a job\ndependency. This covers the VM resv (rebinds and private BOs) as well\nas every external BO, mirroring the drm_gpuvm_resv_add_fence() call\nthat later publishes the job fence to the same set of objects.\nLong-running mode continues to skip this, as before.\n\n(cherry picked from commit a6b842acf3ddd1efc53a56de9260cfa718fb35e7)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74445": {
+                "cve_id": "CVE-2026-74445",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/vmwgfx: reject DX_BIND_QUERY without a DX context\n\nvmw_cmd_dx_bind_query() unconditionally dereferences\nsw_context->dx_ctx_node->ctx.  Userspace can trigger a NULL pointer\ndereference from any render-node fd by submitting an execbuf with\ndx_context_handle == SVGA3D_INVALID_ID and a SVGA_3D_CMD_DX_BIND_QUERY\nopcode in the command stream: dx_ctx_node is left NULL and the kernel\noopses on the assignment.  The same NULL is then re-read in\nvmw_resources_reserve() via vmw_context_get_dx_query_mob().\n\nAll sibling DX handlers fail-close on a missing dx_ctx_node using\nVMW_GET_CTX_NODE().  Use the same pattern here, returning -EINVAL up\nfront before any relocation state is published.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74456": {
+                "cve_id": "CVE-2026-74456",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncan: peak_usb: peak_usb_start(): fix double free of transfer buffer on URB submit error\n\nIn peak_usb_start(), each RX URB transfer buffer is allocated with kmalloc()\nand the URB is flagged URB_FREE_BUFFER so that the final usb_free_urb() also\nfrees the transfer buffer.\n\nIf usb_submit_urb() fails, the error path frees the buffer explicitly with\nkfree(buf) and then calls usb_free_urb(urb). Because URB_FREE_BUFFER is set,\nusb_free_urb() -> urb_destroy() frees the same buffer a second time, a double\nfree of the transfer buffer.\n\n  BUG: KASAN: double-free in usb_free_urb.part.0+0x91/0xb0\n  Free of addr ffff8881069ccb80 by task trigger.sh/285\n\n  Call Trace:\n   kfree+0x113/0x3c0\n   usb_free_urb.part.0+0x91/0xb0\n\nDrop the redundant kfree(buf); usb_free_urb() already releases the transfer\nbuffer. This mirrors commit 03819abbeb11 (\"net: usb: lan78xx: Fix double free\nissue with interrupt buffer allocation\").",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74464": {
+                "cve_id": "CVE-2026-74464",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: openvswitch: fix skb leak on flow key update failure during ct\n\novs_ct_execute() always steals or frees the skb on failure while\novs_flow_key_update() does not.  So, if it fails and we return right\naway, the skb ends up leaked.\n\nFix that by breaking instead and letting the common error handling\ncode at the bottom of the loop to free the skb properly.\n\nThis is a very unlikely scenario as it requires the packet to become\nunparseable by applying a set of actions on a previously parseable skb,\nbut should be fixed nevertheless.\n\nReported by Sashiko.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74470": {
+                "cve_id": "CVE-2026-74470",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: scsi_debug: Fix REPORT ZONES alloc_len underflow OOB write\n\nresp_report_zones() sizes the reply buffer from the CDB allocation\nlength. The v3 fix rounds alloc_len up with ALIGN() before deriving the\ndescriptor count:\n\n\trep_max_zones = (ALIGN((u64)alloc_len, RZONES_DESC_HD) -\n\t\t\t RZONES_DESC_HD) >> ilog2(RZONES_DESC_HD);\n\tarr_len = (u64)RZONES_DESC_HD * (rep_max_zones + 1);\n\nFor alloc_len in 0xFFFFFFC1..0xFFFFFFFF, ALIGN() rounds up to\n0x100000000, so arr_len is 4 GB. On 32-bit, kzalloc()'s size_t is 32-bit\nand truncates 0x100000000 to 0; kzalloc(0) returns ZERO_SIZE_PTR, which\npasses the !arr check, and desc = arr + 64 is then dereferenced in the\nloop -> out-of-bounds write / panic.\n\nClamp rep_max_zones to devip->nr_zones. The loop already stops at\nsdebug_capacity (after nr_zones zones), so a report can never hold more\nthan nr_zones descriptors; the clamp does not change the report, it only\nbounds arr_len to (nr_zones + 1) * RZONES_DESC_HD, a real device\nproperty that can never reach 0x100000000.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74471": {
+                "cve_id": "CVE-2026-74471",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntracing: Check return value of __register_event() in trace_module_add_events()\n\ntrace_module_add_events() ignores the return value of __register_event()\nand unconditionally calls __add_event_to_tracers() for each event.\n\nIf __register_event() fails (for example, if event_init() fails), the\ntrace_event_call is not added to ftrace_events list, but\n__add_event_to_tracers() still creates a trace_event_file pointing to it.\nIf module loading subsequently fails and module memory is freed, tracing\nstate retains a stale trace_event_call pointer in trace_event_file,\nleading to a use-after-free when tracefs or tracing subsystem operations\nare later executed.\n\nFix this by checking the return value of __register_event() and only\ncalling __add_event_to_tracers() if event registration succeeded.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74475": {
+                "cve_id": "CVE-2026-74475",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvxlan: use neigh_ha_snapshot() in route_shortcircuit()\n\nThe neighbour hardware address n->ha can be updated asynchronously by the\nneighbour subsystem, protected by n->ha_lock seqlock. Reading n->ha without\nholding the seqlock loop can lead to torn reads or reading a partially updated\nMAC address.\n\nUse neigh_ha_snapshot() in route_shortcircuit() to safely copy n->ha under\nread_seqbegin()/read_seqretry() lock protection before using it.\n\nNote that arp_reduce() and neigh_reduce() seem to have the same issue\nleft for future patches.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74499": {
+                "cve_id": "CVE-2026-74499",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: usb-audio: fix OOB write in snd_usbmidi_akai_output()\n\nsnd_usbmidi_akai_output() computes its fill-loop bound\n\n\tbuf_end = ep->max_transfer - MAX_AKAI_SYSEX_LEN - 1;\n\nas a signed int, so a small device-advertised bulk-OUT max_transfer\nmakes buf_end negative.  The loop guard then compares the u32\nurb->transfer_buffer_length against that negative int: the usual\narithmetic conversion turns buf_end into a large unsigned value, so the\nguard stays true and each iteration keeps appending SysEx framing and\npayload bytes past the end of the URB transfer buffer, which is only\nmax_transfer bytes long.\n\nA USB device that advertises a tiny bulk-OUT endpoint can therefore\ntrigger an attacker-length- and content-controlled heap out-of-bounds\nwrite when a process writes to the created /dev/snd/midiC*D* node.\n\nReturn early when there is no room for even one SysEx, so the loop is\nnever entered with a bound that would wrap.  The loop is the last\nstatement of the function, so bailing out is equivalent to it not\nrunning.\n\nDiscovered by XBOW, triaged by Baul Lee <baul.lee@xbow.com>",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74500": {
+                "cve_id": "CVE-2026-74500",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: usb-audio: fix stack info leak in RME Digiface status\n\nsnd_rme_digiface_read_status() reads a four-word status block from the\ndevice into an uninitialised on-stack __le32 buf[4] and, whenever the\nvendor control-IN transfer does not return a negative error, copies all\nfour words into the caller's status[].\n\nsnd_usb_ctl_msg() copies the full requested size back into the caller's\nbuffer regardless of how many bytes the data stage actually delivered:\n\n\tbuf = kmemdup(data, size, GFP_KERNEL);\n\terr = usb_control_msg(dev, pipe, request, requesttype,\n\t\t\t      value, index, buf, size, timeout);\n\tmemcpy(data, buf, size);\n\nusb_control_msg() returns the transferred length on a short control-IN,\nwhich is a non-negative value, and writes only that many bytes.  The\nremainder of the copy back is the kmemdup()ed image of the caller's\nbuffer, so a device answering with a short data stage leaves the\ntrailing words of buf[] holding leftover kernel stack.  The only guard\nin the caller is err < 0, so those words are stored into status[].\n\nThey then reach user space: snd_rme_digiface_get_status_val() selects a\n16-bit halfword of status[] per the control's reg/mask, and the eight\nDigiface status controls together expose the whole 16-byte frame to an\nunprivileged reader of /dev/snd/controlC*.\n\nZero-initialise the buffer so a short read yields zeros instead of stack\nresidue.  This mirrors snd_rme_get_status1(), which already clears its\noutput word before the same kind of vendor read.\n\nDiscovered by XBOW, triaged by Baul Lee <baul.lee@xbow.com>",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74506": {
+                "cve_id": "CVE-2026-74506",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nafs: Fix UAF when sending a message\n\nIn afs_make_call(), there's a race with async call reception and\ndestruction.  If a call is dispatched that doesn't have call->write_iter\nset (used to specify the data content for FS.StoreData), then the first\nrxrpc_kernel_send_data() will not set MSG_MORE in the msghdr.\n\nOnce rxrpc_send_data() queues the last request packet, the response could\ncome in at any time and cause the call to be completed and put.  However,\nafs_make_call() will look at the call again to see it ->write_iter should\nbe handled - something it's only allowed to do if it has its own ref on the\ncall.  Whilst this is the case for synchronous calls, it isn't true for\nasync calls such as FS.FetchData.\n\nThere's also a potential UAF in afs_make_call() in the event that an\nasynchronous call is being sent, but the call fails in some way (e.g. it\ngets aborted from the server).  The problem there is that afs_make_call()\ntries to abort a call if the rxrpc send fails, but the asynchronous\nnotification from rxrpc may have caused the afs_call to be torn down.\n\ngeneric/650 plays games with randomly taking CPUs offline, and can\ninterject a significant delay such that the call is deallocated before\nafs_make_call() gets to check call->write_iter - and a UAF ensues (caught\nby KASAN).\n\n   BUG: KASAN: slab-use-after-free in afs_make_call+0x1c90/0x2210 [kafs]\n   Read of size 8 at addr ffff888035e050e8 by task fsstress/1409\n\nFix this by making afs_make_op_call() give the op->call its own ref rather\nthan transferring the caller's ref to it and then dropping the ref when\nafs_make_call() returns.\n\nThis also means that the afs_make_call() func never loses its ref on the\ncall now.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74508": {
+                "cve_id": "CVE-2026-74508",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: HIDP: reject frames without a transaction header\n\nhidp_recv_ctrl_frame() and hidp_recv_intr_frame() read skb->data[0]\nbefore checking that the L2CAP SDU contains a transaction header. A\nconnected HIDP peer can send an empty basic-mode SDU and make both paths\nuse an uninitialized byte from skb tailroom.\n\nKMSAN reports the use in hidp_session_run(), with the uninitialized value\noriginating in __alloc_skb() through vhci_write(). The control path\nproduces two reports and the interrupt path produces one.\n\nThe byte can also be controlled by a malformed lower-layer packet. If an\nHCI ACL packet contains an L2CAP PDU with a declared zero-length payload\nfollowed by an extra 0x15 byte, l2cap_recv_acldata() reduces skb->len to\nthe declared PDU length before dispatch. The current HIDP path nevertheless\nconsumes the extra byte as HIDP_TRANS_HID_CONTROL |\nHIDP_CTRL_VIRTUAL_CABLE_UNPLUG and terminates the HIDP session. With this\nchange, the same packet is discarded and a subsequent feature report\nrequest succeeds.\n\nPull the transaction header with skb_pull_data() and discard frames that\ndo not contain it.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74529": {
+                "cve_id": "CVE-2026-74529",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: hci_sync: hold conn in hci_connect_pa_sync() callback\n\nThere is theoretical UAF if the conn is freed while the hci_sync task is\nrunning.\n\nHold refcount to avoid that.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74538": {
+                "cve_id": "CVE-2026-74538",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: ISO: lock sk in iso_connect_ind\n\nAccessing iso_pi(sk)->conn requires lock_sock, which is not taken in the\n\"ev3\" part of iso_connect_ind.  It may also be NULL if socket has\ntransitioned away from the LISTEN/CONNECT states before locking.\n\nFix by adding lock/release. Recheck hcon is valid after lock acquire\nwhere needed.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74565": {
+                "cve_id": "CVE-2026-74565",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_tables: make nft_object rhltable per table\n\nThe nft_object rhltable is global, this allows for accessing objects\nthat are being dismangled from lookup path by other existing netns.\nGiven the nft_obj_destroy() releases the object inmediately, this might\nlead to use-after-free of these objects that are being released.\nMake the existing rhltable per table to address this issue to deal with\nwith the nft_rcv_nl_event() path too.\n\nUpdate nft_obj_lookup() to take the table as non-const, otherwise,\ncompiler complains when passing the objname_ht to rhltable_lookup().",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74573": {
+                "cve_id": "CVE-2026-74573",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niommu/arm-smmu-v3-iommufd: Require exactly one Stream ID for a vDEVICE\n\narm_vsmmu_vsid_to_sid() maps a guest's vSID to a single physical Stream ID\ntaken from master->streams[0], assuming a device has exactly one stream. A\ndevice with several streams gets only its first one mapped, so a guest vSID\ninvalidation cannot reach the others' ATC and IOTLB entries; a device with\nnone makes master->streams a ZERO_SIZE_PTR, read out of bounds.\n\nAdd an arm_vsmmu_vdevice_init() op to reject the vDEVICE with -EOPNOTSUPP\nwhen master->num_streams is not one, rather than mapping it silently.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74578": {
+                "cve_id": "CVE-2026-74578",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncrypto: algif_skcipher - force synchronous processing on trees without ctx->state\n\nThe AIO/async path in skcipher_recvmsg() passes the socket-wide ctx->iv\ndirectly into the skcipher request. After io_submit() the socket lock is\ndropped and the request is processed asynchronously, so a concurrent\nsendmsg(ALG_SET_IV) can overwrite ctx->iv and make the in-flight request\nrun under an attacker-controlled IV. For CTR/stream modes this is\nIV/keystream reuse and lets an unprivileged user recover the plaintext of\na concurrent operation.\n\nSnapshotting ctx->iv into per-request storage for the async path is not\nsufficient. For ciphers with statesize == 0 - which includes cbc and ctr -\nthe MSG_MORE inter-chunk IV chaining is carried solely by the in-place\nreq->iv writeback, which a snapshot redirects into per-request memory that\naf_alg_free_resources() releases on completion, silently producing wrong\noutput. Writing the IV back from the completion callback instead is not\npossible either: that would require lock_sock() there, but the callback can\nrun in softirq/atomic context, so it must not sleep.\n\nMake the operation synchronous instead, which removes both the IV race and\nany writeback race. This is equivalent to the upstream resolution, commit\nfcc77d33a34c (\"net: Remove support for AIO on sockets\"), which removed the\nAIO socket path across net/ entirely and so produces the same end state for\nthis file. This patch deviates from that commit deliberately: rather than\nremoving AIO socket support tree-wide, which would be far too invasive for\nstable, it removes only the AIO branch in crypto/algif_skcipher.c.\nio_submit() now completes synchronously; AF_ALG async is rarely used in\npractice.\n\nThe -EIOCBQUEUED check in skcipher_recvmsg() is now dead but harmless,\nand is left alone to keep the fix minimal.\n\nTested on 6.6.y: attacker IV injection dropped from 2296/200000 to 0/200000\nafter the change; MSG_MORE chunked CTR output bit-identical to single-shot.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
                     }
                 ]
             },
@@ -77602,23 +78044,6 @@
                     }
                 ]
             },
-            "CVE-2026-53000": {
-                "cve_id": "CVE-2026-53000",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nat: use kfree_rcu to release ops\n\nFlorian Westphal says:\n\n\"Historically this is not an issue, even for normal base hooks: the data\npath doesn't use the original nf_hook_ops that are used to register the\ncallbacks.\n\nHowever, in v5.14 I added the ability to dump the active netfilter\nhooks from userspace.\n\nThis code will peek back into the nf_hook_ops that are available\nat the tail of the pointer-array blob used by the datapath.\n\nThe nat hooks are special, because they are called indirectly from\nthe central nat dispatcher hook. They are currently invisible to\nthe nfnl hook dump subsystem though.\n\nBut once that changes the nat ops structures have to be deferred too.\"\n\nUpdate nf_nat_register_fn() to deal with partial exposition of the hooks\nfrom error path which can be also an issue for nfnetlink_hook.",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el10"
-                    },
-                    {
-                        "introduced": "6.17.1-300.fc43",
-                        "identifier": "fc43"
-                    }
-                ]
-            },
             "CVE-2026-53001": {
                 "cve_id": "CVE-2026-53001",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -91119,6 +91544,23 @@
                     }
                 ]
             },
+            "CVE-2026-68413": {
+                "cve_id": "CVE-2026-68413",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: ipw2100: fix potential memory leak in ipw2100_pci_init_one()\n\nThe memory allocated in the ipw2100_alloc_device() function is not freed\nin some of the error paths in ipw2100_pci_init_one(). Fix that by\nconverting the direct return into a goto to the error path return.\n\nThe error path when pci_enable_device() fails cannot jump to fail, since\nat this point priv is not set, so perform error handling inline.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68414": {
                 "cve_id": "CVE-2026-68414",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -91493,6 +91935,23 @@
                     }
                 ]
             },
+            "CVE-2026-68470": {
+                "cve_id": "CVE-2026-68470",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: mac80211: validate extension-frame layout before RX\n\nExtension frames only have the extension header at the regular 802.11\nheader offset. The generic RX path can still reach helpers and interface\ndispatch code that read regular header address fields before unsupported\nextension subtypes are dropped.\n\nmac80211 currently only handles S1G beacon extension frames. Drop other\nextension subtypes before they can reach regular-header RX processing.\nFor S1G beacons, linearize the SKB with the management-frame path and\nrequire the fixed S1G beacon header, including optional fixed fields\nindicated by frame control, before generic RX dispatch.\n\nRoute S1G beacons through the station/default-link RX path without\nregular-header station lookup. Avoid regular-header address reads in the\nmac80211 RX paths that process S1G extension beacons, including\naccept-frame, duplicate-detection, address-copy, and MLO\naddress-translation paths.\n\nAlso make ieee80211_get_bssid() length-safe before returning the S1G\nsource-address pointer.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-68480": {
                 "cve_id": "CVE-2026-68480",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -91513,6 +91972,431 @@
                         "introduced": "0",
                         "fixed": "7.1.7-200.fc44",
                         "identifier": "fc44"
+                    }
+                ]
+            },
+            "CVE-2026-72011": {
+                "cve_id": "CVE-2026-72011",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ns390/diag: Add missing array_index_nospec() call to memtop_get_page_count()\n\n'level' is user space controlled and used to read from an array. Add the\nmissing array_index_nospec() call to prevent speculative execution.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72019": {
+                "cve_id": "CVE-2026-72019",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmacsec: don't read an unset MAC header in macsec_encrypt()\n\nmacsec_encrypt() reads the Ethernet header via eth_hdr(skb)\n(skb->head + skb->mac_header) to memmove() the 12 source/destination MAC\nbytes forward and make room for the SecTAG.\n\nOn the AF_PACKET SOCK_RAW + PACKET_QDISC_BYPASS transmit path the skb\nreaches the macsec ndo_start_xmit() with the MAC header unset, so\neth_hdr(skb) resolves to skb->head + (u16)~0 and the read is out of\nbounds: a 12-byte heap over-read that is also emitted on the wire as the\nframe's outer source/destination MAC. KASAN reports a slab-out-of-bounds\nread in macsec_start_xmit() on 6.0; on current mainline a CONFIG_DEBUG_NET\nbuild flags it as an unset mac header in skb_mac_header().\n\nOn the TX path the L2 header is at skb->data, so use skb_eth_hdr(), added\nby commit 96cc4b69581d (\"macvlan: do not assume mac_header is set in\nmacvlan_broadcast()\") for exactly this purpose.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72025": {
+                "cve_id": "CVE-2026-72025",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ns390/monwriter: Reject buffer reuse with different data length\n\nWhen data buffers are reused, e.g. for interval sample records, the\nfirst record determines the data length, and the size of the buffer for\nuser copy. Current monwriter code does not check if the data length was\nchanged for subsequent records, which also would never happen for valid\nuser programs.\n\nHowever, a malicious user could change the data length, resulting in out\nof bounds user copy to the kernel buffer, and memory corruption. By\ndefault, the monwriter misc device is created with root-only permissions,\nso practical impact is typically low.\n\nFix this by checking for changed data length and rejecting such records.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72069": {
+                "cve_id": "CVE-2026-72069",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nlocking/rt: Fix the incorrect RCU protection in rt_spin_unlock()\n\nrt_spin_unlock() releases the RCU protection before unlocking the\nlock. That opens the door for the following UAF scenario:\n\n T1\t\t\t\t\tT2\n spin_lock(&p->lock);\t\trcu_read_lock();\n invalidate(p);\t\t\tp = rcu_dereference(ptr);\n rcu_assign_pointer(ptr, NULL);\tif (!p) return;\n spin_unlock(&p->lock);\t\tspin_lock(&p->lock)\n \t\t\t\t   lock(&lock->lock);\n\t\t\t\t   rcu_read_lock();\n kfree_rcu(p);\t\t\trcu_read_unlock();\n\t\t\t\t....\n\t\t\t\tspin_unlock(&p->lock)\n\t\t\t\t  rcu_read_unlock(); // Ends grace period\n rcu_do_batch()\n   kfree(p);\n\t\t\t    UAF ->\t  rt_mutex_cmpxchg_release(&lock->lock...)\n\nRegular spinlocks keep preemption disabled accross the unlock operation,\nwhich provides full RCU protection, but the RT substitution fails to\nresemble that. Same applies for the rwlock substitution.\n\nMove the rcu_read_unlock() invocation past the unlock operations to match\nthe non-RT semantics. This makes it asymmetric vs. rt_xxx_lock(), but\nthat's harmless as the caller needs to hold RCU read lock across the lock\noperation. The migrate_enable() call stays before the unlock operation\nbecause there is no per CPU operation in the unlock path which would\nrequire migration to be kept disabled.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72088": {
+                "cve_id": "CVE-2026-72088",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: hpsa: Fix DMA mapping leak on IOACCEL2 reset path\n\nIf phys_disk->in_reset is set, the function returns directly without\nundoing the resources acquired for the command. Add the missing error\ncleanup by unmapping the IOACCEL2 SG chain block when needed, unmapping\nthe SCSI command, and dropping the outstanding IOACCEL command count\nbefore returning.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72305": {
+                "cve_id": "CVE-2026-72305",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nVDUSE: avoid leaking information to userspace\n\nThe bounceing is not necessarily page aligned, so current VDUSE can\nleak kernel information through mapping bounce pages to\nuserspace. Allocate bounce pages with __GFP_ZERO to avoid leaking\ninformation to userspace.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72310": {
+                "cve_id": "CVE-2026-72310",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: fix overflow in passthrough ioctl bounds check\n\nsmb2_ioctl_query_info() validates the PASSTHRU_FSCTL response payload\nbefore copying it to userspace.\n\nThe payload offset and length both come from 32-bit fields. The bounds\ncheck currently adds OutputOffset and qi.input_buffer_length directly, so\nthe addition can wrap in 32-bit arithmetic before the result is compared\nagainst the response buffer length.\n\nA malicious server can use a large OutputOffset and a small OutputCount\nto make the wrapped sum pass the bounds check. The later copy_to_user()\nthen reads from io_rsp + OutputOffset, outside the response buffer.\n\nUse size_add() for the offset plus length check so overflow is treated as\nout of bounds.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72373": {
+                "cve_id": "CVE-2026-72373",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nafs: Fix missing NULL pointer check in afs_break_some_callbacks()\n\nFix afs_break_some_callbacks() to check to see if afs_lookup_volume_rcu()\nreturned NULL (e.g. the specified volume is unknown).",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72428": {
+                "cve_id": "CVE-2026-72428",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbpf: Fix stack slot index in nospec checks\n\ncheck_stack_write_fixed_off() computes the byte slot for a fixed-offset\nstack write as -off - 1, and records each written byte in slot_type[] with\n(slot - i) % BPF_REG_SIZE.\n\nThe Spectre v4 sanitization pre-check uses slot_type[i] instead. For a\n4-byte write at fp-8 after the lower half of fp-8 has been zeroed, the\npre-check scans bytes 0..3 and sees STACK_ZERO while the actual write updates\nbytes 7..4. That can leave the second half-slot write without nospec_result\neven though the bytes being overwritten still require sanitization.\n\nUse the same slot index in the sanitization pre-check that the write path uses\nwhen updating slot_type[].",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74440": {
+                "cve_id": "CVE-2026-74440",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/xe: Wait on external BO kernel fences in exec IOCTL\n\nBefore arming a user job, xe_exec_ioctl() only added the VM's\ndma-resv KERNEL slot as a dependency. That slot covers rebinds and\nthe kernel operations of the VM's private BOs, but not external BOs\n(bo->vm == NULL), which carry their kernel operations (evictions,\nmoves, ...) in their own dma-resv KERNEL slot.\n\nThe DMA_RESV_USAGE_KERNEL slot is the cross-driver contract for\nmemory management operations that must complete before the BO or its\nbacking store may be used: any accessor is required to wait on the\nKERNEL fences before touching the resv. By skipping the external BOs'\nKERNEL slots, the exec path violated that contract and could schedule\na user job while a kernel operation on an external BO mapped by the VM\nwas still in flight, racing against it and potentially reading or\nwriting memory that was being moved.\n\nReplace the VM-only dependency with an iteration over every object\nlocked by the exec, adding each object's KERNEL slot as a job\ndependency. This covers the VM resv (rebinds and private BOs) as well\nas every external BO, mirroring the drm_gpuvm_resv_add_fence() call\nthat later publishes the job fence to the same set of objects.\nLong-running mode continues to skip this, as before.\n\n(cherry picked from commit a6b842acf3ddd1efc53a56de9260cfa718fb35e7)",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74445": {
+                "cve_id": "CVE-2026-74445",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/vmwgfx: reject DX_BIND_QUERY without a DX context\n\nvmw_cmd_dx_bind_query() unconditionally dereferences\nsw_context->dx_ctx_node->ctx.  Userspace can trigger a NULL pointer\ndereference from any render-node fd by submitting an execbuf with\ndx_context_handle == SVGA3D_INVALID_ID and a SVGA_3D_CMD_DX_BIND_QUERY\nopcode in the command stream: dx_ctx_node is left NULL and the kernel\noopses on the assignment.  The same NULL is then re-read in\nvmw_resources_reserve() via vmw_context_get_dx_query_mob().\n\nAll sibling DX handlers fail-close on a missing dx_ctx_node using\nVMW_GET_CTX_NODE().  Use the same pattern here, returning -EINVAL up\nfront before any relocation state is published.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74456": {
+                "cve_id": "CVE-2026-74456",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncan: peak_usb: peak_usb_start(): fix double free of transfer buffer on URB submit error\n\nIn peak_usb_start(), each RX URB transfer buffer is allocated with kmalloc()\nand the URB is flagged URB_FREE_BUFFER so that the final usb_free_urb() also\nfrees the transfer buffer.\n\nIf usb_submit_urb() fails, the error path frees the buffer explicitly with\nkfree(buf) and then calls usb_free_urb(urb). Because URB_FREE_BUFFER is set,\nusb_free_urb() -> urb_destroy() frees the same buffer a second time, a double\nfree of the transfer buffer.\n\n  BUG: KASAN: double-free in usb_free_urb.part.0+0x91/0xb0\n  Free of addr ffff8881069ccb80 by task trigger.sh/285\n\n  Call Trace:\n   kfree+0x113/0x3c0\n   usb_free_urb.part.0+0x91/0xb0\n\nDrop the redundant kfree(buf); usb_free_urb() already releases the transfer\nbuffer. This mirrors commit 03819abbeb11 (\"net: usb: lan78xx: Fix double free\nissue with interrupt buffer allocation\").",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74464": {
+                "cve_id": "CVE-2026-74464",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: openvswitch: fix skb leak on flow key update failure during ct\n\novs_ct_execute() always steals or frees the skb on failure while\novs_flow_key_update() does not.  So, if it fails and we return right\naway, the skb ends up leaked.\n\nFix that by breaking instead and letting the common error handling\ncode at the bottom of the loop to free the skb properly.\n\nThis is a very unlikely scenario as it requires the packet to become\nunparseable by applying a set of actions on a previously parseable skb,\nbut should be fixed nevertheless.\n\nReported by Sashiko.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74470": {
+                "cve_id": "CVE-2026-74470",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nscsi: scsi_debug: Fix REPORT ZONES alloc_len underflow OOB write\n\nresp_report_zones() sizes the reply buffer from the CDB allocation\nlength. The v3 fix rounds alloc_len up with ALIGN() before deriving the\ndescriptor count:\n\n\trep_max_zones = (ALIGN((u64)alloc_len, RZONES_DESC_HD) -\n\t\t\t RZONES_DESC_HD) >> ilog2(RZONES_DESC_HD);\n\tarr_len = (u64)RZONES_DESC_HD * (rep_max_zones + 1);\n\nFor alloc_len in 0xFFFFFFC1..0xFFFFFFFF, ALIGN() rounds up to\n0x100000000, so arr_len is 4 GB. On 32-bit, kzalloc()'s size_t is 32-bit\nand truncates 0x100000000 to 0; kzalloc(0) returns ZERO_SIZE_PTR, which\npasses the !arr check, and desc = arr + 64 is then dereferenced in the\nloop -> out-of-bounds write / panic.\n\nClamp rep_max_zones to devip->nr_zones. The loop already stops at\nsdebug_capacity (after nr_zones zones), so a report can never hold more\nthan nr_zones descriptors; the clamp does not change the report, it only\nbounds arr_len to (nr_zones + 1) * RZONES_DESC_HD, a real device\nproperty that can never reach 0x100000000.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74471": {
+                "cve_id": "CVE-2026-74471",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntracing: Check return value of __register_event() in trace_module_add_events()\n\ntrace_module_add_events() ignores the return value of __register_event()\nand unconditionally calls __add_event_to_tracers() for each event.\n\nIf __register_event() fails (for example, if event_init() fails), the\ntrace_event_call is not added to ftrace_events list, but\n__add_event_to_tracers() still creates a trace_event_file pointing to it.\nIf module loading subsequently fails and module memory is freed, tracing\nstate retains a stale trace_event_call pointer in trace_event_file,\nleading to a use-after-free when tracefs or tracing subsystem operations\nare later executed.\n\nFix this by checking the return value of __register_event() and only\ncalling __add_event_to_tracers() if event registration succeeded.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74475": {
+                "cve_id": "CVE-2026-74475",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvxlan: use neigh_ha_snapshot() in route_shortcircuit()\n\nThe neighbour hardware address n->ha can be updated asynchronously by the\nneighbour subsystem, protected by n->ha_lock seqlock. Reading n->ha without\nholding the seqlock loop can lead to torn reads or reading a partially updated\nMAC address.\n\nUse neigh_ha_snapshot() in route_shortcircuit() to safely copy n->ha under\nread_seqbegin()/read_seqretry() lock protection before using it.\n\nNote that arp_reduce() and neigh_reduce() seem to have the same issue\nleft for future patches.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74499": {
+                "cve_id": "CVE-2026-74499",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: usb-audio: fix OOB write in snd_usbmidi_akai_output()\n\nsnd_usbmidi_akai_output() computes its fill-loop bound\n\n\tbuf_end = ep->max_transfer - MAX_AKAI_SYSEX_LEN - 1;\n\nas a signed int, so a small device-advertised bulk-OUT max_transfer\nmakes buf_end negative.  The loop guard then compares the u32\nurb->transfer_buffer_length against that negative int: the usual\narithmetic conversion turns buf_end into a large unsigned value, so the\nguard stays true and each iteration keeps appending SysEx framing and\npayload bytes past the end of the URB transfer buffer, which is only\nmax_transfer bytes long.\n\nA USB device that advertises a tiny bulk-OUT endpoint can therefore\ntrigger an attacker-length- and content-controlled heap out-of-bounds\nwrite when a process writes to the created /dev/snd/midiC*D* node.\n\nReturn early when there is no room for even one SysEx, so the loop is\nnever entered with a bound that would wrap.  The loop is the last\nstatement of the function, so bailing out is equivalent to it not\nrunning.\n\nDiscovered by XBOW, triaged by Baul Lee <baul.lee@xbow.com>",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74500": {
+                "cve_id": "CVE-2026-74500",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: usb-audio: fix stack info leak in RME Digiface status\n\nsnd_rme_digiface_read_status() reads a four-word status block from the\ndevice into an uninitialised on-stack __le32 buf[4] and, whenever the\nvendor control-IN transfer does not return a negative error, copies all\nfour words into the caller's status[].\n\nsnd_usb_ctl_msg() copies the full requested size back into the caller's\nbuffer regardless of how many bytes the data stage actually delivered:\n\n\tbuf = kmemdup(data, size, GFP_KERNEL);\n\terr = usb_control_msg(dev, pipe, request, requesttype,\n\t\t\t      value, index, buf, size, timeout);\n\tmemcpy(data, buf, size);\n\nusb_control_msg() returns the transferred length on a short control-IN,\nwhich is a non-negative value, and writes only that many bytes.  The\nremainder of the copy back is the kmemdup()ed image of the caller's\nbuffer, so a device answering with a short data stage leaves the\ntrailing words of buf[] holding leftover kernel stack.  The only guard\nin the caller is err < 0, so those words are stored into status[].\n\nThey then reach user space: snd_rme_digiface_get_status_val() selects a\n16-bit halfword of status[] per the control's reg/mask, and the eight\nDigiface status controls together expose the whole 16-byte frame to an\nunprivileged reader of /dev/snd/controlC*.\n\nZero-initialise the buffer so a short read yields zeros instead of stack\nresidue.  This mirrors snd_rme_get_status1(), which already clears its\noutput word before the same kind of vendor read.\n\nDiscovered by XBOW, triaged by Baul Lee <baul.lee@xbow.com>",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74506": {
+                "cve_id": "CVE-2026-74506",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nafs: Fix UAF when sending a message\n\nIn afs_make_call(), there's a race with async call reception and\ndestruction.  If a call is dispatched that doesn't have call->write_iter\nset (used to specify the data content for FS.StoreData), then the first\nrxrpc_kernel_send_data() will not set MSG_MORE in the msghdr.\n\nOnce rxrpc_send_data() queues the last request packet, the response could\ncome in at any time and cause the call to be completed and put.  However,\nafs_make_call() will look at the call again to see it ->write_iter should\nbe handled - something it's only allowed to do if it has its own ref on the\ncall.  Whilst this is the case for synchronous calls, it isn't true for\nasync calls such as FS.FetchData.\n\nThere's also a potential UAF in afs_make_call() in the event that an\nasynchronous call is being sent, but the call fails in some way (e.g. it\ngets aborted from the server).  The problem there is that afs_make_call()\ntries to abort a call if the rxrpc send fails, but the asynchronous\nnotification from rxrpc may have caused the afs_call to be torn down.\n\ngeneric/650 plays games with randomly taking CPUs offline, and can\ninterject a significant delay such that the call is deallocated before\nafs_make_call() gets to check call->write_iter - and a UAF ensues (caught\nby KASAN).\n\n   BUG: KASAN: slab-use-after-free in afs_make_call+0x1c90/0x2210 [kafs]\n   Read of size 8 at addr ffff888035e050e8 by task fsstress/1409\n\nFix this by making afs_make_op_call() give the op->call its own ref rather\nthan transferring the caller's ref to it and then dropping the ref when\nafs_make_call() returns.\n\nThis also means that the afs_make_call() func never loses its ref on the\ncall now.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74508": {
+                "cve_id": "CVE-2026-74508",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: HIDP: reject frames without a transaction header\n\nhidp_recv_ctrl_frame() and hidp_recv_intr_frame() read skb->data[0]\nbefore checking that the L2CAP SDU contains a transaction header. A\nconnected HIDP peer can send an empty basic-mode SDU and make both paths\nuse an uninitialized byte from skb tailroom.\n\nKMSAN reports the use in hidp_session_run(), with the uninitialized value\noriginating in __alloc_skb() through vhci_write(). The control path\nproduces two reports and the interrupt path produces one.\n\nThe byte can also be controlled by a malformed lower-layer packet. If an\nHCI ACL packet contains an L2CAP PDU with a declared zero-length payload\nfollowed by an extra 0x15 byte, l2cap_recv_acldata() reduces skb->len to\nthe declared PDU length before dispatch. The current HIDP path nevertheless\nconsumes the extra byte as HIDP_TRANS_HID_CONTROL |\nHIDP_CTRL_VIRTUAL_CABLE_UNPLUG and terminates the HIDP session. With this\nchange, the same packet is discarded and a subsequent feature report\nrequest succeeds.\n\nPull the transaction header with skb_pull_data() and discard frames that\ndo not contain it.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74529": {
+                "cve_id": "CVE-2026-74529",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: hci_sync: hold conn in hci_connect_pa_sync() callback\n\nThere is theoretical UAF if the conn is freed while the hci_sync task is\nrunning.\n\nHold refcount to avoid that.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74538": {
+                "cve_id": "CVE-2026-74538",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: ISO: lock sk in iso_connect_ind\n\nAccessing iso_pi(sk)->conn requires lock_sock, which is not taken in the\n\"ev3\" part of iso_connect_ind.  It may also be NULL if socket has\ntransitioned away from the LISTEN/CONNECT states before locking.\n\nFix by adding lock/release. Recheck hcon is valid after lock acquire\nwhere needed.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74565": {
+                "cve_id": "CVE-2026-74565",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nf_tables: make nft_object rhltable per table\n\nThe nft_object rhltable is global, this allows for accessing objects\nthat are being dismangled from lookup path by other existing netns.\nGiven the nft_obj_destroy() releases the object inmediately, this might\nlead to use-after-free of these objects that are being released.\nMake the existing rhltable per table to address this issue to deal with\nwith the nft_rcv_nl_event() path too.\n\nUpdate nft_obj_lookup() to take the table as non-const, otherwise,\ncompiler complains when passing the objname_ht to rhltable_lookup().",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74573": {
+                "cve_id": "CVE-2026-74573",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\niommu/arm-smmu-v3-iommufd: Require exactly one Stream ID for a vDEVICE\n\narm_vsmmu_vsid_to_sid() maps a guest's vSID to a single physical Stream ID\ntaken from master->streams[0], assuming a device has exactly one stream. A\ndevice with several streams gets only its first one mapped, so a guest vSID\ninvalidation cannot reach the others' ATC and IOTLB entries; a device with\nnone makes master->streams a ZERO_SIZE_PTR, read out of bounds.\n\nAdd an arm_vsmmu_vdevice_init() op to reject the vDEVICE with -EOPNOTSUPP\nwhen master->num_streams is not one, rather than mapping it silently.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74578": {
+                "cve_id": "CVE-2026-74578",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncrypto: algif_skcipher - force synchronous processing on trees without ctx->state\n\nThe AIO/async path in skcipher_recvmsg() passes the socket-wide ctx->iv\ndirectly into the skcipher request. After io_submit() the socket lock is\ndropped and the request is processed asynchronously, so a concurrent\nsendmsg(ALG_SET_IV) can overwrite ctx->iv and make the in-flight request\nrun under an attacker-controlled IV. For CTR/stream modes this is\nIV/keystream reuse and lets an unprivileged user recover the plaintext of\na concurrent operation.\n\nSnapshotting ctx->iv into per-request storage for the async path is not\nsufficient. For ciphers with statesize == 0 - which includes cbc and ctr -\nthe MSG_MORE inter-chunk IV chaining is carried solely by the in-place\nreq->iv writeback, which a snapshot redirects into per-request memory that\naf_alg_free_resources() releases on completion, silently producing wrong\noutput. Writing the IV back from the completion callback instead is not\npossible either: that would require lock_sock() there, but the callback can\nrun in softirq/atomic context, so it must not sleep.\n\nMake the operation synchronous instead, which removes both the IV race and\nany writeback race. This is equivalent to the upstream resolution, commit\nfcc77d33a34c (\"net: Remove support for AIO on sockets\"), which removed the\nAIO socket path across net/ entirely and so produces the same end state for\nthis file. This patch deviates from that commit deliberately: rather than\nremoving AIO socket support tree-wide, which would be far too invasive for\nstable, it removes only the AIO branch in crypto/algif_skcipher.c.\nio_submit() now completes synchronously; AF_ALG async is rarely used in\npractice.\n\nThe -EIOCBQUEUED check in skcipher_recvmsg() is now dead but harmless,\nand is left alone to keep the fix minimal.\n\nTested on 6.6.y: attacker IV injection dropped from 2296/200000 to 0/200000\nafter the change; MSG_MORE chunked CTR output bit-identical to single-shot.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
                     }
                 ]
             },
