@@ -49413,10 +49413,163 @@
                     }
                 ]
             },
+            "CVE-2026-72322": {
+                "cve_id": "CVE-2026-72322",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: mcast: Fix potential UAF in MLD delayed work\n\nA race condition exists between device teardown and incoming MLD query\nprocessing, leading to a Use-After-Free in the MLD delayed work.\n\nDuring device destruction, the primary reference to inet6_dev is dropped,\nwhich can drop its refcount to 0. The actual freeing of inet6_dev memory\nis deferred via RCU.\n\nConcurrently, the packet receive path runs under RCU read lock and obtains\nthe inet6_dev pointer. Because the memory is RCU-protected, CPU-0 can\nsafely dereference inet6_dev even if its refcount has hit 0.\n\nHowever, if CPU-0 calls igmp6_event_query() and schedules delayed work, it\nattempts to acquire a reference using in6_dev_hold(). This increments the\nrefcount from 0 to 1, triggering a \"refcount_t: addition on 0\" warning.\nSince the inet6_dev memory is still scheduled to be freed after the RCU\ngrace period, the device is freed while the work is still scheduled.\nWhen the work runs, it accesses the freed memory, causing a kernel panic.\n\nFix this by using refcount_inc_not_zero() (via a new helper\nin6_dev_hold_safe()) to prevent acquiring a reference if the device is\nalready being destroyed. If the refcount is 0, we do not schedule the work.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72323": {
                 "cve_id": "CVE-2026-72323",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv4: igmp: Fix potential UAF in igmp_gq_start_timer()\n\nA race condition exists between device teardown (inetdev_destroy) and\nincoming IGMP query processing (igmp_rcv), leading to a Use-After-Free\nin the IGMP timer callback.\n\nDuring device destruction, inetdev_destroy() drops the primary reference\nto in_device, which can drop its refcount to 0. The actual freeing of\nin_device memory is deferred via RCU (using call_rcu()).\n\nConcurrently, igmp_rcv() runs under RCU read lock and obtains the\nin_device pointer. Because the memory is RCU-protected, CPU-0 can safely\ndereference in_device even if its refcount has hit 0.\n\nHowever, if CPU-0 calls igmp_gq_start_timer() and re-arms the timer, it\nattempts to acquire a reference using in_dev_hold(). This increments the\nrefcount from 0 to 1, triggering a \"refcount_t: addition on 0\" warning.\nSince the in_device memory is still scheduled to be freed after the RCU\ngrace period (as the free callback does not check the refcount again),\nthe device is freed while the timer is still armed. When the timer\nexpires, it accesses the freed memory, causing a kernel panic.\n\nFix this by using refcount_inc_not_zero() (via a new helper\nin_dev_hold_safe()) to prevent acquiring a reference if the device is\nalready being destroyed. If the refcount is 0, we do not arm the timer.\n\nA similar issue in IPv6 MLD is fixed in a subsequent patch.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72325": {
+                "cve_id": "CVE-2026-72325",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nperf/x86/amd/core: Avoid enabling BRS from the SVM reload path\n\nBranch Sampling (BRS) and Last Branch Record (LBR) are mutually\nexclusive hardware features, and users of both are tracked via\ncpuc->lbr_users.\n\nWhen SVM is toggled on a CPU, the host perf events are reprogrammed to\nupdate the HostOnly filter bit (set when virtualization is enabled,\ncleared when it is disabled). On PerfMonV2-capable processors, this\nreprogramming is performed by calling amd_pmu_enable_all() to rewrite\nthe event selectors. However, amd_pmu_enable_all() also calls\namd_brs_enable_all(), which enables BRS whenever cpuc->lbr_users > 0.\nHaving active LBR events satisfies this gating on processors that have\nLBR but not BRS. The kernel then tries to set the BRS enable bit in\nDebugExtnCfg (MSR 0xc000010f). Since that bit is deprecated on such\nhardware, the write results in a #GP:\n\n  Call Trace:\n   <IRQ>\n   amd_pmu_enable_all+0x1d/0x90\n   amd_pmu_disable_virt+0x62/0xb0\n   kvm_arch_disable_virtualization_cpu+0xa/0x40 [kvm]\n   hardware_disable_nolock+0x1a/0x30 [kvm]\n   __flush_smp_call_function_queue+0x9b/0x410\n   __sysvec_call_function+0x18/0xc0\n   sysvec_call_function+0x69/0x90\n   </IRQ>\n   <TASK>\n   asm_sysvec_call_function+0x16/0x20\n  RIP: 0010:cpuidle_enter_state+0xc4/0x450\n   ? cpuidle_enter_state+0xb7/0x450\n   cpuidle_enter+0x29/0x40\n   cpuidle_idle_call+0xf5/0x160\n   do_idle+0x7b/0xe0\n   cpu_startup_entry+0x26/0x30\n   start_secondary+0x115/0x140\n   secondary_startup_64_no_verify+0x194/0x19b\n   </TASK>\n\nFix this by ensuring that BRS is not enabled from the event selector\nreprogramming path even when cpuc->lbr_users > 0.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72330": {
+                "cve_id": "CVE-2026-72330",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/tls: Consume empty data records in tls_sw_read_sock()\n\nA peer may send a zero-length TLS application_data record; TLS 1.3\nexplicitly permits these as a traffic-analysis countermeasure (RFC\n8446, Section 5.1). After decryption such a record has full_len ==\n0. tls_sw_read_sock() hands it to the read_actor, which has no\npayload to consume and returns zero. The loop treats a zero return\nas backpressure (used <= 0), requeues the skb at the head of\nrx_list, and stops. rx_list is serviced head-first on the next\ncall, so the empty record is dequeued, fails the same way, and is\nrequeued again; every later record on the connection is blocked\nbehind it.\n\ntls_sw_recvmsg() does not stall on this: a zero-length data record\ncopies nothing and falls through to consume_skb(). Mirror that in\nthe read_sock() path by recognizing an empty data record before\nthe actor runs, consuming it, and continuing.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72333": {
+                "cve_id": "CVE-2026-72333",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: L2CAP: fix tx ident leak for commands without a response\n\nCommit 6c3ea155e5ee (\"Bluetooth: L2CAP: Fix not tracking outstanding\nTX ident\") changed ident allocation to use an IDA, releasing idents in\nl2cap_put_ident() when the matching response command is received.\n\nBut identifiers allocated for commands that have no response defined\nare never released. In particular L2CAP_LE_CREDITS is sent repeatedly for\nthe lifetime of an LE CoC channel, so a peer streaming data to the\nhost exhausts the 1-255 ident range after 254 credit packets. From\nthen on l2cap_get_ident() fails:\n\n    kernel: Bluetooth: Unable to allocate ident: -28\n\nand every subsequent L2CAP_LE_CREDITS packet is sent with ident 0,\nwhich is invalid (Core Spec, Vol 3, Part A, Section 4: \"Signaling\nidentifier 0x00 is an invalid identifier and shall never be used in\nany command\"). Remote stacks that validate the ident drop these\ncommands, never receive new credits, and the channel stalls\npermanently. With default socket buffers this happens after roughly 0.5 MB\nof received data (the exact amount depends on the socket receive buffer):\n\n  < ACL Data TX: Handle 2048 flags 0x00 dlen 12\n        LE L2CAP: LE Flow Control Credit (0x16) ident 0 len 4\n          Source CID: 64\n          Credits: 1\n\nRelease the ident immediately after sending L2CAP_LE_CREDITS since no\nresponse will ever release it. Use a local variable instead of\nchan->ident so that an ident that an EXT_FLOWCTL channel may be waiting on\n(e.g. a pending reconfigure) is not overwritten by a credit packet.\n\nAlso add the missing L2CAP_LE_CONN_RSP case to l2cap_put_ident() so\nidents allocated for outgoing L2CAP_LE_CONN_REQ commands are released\nwhen the response arrives.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72334": {
+                "cve_id": "CVE-2026-72334",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: ISO: fix malformed ISO_END/CONT handling\n\nCore specification (Part C vol 4 sec 5.4.5) does not exclude empty\nISO_CONT, ISO_END packets.  We currently reject them if they are last.\n\nIf controller sends malformed sequence\n\n    ISO_START -> rx_len = 4, ISO_CONT skb->len 4, ISO_START\n\nthat ends payload in ISO_CONT, we leak conn->rx_skb. If controller sends\ntoo long ISO_END, we panic on skb_put. If controller sends too short\nISO_END we accept it.\n\nFix by marking unfinished ISO_START via conn->rx_skb != NULL.  Check\nskb->len properly before skb_put.  Combine the ISO_CONT/END code paths\nas they require the same initial checks. Reject too short ISO_END\npackets.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72335": {
+                "cve_id": "CVE-2026-72335",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: MGMT: Fix adv monitor add failure cleanup\n\nhci_add_adv_monitor() publishes a new adv_monitor in\nhdev->adv_monitors_idr before the powered MSFT setup step. The MSFT\noffload add path can then fail either locally before the controller add\ncommand completes, or in the MSFT add callback. In the current queued\nmanagement add flow, hci_cmd_sync_work() still invokes\nmgmt_add_adv_patterns_monitor_complete() with the original pending command\nafter msft_add_monitor_pattern() returns.\n\nThe buggy scenario involves two paths, with each column showing the order\nwithin that path:\n\nMSFT add handling                  MGMT completion\n1. insert monitor and handle       1. receive sync error\n2. send MSFT add command           2. call add-monitor completion\n3. callback sees bad response      3. load cmd->user_data\n4. callback frees monitor          4. read monitor->handle\n\nLocal MSFT setup failures have the other half of the same ownership bug:\nthey return an error after the IDR insertion, but no later code removes the\nfailed monitor from the IDR.\n\nKeep ownership with the pending management command until its completion.\nFor normal management adds, the MSFT add callback now records successful\ncontroller state and returns errors to its caller. The management\ncompletion frees the monitor on non-success after copying the response\nhandle, while resume/reregister callback-error cleanup remains in the\nMSFT callback. The success path keeps the existing bookkeeping.\n\nValidation reproduced this kernel report:\nBUG: KASAN: slab-use-after-free in mgmt_add_adv_patterns_monitor_complete+0xfb/0x260 [bluetooth]\n\nCall Trace:\n <TASK>\n dump_stack_lvl+0x66/0xa0\n print_report+0xce/0x5f0\n ? mgmt_add_adv_patterns_monitor_complete+0xfb/0x260 [bluetooth]\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? __virt_addr_valid+0x19f/0x330\n ? mgmt_add_adv_patterns_monitor_complete+0xfb/0x260 [bluetooth]\n kasan_report+0xe0/0x110\n ? mgmt_add_adv_patterns_monitor_complete+0xfb/0x260 [bluetooth]\n mgmt_add_adv_patterns_monitor_complete+0xfb/0x260 [bluetooth]\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? 0xffffffffc00d00da\n ? __pfx_mgmt_add_adv_patterns_monitor_complete+0x10/0x10 [bluetooth]\n ? __pfx_mgmt_add_adv_patterns_monitor_complete+0x10/0x10 [bluetooth]\n ? hci_cmd_sync_work+0x1ab/0x210 [bluetooth]\n hci_cmd_sync_work+0x1c0/0x210 [bluetooth]\n ? __pfx_mgmt_add_adv_patterns_monitor_complete+0x10/0x10 [bluetooth]\n process_one_work+0x4fd/0xbc0\n ? __pfx_process_one_work+0x10/0x10\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? __list_add_valid_or_report+0x37/0xf0\n ? __pfx_hci_cmd_sync_work+0x10/0x10 [bluetooth]\n ? srso_alias_return_thunk+0x5/0xfbef5\n worker_thread+0x2d8/0x570\n ? __pfx_worker_thread+0x10/0x10\n kthread+0x1ad/0x1f0\n ? __pfx_kthread+0x10/0x10\n ret_from_fork+0x3c9/0x540\n ? __pfx_ret_from_fork+0x10/0x10\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? __switch_to+0x2e9/0x730\n ? __pfx_kthread+0x10/0x10\n ret_from_fork_asm+0x1a/0x30\n </TASK>\n\nAllocated by task 471 on cpu 3 at 285.205389s:\n kasan_save_stack+0x33/0x60\n kasan_save_track+0x17/0x60\n __kasan_kmalloc+0xaa/0xb0\n add_adv_patterns_monitor_rssi+0xd5/0x230 [bluetooth]\n hci_sock_sendmsg+0x96b/0xf80 [bluetooth]\n __sys_sendto+0x2bc/0x2d0\n __x64_sys_sendto+0x76/0x90\n do_syscall_64+0x115/0x6a0\n entry_SYSCALL_64_after_hwframe+0x77/0x7f\n\nFreed by task 454 on cpu 2 at 285.217112s:\n kasan_save_stack+0x33/0x60\n kasan_save_track+0x17/0x60\n kasan_save_free_info+0x3b/0x60\n __kasan_slab_free+0x5f/0x80\n kfree+0x313/0x590\n msft_add_monitor_sync+0x54a/0x570 [bluetooth]\n hci_add_adv_monitor+0x133/0x180 [bluetooth]\n hci_cmd_sync_work+0x187/0x210 [bluetooth]\n process_one_work+0x4fd/0xbc0\n worker_thread+0x2d8/0x570\n kthread+0x1ad/0x1f0\n ret_from_fork+0x3c9/0x540\n ret_from_fork_asm+0x1a/0x30",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72336": {
+                "cve_id": "CVE-2026-72336",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: 6lowpan: hold L2CAP conn across debugfs control\n\nget_l2cap_conn() looks up an LE hci_conn under hdev protection, but\nthen drops that protection before reading hcon->l2cap_data and before\nlowpan_control_write() later dereferences conn->hcon.  A disconnect or\ndevice close can tear down the same L2CAP connection in that window.\n\nThe buggy scenario involves two paths, with each column showing the order\nwithin that path:\n\n6LoWPAN control write:              HCI disconnect/device close:\n  1. get_l2cap_conn() finds hcon      1. hci_disconn_cfm() dispatches\n     and hcon->l2cap_data.               the L2CAP disconnect callback.\n  2. get_l2cap_conn() drops hdev      2. l2cap_conn_del() clears\n     protection and returns conn.        hcon->l2cap_data and drops the\n                                         L2CAP connection reference.\n  3. lowpan_control_write() reads     3. hci_conn_del() removes and drops\n     conn->hcon.                         the HCI connection.\n\nTake a reference to the L2CAP connection with\nl2cap_conn_hold_unless_zero() while hdev is still locked, and drop that\nreference after the debugfs command's last use of conn.  This mirrors the\nexisting L2CAP ACL receive-side handoff and keeps the connection\ndereferenceable after leaving hdev protection.  Export the existing helper\nso the bluetooth_6lowpan module can use the same lifetime primitive.\n\nValidation reproduced this kernel report:\nBUG: KASAN: slab-use-after-free in lowpan_control_write+0x374/0x520\nThe buggy address belongs to the object at ffff888111b9d000 which belongs\nto the cache kmalloc-1k of size 1024\nThe buggy address is located 0 bytes inside of freed 1024-byte region\n[ffff888111b9d000, ffff888111b9d400)\nRead of size 8\nCall trace:\n  dump_stack_lvl+0x66/0xa0\n  print_report+0xce/0x5f0\n  lowpan_control_write+0x374/0x520 (net/bluetooth/6lowpan.c:1131)\n  srso_alias_return_thunk+0x5/0xfbef5\n  __virt_addr_valid+0x19f/0x330\n  kasan_report+0xe0/0x110\n  __debugfs_file_get+0xf7/0x400\n  full_proxy_write+0x9e/0xd0\n  vfs_write+0x1b0/0x810\n  ksys_write+0xd2/0x170\n  dnotify_flush+0x32/0x220\n  do_syscall_64+0x115/0x6a0 (arch/x86/entry/syscall_64.c:87)\n  entry_SYSCALL_64_after_hwframe+0x77/0x7f\nAllocated by task stack:\n  kasan_save_stack+0x33/0x60\n  kasan_save_track+0x17/0x60\n  __kasan_kmalloc+0xaa/0xb0\n  l2cap_conn_add+0x45/0x520\n  l2cap_chan_connect+0xac6/0xd90\n  l2cap_sock_connect+0x216/0x350\n  __sys_connect+0x101/0x130\n  __x64_sys_connect+0x40/0x50\n  do_syscall_64+0x115/0x6a0 (arch/x86/entry/syscall_64.c:87)\n  entry_SYSCALL_64_after_hwframe+0x77/0x7f\nFreed by task stack:\n  kasan_save_stack+0x33/0x60\n  kasan_save_track+0x17/0x60\n  kasan_save_free_info+0x3b/0x60\n  __kasan_slab_free+0x5f/0x80\n  kfree+0x313/0x590\n  hci_conn_hash_flush+0xc0/0x140\n  hci_dev_close_sync+0x41a/0xb00\n  hci_dev_close+0x12f/0x160\n  hci_sock_ioctl+0x157/0x570\n  sock_do_ioctl+0xf7/0x210\n  sock_ioctl+0x32f/0x490\n  __x64_sys_ioctl+0xc7/0x110\n  do_syscall_64+0x115/0x6a0 (arch/x86/entry/syscall_64.c:87)\n  entry_SYSCALL_64_after_hwframe+0x77/0x7f\n  kasan_record_aux_stack+0xa7/0xc0\n  insert_work+0x32/0x100\n  __queue_work+0x262/0xa60\n  queue_work_on+0xad/0xb0\n  l2cap_connect_cfm+0x4ef/0x670\n  hci_le_remote_feat_complete_evt+0x247/0x430\n  hci_event_packet+0x360/0x6f0\n  hci_rx_work+0x2ae/0x7a0\n  process_one_work+0x4fd/0xbc0\n  worker_thread+0x2d8/0x570\n  kthread+0x1ad/0x1f0\n  ret_from_fork+0x3c9/0x540\n  ret_from_fork_asm+0x1a/0x30",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72338": {
+                "cve_id": "CVE-2026-72338",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: act_pedit: fix TOCTOU heap OOB write in tc offload\n\nThere is a TOCTOU race condition in flower lockless approach between sizing\na flow_rule buffer and filling it.\nzdi-disclosures@trendmicro.com reports:\nThe cls_flower classifier operates with TCF_PROTO_OPS_DOIT_UNLOCKED\n(fl_change runs without RTNL), while RTM_NEWACTION holds RTNL, so the\nindependent locking domains make the race reachable in practice.  KASAN\nconfirms:\n  BUG: KASAN: slab-out-of-bounds in tcf_pedit_offload_act_setup+0x81b/0x930\n  Write of size 4 at addr ffff888001f27520 by task poc-toctou/312\n  The buggy address is located 0 bytes to the right of\n   allocated 288-byte region [ffff888001f27400, ffff888001f27520)\n   (cache kmalloc-512)\n\nNote: The result is a heap OOB write attacker-controlled content into the\nadjacent slab object (requires CAP_NET_ADMIN).\n\nThe fix introduces reading tcfp_nkeys under act->tcfa_lock in all places\nusing a new tcf_pedit_nkeys_locked() which replaces the old tcf_pedit_nkeys().\nAdditionally we close the remaining TOCTOU window between the sizing read and\nthe fill reads by more careful accounting.\nRather than silently truncating the key count, which leads to incorrect\naction semantics offloaded to hardware and secondary OOB writes if\nthe remaining capacity is zero or consumed by prior actions, we enforce\nremaining capacity checks and return -ENOSPC if the required space exceeds\nthe remaining capacity.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72339": {
+                "cve_id": "CVE-2026-72339",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nqede: fix off-by-one in BD ring consumption on build_skb failure\n\nqede_rx_build_skb() and qede_tpa_rx_build_skb() do not check for a\nNULL return from qede_build_skb(). When it returns NULL under memory\npressure, the functions still consume a BD from the ring before\nreturning NULL. The callers then recycle additional BDs, resulting in\none extra BD being consumed (off-by-one). This desynchronizes the BD\nring, which can corrupt DMA page reference counts and lead to SLUB\nfreelist corruption.\n\nCommit 4e910dbe3650 (\"qede: confirm skb is allocated before using\")\nadded a NULL check inside qede_build_skb() to prevent a NULL pointer\ndereference, but did not address the missing NULL checks in the\ncallers, making this off-by-one reachable.\n\nFix this by adding NULL checks for the return value of\nqede_build_skb() in both qede_rx_build_skb() and\nqede_tpa_rx_build_skb(), returning NULL immediately before any BD ring\nmanipulation.",
                 "severity": "CRITICAL",
                 "status": "open",
                 "events": [
@@ -105774,10 +105927,163 @@
                     }
                 ]
             },
+            "CVE-2026-72322": {
+                "cve_id": "CVE-2026-72322",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: mcast: Fix potential UAF in MLD delayed work\n\nA race condition exists between device teardown and incoming MLD query\nprocessing, leading to a Use-After-Free in the MLD delayed work.\n\nDuring device destruction, the primary reference to inet6_dev is dropped,\nwhich can drop its refcount to 0. The actual freeing of inet6_dev memory\nis deferred via RCU.\n\nConcurrently, the packet receive path runs under RCU read lock and obtains\nthe inet6_dev pointer. Because the memory is RCU-protected, CPU-0 can\nsafely dereference inet6_dev even if its refcount has hit 0.\n\nHowever, if CPU-0 calls igmp6_event_query() and schedules delayed work, it\nattempts to acquire a reference using in6_dev_hold(). This increments the\nrefcount from 0 to 1, triggering a \"refcount_t: addition on 0\" warning.\nSince the inet6_dev memory is still scheduled to be freed after the RCU\ngrace period, the device is freed while the work is still scheduled.\nWhen the work runs, it accesses the freed memory, causing a kernel panic.\n\nFix this by using refcount_inc_not_zero() (via a new helper\nin6_dev_hold_safe()) to prevent acquiring a reference if the device is\nalready being destroyed. If the refcount is 0, we do not schedule the work.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72323": {
                 "cve_id": "CVE-2026-72323",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv4: igmp: Fix potential UAF in igmp_gq_start_timer()\n\nA race condition exists between device teardown (inetdev_destroy) and\nincoming IGMP query processing (igmp_rcv), leading to a Use-After-Free\nin the IGMP timer callback.\n\nDuring device destruction, inetdev_destroy() drops the primary reference\nto in_device, which can drop its refcount to 0. The actual freeing of\nin_device memory is deferred via RCU (using call_rcu()).\n\nConcurrently, igmp_rcv() runs under RCU read lock and obtains the\nin_device pointer. Because the memory is RCU-protected, CPU-0 can safely\ndereference in_device even if its refcount has hit 0.\n\nHowever, if CPU-0 calls igmp_gq_start_timer() and re-arms the timer, it\nattempts to acquire a reference using in_dev_hold(). This increments the\nrefcount from 0 to 1, triggering a \"refcount_t: addition on 0\" warning.\nSince the in_device memory is still scheduled to be freed after the RCU\ngrace period (as the free callback does not check the refcount again),\nthe device is freed while the timer is still armed. When the timer\nexpires, it accesses the freed memory, causing a kernel panic.\n\nFix this by using refcount_inc_not_zero() (via a new helper\nin_dev_hold_safe()) to prevent acquiring a reference if the device is\nalready being destroyed. If the refcount is 0, we do not arm the timer.\n\nA similar issue in IPv6 MLD is fixed in a subsequent patch.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72325": {
+                "cve_id": "CVE-2026-72325",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nperf/x86/amd/core: Avoid enabling BRS from the SVM reload path\n\nBranch Sampling (BRS) and Last Branch Record (LBR) are mutually\nexclusive hardware features, and users of both are tracked via\ncpuc->lbr_users.\n\nWhen SVM is toggled on a CPU, the host perf events are reprogrammed to\nupdate the HostOnly filter bit (set when virtualization is enabled,\ncleared when it is disabled). On PerfMonV2-capable processors, this\nreprogramming is performed by calling amd_pmu_enable_all() to rewrite\nthe event selectors. However, amd_pmu_enable_all() also calls\namd_brs_enable_all(), which enables BRS whenever cpuc->lbr_users > 0.\nHaving active LBR events satisfies this gating on processors that have\nLBR but not BRS. The kernel then tries to set the BRS enable bit in\nDebugExtnCfg (MSR 0xc000010f). Since that bit is deprecated on such\nhardware, the write results in a #GP:\n\n  Call Trace:\n   <IRQ>\n   amd_pmu_enable_all+0x1d/0x90\n   amd_pmu_disable_virt+0x62/0xb0\n   kvm_arch_disable_virtualization_cpu+0xa/0x40 [kvm]\n   hardware_disable_nolock+0x1a/0x30 [kvm]\n   __flush_smp_call_function_queue+0x9b/0x410\n   __sysvec_call_function+0x18/0xc0\n   sysvec_call_function+0x69/0x90\n   </IRQ>\n   <TASK>\n   asm_sysvec_call_function+0x16/0x20\n  RIP: 0010:cpuidle_enter_state+0xc4/0x450\n   ? cpuidle_enter_state+0xb7/0x450\n   cpuidle_enter+0x29/0x40\n   cpuidle_idle_call+0xf5/0x160\n   do_idle+0x7b/0xe0\n   cpu_startup_entry+0x26/0x30\n   start_secondary+0x115/0x140\n   secondary_startup_64_no_verify+0x194/0x19b\n   </TASK>\n\nFix this by ensuring that BRS is not enabled from the event selector\nreprogramming path even when cpuc->lbr_users > 0.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72330": {
+                "cve_id": "CVE-2026-72330",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/tls: Consume empty data records in tls_sw_read_sock()\n\nA peer may send a zero-length TLS application_data record; TLS 1.3\nexplicitly permits these as a traffic-analysis countermeasure (RFC\n8446, Section 5.1). After decryption such a record has full_len ==\n0. tls_sw_read_sock() hands it to the read_actor, which has no\npayload to consume and returns zero. The loop treats a zero return\nas backpressure (used <= 0), requeues the skb at the head of\nrx_list, and stops. rx_list is serviced head-first on the next\ncall, so the empty record is dequeued, fails the same way, and is\nrequeued again; every later record on the connection is blocked\nbehind it.\n\ntls_sw_recvmsg() does not stall on this: a zero-length data record\ncopies nothing and falls through to consume_skb(). Mirror that in\nthe read_sock() path by recognizing an empty data record before\nthe actor runs, consuming it, and continuing.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72333": {
+                "cve_id": "CVE-2026-72333",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: L2CAP: fix tx ident leak for commands without a response\n\nCommit 6c3ea155e5ee (\"Bluetooth: L2CAP: Fix not tracking outstanding\nTX ident\") changed ident allocation to use an IDA, releasing idents in\nl2cap_put_ident() when the matching response command is received.\n\nBut identifiers allocated for commands that have no response defined\nare never released. In particular L2CAP_LE_CREDITS is sent repeatedly for\nthe lifetime of an LE CoC channel, so a peer streaming data to the\nhost exhausts the 1-255 ident range after 254 credit packets. From\nthen on l2cap_get_ident() fails:\n\n    kernel: Bluetooth: Unable to allocate ident: -28\n\nand every subsequent L2CAP_LE_CREDITS packet is sent with ident 0,\nwhich is invalid (Core Spec, Vol 3, Part A, Section 4: \"Signaling\nidentifier 0x00 is an invalid identifier and shall never be used in\nany command\"). Remote stacks that validate the ident drop these\ncommands, never receive new credits, and the channel stalls\npermanently. With default socket buffers this happens after roughly 0.5 MB\nof received data (the exact amount depends on the socket receive buffer):\n\n  < ACL Data TX: Handle 2048 flags 0x00 dlen 12\n        LE L2CAP: LE Flow Control Credit (0x16) ident 0 len 4\n          Source CID: 64\n          Credits: 1\n\nRelease the ident immediately after sending L2CAP_LE_CREDITS since no\nresponse will ever release it. Use a local variable instead of\nchan->ident so that an ident that an EXT_FLOWCTL channel may be waiting on\n(e.g. a pending reconfigure) is not overwritten by a credit packet.\n\nAlso add the missing L2CAP_LE_CONN_RSP case to l2cap_put_ident() so\nidents allocated for outgoing L2CAP_LE_CONN_REQ commands are released\nwhen the response arrives.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72334": {
+                "cve_id": "CVE-2026-72334",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: ISO: fix malformed ISO_END/CONT handling\n\nCore specification (Part C vol 4 sec 5.4.5) does not exclude empty\nISO_CONT, ISO_END packets.  We currently reject them if they are last.\n\nIf controller sends malformed sequence\n\n    ISO_START -> rx_len = 4, ISO_CONT skb->len 4, ISO_START\n\nthat ends payload in ISO_CONT, we leak conn->rx_skb. If controller sends\ntoo long ISO_END, we panic on skb_put. If controller sends too short\nISO_END we accept it.\n\nFix by marking unfinished ISO_START via conn->rx_skb != NULL.  Check\nskb->len properly before skb_put.  Combine the ISO_CONT/END code paths\nas they require the same initial checks. Reject too short ISO_END\npackets.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72335": {
+                "cve_id": "CVE-2026-72335",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: MGMT: Fix adv monitor add failure cleanup\n\nhci_add_adv_monitor() publishes a new adv_monitor in\nhdev->adv_monitors_idr before the powered MSFT setup step. The MSFT\noffload add path can then fail either locally before the controller add\ncommand completes, or in the MSFT add callback. In the current queued\nmanagement add flow, hci_cmd_sync_work() still invokes\nmgmt_add_adv_patterns_monitor_complete() with the original pending command\nafter msft_add_monitor_pattern() returns.\n\nThe buggy scenario involves two paths, with each column showing the order\nwithin that path:\n\nMSFT add handling                  MGMT completion\n1. insert monitor and handle       1. receive sync error\n2. send MSFT add command           2. call add-monitor completion\n3. callback sees bad response      3. load cmd->user_data\n4. callback frees monitor          4. read monitor->handle\n\nLocal MSFT setup failures have the other half of the same ownership bug:\nthey return an error after the IDR insertion, but no later code removes the\nfailed monitor from the IDR.\n\nKeep ownership with the pending management command until its completion.\nFor normal management adds, the MSFT add callback now records successful\ncontroller state and returns errors to its caller. The management\ncompletion frees the monitor on non-success after copying the response\nhandle, while resume/reregister callback-error cleanup remains in the\nMSFT callback. The success path keeps the existing bookkeeping.\n\nValidation reproduced this kernel report:\nBUG: KASAN: slab-use-after-free in mgmt_add_adv_patterns_monitor_complete+0xfb/0x260 [bluetooth]\n\nCall Trace:\n <TASK>\n dump_stack_lvl+0x66/0xa0\n print_report+0xce/0x5f0\n ? mgmt_add_adv_patterns_monitor_complete+0xfb/0x260 [bluetooth]\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? __virt_addr_valid+0x19f/0x330\n ? mgmt_add_adv_patterns_monitor_complete+0xfb/0x260 [bluetooth]\n kasan_report+0xe0/0x110\n ? mgmt_add_adv_patterns_monitor_complete+0xfb/0x260 [bluetooth]\n mgmt_add_adv_patterns_monitor_complete+0xfb/0x260 [bluetooth]\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? 0xffffffffc00d00da\n ? __pfx_mgmt_add_adv_patterns_monitor_complete+0x10/0x10 [bluetooth]\n ? __pfx_mgmt_add_adv_patterns_monitor_complete+0x10/0x10 [bluetooth]\n ? hci_cmd_sync_work+0x1ab/0x210 [bluetooth]\n hci_cmd_sync_work+0x1c0/0x210 [bluetooth]\n ? __pfx_mgmt_add_adv_patterns_monitor_complete+0x10/0x10 [bluetooth]\n process_one_work+0x4fd/0xbc0\n ? __pfx_process_one_work+0x10/0x10\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? __list_add_valid_or_report+0x37/0xf0\n ? __pfx_hci_cmd_sync_work+0x10/0x10 [bluetooth]\n ? srso_alias_return_thunk+0x5/0xfbef5\n worker_thread+0x2d8/0x570\n ? __pfx_worker_thread+0x10/0x10\n kthread+0x1ad/0x1f0\n ? __pfx_kthread+0x10/0x10\n ret_from_fork+0x3c9/0x540\n ? __pfx_ret_from_fork+0x10/0x10\n ? srso_alias_return_thunk+0x5/0xfbef5\n ? __switch_to+0x2e9/0x730\n ? __pfx_kthread+0x10/0x10\n ret_from_fork_asm+0x1a/0x30\n </TASK>\n\nAllocated by task 471 on cpu 3 at 285.205389s:\n kasan_save_stack+0x33/0x60\n kasan_save_track+0x17/0x60\n __kasan_kmalloc+0xaa/0xb0\n add_adv_patterns_monitor_rssi+0xd5/0x230 [bluetooth]\n hci_sock_sendmsg+0x96b/0xf80 [bluetooth]\n __sys_sendto+0x2bc/0x2d0\n __x64_sys_sendto+0x76/0x90\n do_syscall_64+0x115/0x6a0\n entry_SYSCALL_64_after_hwframe+0x77/0x7f\n\nFreed by task 454 on cpu 2 at 285.217112s:\n kasan_save_stack+0x33/0x60\n kasan_save_track+0x17/0x60\n kasan_save_free_info+0x3b/0x60\n __kasan_slab_free+0x5f/0x80\n kfree+0x313/0x590\n msft_add_monitor_sync+0x54a/0x570 [bluetooth]\n hci_add_adv_monitor+0x133/0x180 [bluetooth]\n hci_cmd_sync_work+0x187/0x210 [bluetooth]\n process_one_work+0x4fd/0xbc0\n worker_thread+0x2d8/0x570\n kthread+0x1ad/0x1f0\n ret_from_fork+0x3c9/0x540\n ret_from_fork_asm+0x1a/0x30",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72336": {
+                "cve_id": "CVE-2026-72336",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: 6lowpan: hold L2CAP conn across debugfs control\n\nget_l2cap_conn() looks up an LE hci_conn under hdev protection, but\nthen drops that protection before reading hcon->l2cap_data and before\nlowpan_control_write() later dereferences conn->hcon.  A disconnect or\ndevice close can tear down the same L2CAP connection in that window.\n\nThe buggy scenario involves two paths, with each column showing the order\nwithin that path:\n\n6LoWPAN control write:              HCI disconnect/device close:\n  1. get_l2cap_conn() finds hcon      1. hci_disconn_cfm() dispatches\n     and hcon->l2cap_data.               the L2CAP disconnect callback.\n  2. get_l2cap_conn() drops hdev      2. l2cap_conn_del() clears\n     protection and returns conn.        hcon->l2cap_data and drops the\n                                         L2CAP connection reference.\n  3. lowpan_control_write() reads     3. hci_conn_del() removes and drops\n     conn->hcon.                         the HCI connection.\n\nTake a reference to the L2CAP connection with\nl2cap_conn_hold_unless_zero() while hdev is still locked, and drop that\nreference after the debugfs command's last use of conn.  This mirrors the\nexisting L2CAP ACL receive-side handoff and keeps the connection\ndereferenceable after leaving hdev protection.  Export the existing helper\nso the bluetooth_6lowpan module can use the same lifetime primitive.\n\nValidation reproduced this kernel report:\nBUG: KASAN: slab-use-after-free in lowpan_control_write+0x374/0x520\nThe buggy address belongs to the object at ffff888111b9d000 which belongs\nto the cache kmalloc-1k of size 1024\nThe buggy address is located 0 bytes inside of freed 1024-byte region\n[ffff888111b9d000, ffff888111b9d400)\nRead of size 8\nCall trace:\n  dump_stack_lvl+0x66/0xa0\n  print_report+0xce/0x5f0\n  lowpan_control_write+0x374/0x520 (net/bluetooth/6lowpan.c:1131)\n  srso_alias_return_thunk+0x5/0xfbef5\n  __virt_addr_valid+0x19f/0x330\n  kasan_report+0xe0/0x110\n  __debugfs_file_get+0xf7/0x400\n  full_proxy_write+0x9e/0xd0\n  vfs_write+0x1b0/0x810\n  ksys_write+0xd2/0x170\n  dnotify_flush+0x32/0x220\n  do_syscall_64+0x115/0x6a0 (arch/x86/entry/syscall_64.c:87)\n  entry_SYSCALL_64_after_hwframe+0x77/0x7f\nAllocated by task stack:\n  kasan_save_stack+0x33/0x60\n  kasan_save_track+0x17/0x60\n  __kasan_kmalloc+0xaa/0xb0\n  l2cap_conn_add+0x45/0x520\n  l2cap_chan_connect+0xac6/0xd90\n  l2cap_sock_connect+0x216/0x350\n  __sys_connect+0x101/0x130\n  __x64_sys_connect+0x40/0x50\n  do_syscall_64+0x115/0x6a0 (arch/x86/entry/syscall_64.c:87)\n  entry_SYSCALL_64_after_hwframe+0x77/0x7f\nFreed by task stack:\n  kasan_save_stack+0x33/0x60\n  kasan_save_track+0x17/0x60\n  kasan_save_free_info+0x3b/0x60\n  __kasan_slab_free+0x5f/0x80\n  kfree+0x313/0x590\n  hci_conn_hash_flush+0xc0/0x140\n  hci_dev_close_sync+0x41a/0xb00\n  hci_dev_close+0x12f/0x160\n  hci_sock_ioctl+0x157/0x570\n  sock_do_ioctl+0xf7/0x210\n  sock_ioctl+0x32f/0x490\n  __x64_sys_ioctl+0xc7/0x110\n  do_syscall_64+0x115/0x6a0 (arch/x86/entry/syscall_64.c:87)\n  entry_SYSCALL_64_after_hwframe+0x77/0x7f\n  kasan_record_aux_stack+0xa7/0xc0\n  insert_work+0x32/0x100\n  __queue_work+0x262/0xa60\n  queue_work_on+0xad/0xb0\n  l2cap_connect_cfm+0x4ef/0x670\n  hci_le_remote_feat_complete_evt+0x247/0x430\n  hci_event_packet+0x360/0x6f0\n  hci_rx_work+0x2ae/0x7a0\n  process_one_work+0x4fd/0xbc0\n  worker_thread+0x2d8/0x570\n  kthread+0x1ad/0x1f0\n  ret_from_fork+0x3c9/0x540\n  ret_from_fork_asm+0x1a/0x30",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72338": {
+                "cve_id": "CVE-2026-72338",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/sched: act_pedit: fix TOCTOU heap OOB write in tc offload\n\nThere is a TOCTOU race condition in flower lockless approach between sizing\na flow_rule buffer and filling it.\nzdi-disclosures@trendmicro.com reports:\nThe cls_flower classifier operates with TCF_PROTO_OPS_DOIT_UNLOCKED\n(fl_change runs without RTNL), while RTM_NEWACTION holds RTNL, so the\nindependent locking domains make the race reachable in practice.  KASAN\nconfirms:\n  BUG: KASAN: slab-out-of-bounds in tcf_pedit_offload_act_setup+0x81b/0x930\n  Write of size 4 at addr ffff888001f27520 by task poc-toctou/312\n  The buggy address is located 0 bytes to the right of\n   allocated 288-byte region [ffff888001f27400, ffff888001f27520)\n   (cache kmalloc-512)\n\nNote: The result is a heap OOB write attacker-controlled content into the\nadjacent slab object (requires CAP_NET_ADMIN).\n\nThe fix introduces reading tcfp_nkeys under act->tcfa_lock in all places\nusing a new tcf_pedit_nkeys_locked() which replaces the old tcf_pedit_nkeys().\nAdditionally we close the remaining TOCTOU window between the sizing read and\nthe fill reads by more careful accounting.\nRather than silently truncating the key count, which leads to incorrect\naction semantics offloaded to hardware and secondary OOB writes if\nthe remaining capacity is zero or consumed by prior actions, we enforce\nremaining capacity checks and return -ENOSPC if the required space exceeds\nthe remaining capacity.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72339": {
+                "cve_id": "CVE-2026-72339",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nqede: fix off-by-one in BD ring consumption on build_skb failure\n\nqede_rx_build_skb() and qede_tpa_rx_build_skb() do not check for a\nNULL return from qede_build_skb(). When it returns NULL under memory\npressure, the functions still consume a BD from the ring before\nreturning NULL. The callers then recycle additional BDs, resulting in\none extra BD being consumed (off-by-one). This desynchronizes the BD\nring, which can corrupt DMA page reference counts and lead to SLUB\nfreelist corruption.\n\nCommit 4e910dbe3650 (\"qede: confirm skb is allocated before using\")\nadded a NULL check inside qede_build_skb() to prevent a NULL pointer\ndereference, but did not address the missing NULL checks in the\ncallers, making this off-by-one reachable.\n\nFix this by adding NULL checks for the return value of\nqede_build_skb() in both qede_rx_build_skb() and\nqede_tpa_rx_build_skb(), returning NULL immediately before any BD ring\nmanipulation.",
                 "severity": "CRITICAL",
                 "status": "open",
                 "events": [
