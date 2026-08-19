@@ -49175,6 +49175,40 @@
                     }
                 ]
             },
+            "CVE-2026-72298": {
+                "cve_id": "CVE-2026-72298",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: qrtr: fix 32-bit integer overflow in qrtr_endpoint_post()\n\nqrtr_endpoint_post() validates an incoming packet with\n\n\tif (!size || len != ALIGN(size, 4) + hdrlen)\n\t\tgoto err;\n\nwhere size comes from the wire. On 32-bit, size_t is 32 bits and\nALIGN(size, 4) wraps to 0 for size >= 0xfffffffd, so the check\npasses and skb_put_data(skb, data + hdrlen, size) writes past the\nhdrlen-sized skb and oopses the kernel. 64-bit is unaffected.\n\nThis is the 32-bit residual of ad9d24c9429e2 (\"net: qrtr: fix OOB\nRead in qrtr_endpoint_post\"), which fixed only the 64-bit case.\n\nReject any size that cannot fit the buffer before the ALIGN.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72299": {
+                "cve_id": "CVE-2026-72299",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntipc: restrict socket queue dumps in enqueue tracepoints\n\ntipc_sk_enqueue() runs with sk->sk_lock.slock held while the socket is\nowned by user context. The spinlock protects the backlog queue in this\npath, but it does not serialize against the socket owner consuming or\npurging sk_receive_queue.\n\nKASAN reported:\n\n  CPU: 14 UID: 0 PID: 1050 Comm: tipc3 Not tainted 7.1.0-rc6+ #126 PREEMPT(lazy)\n  Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS 1.15.0-1 04/01/2014\n  Call Trace:\n    <TASK>\n    dump_stack_lvl+0x76/0xa0 lib/dump_stack.c:123\n    print_report+0xce/0x5b0 mm/kasan/report.c:482\n    kasan_report+0xc6/0x100 mm/kasan/report.c:597\n    __asan_report_load4_noabort+0x14/0x30 mm/kasan/report_generic.c:380\n    tipc_skb_dump+0x1327/0x16f0 net/tipc/trace.c:73\n    tipc_list_dump+0x208/0x2e0 net/tipc/trace.c:187\n    tipc_sk_dump+0xaf6/0xd60 net/tipc/socket.c:3996\n    trace_event_raw_event_tipc_sk_class+0x312/0x5a0 net/tipc/trace.h:188\n    tipc_sk_rcv+0xb1d/0x1d50 net/tipc/socket.c:2497\n    tipc_node_xmit+0x1c3/0x1440 net/tipc/node.c:1689\n    __tipc_sendmsg+0x97a/0x1440 net/tipc/socket.c:1512\n    tipc_sendmsg+0x52/0x80 net/tipc/socket.c:1400\n    sock_sendmsg+0x2f6/0x3e0 net/socket.c:825\n    splice_to_socket+0x7f9/0x1010 fs/splice.c:884\n    do_splice+0xe21/0x2330 fs/splice.c:936\n    __do_splice+0x153/0x260 fs/splice.c:1431\n    __x64_sys_splice+0x150/0x230 fs/splice.c:1616\n    x64_sys_call+0xeb5/0x2790 arch/x86/entry/syscall_64.c:41\n    do_syscall_64+0xf3/0x620 arch/x86/entry/syscall_64.c:63\n    entry_SYSCALL_64_after_hwframe+0x76/0x7e arch/x86/entry/entry_64.S:130\n  RIP: 0033:0x71624e8aafe2\n  Code: 08 0f 85 71 3a ff ff 49 89 fb 48 89 f0 48 89 d7 48 89 ce 4c 89 c2 4d 89 ca 4c 8b 44 24 08 4c 8b 4c 24 10 4c 89 5c 24 08 0f 05 <c3> 66 2e 0f 1f 84 00 00 00 00 00 66 2e 0f 1f 84 00 00 00 00 00 66\n  RSP: 002b:0000716157ffed68 EFLAGS: 00000246 ORIG_RAX: 0000000000000113\n  RAX: ffffffffffffffda RBX: 0000716157fff6c0 RCX: 000071624e8aafe2\n  RDX: 000000000000005f RSI: 0000000000000000 RDI: 0000000000000066\n  RBP: 0000716157ffed90 R08: 0000000000008000 R09: 0000000000000001\n  R10: 0000000000000000 R11: 0000000000000246 R12: ffffffffffffff00\n  R13: 0000000000000021 R14: 0000000000000000 R15: 00007fff89799c40\n    </TASK>\n\nThe TIPC_DUMP_ALL tracepoints in tipc_sk_enqueue() also dump\nsk_receive_queue and can therefore dereference skbs that the socket\nowner has already dequeued or freed. Restrict these dumps to\nTIPC_DUMP_SK_BKLGQ, which matches the queue protected by the held\nspinlock.\n\nKeep the change limited to the enqueue path, where the unsafe queue dump\nis reachable while the socket is owned by user context.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72300": {
                 "cve_id": "CVE-2026-72300",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -49192,10 +49226,61 @@
                     }
                 ]
             },
+            "CVE-2026-72301": {
+                "cve_id": "CVE-2026-72301",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SOF: ipc3-control: Fix TOCTOU in bytes_put and bytes_get\n\nIn sof_ipc3_bytes_put(), the size used for the memcpy is derived from\nthe old data->size already in the buffer, not the incoming new data's\nsize field. If the new data has a different size, the copy length is\nwrong: it may truncate valid data or copy stale bytes.\n\nSimilarly, sof_ipc3_bytes_get() checks data->size against max_size\nwithout accounting for the sizeof(struct sof_ipc_ctrl_data) offset\nof the flex array within the allocation.\n\nFix bytes_put to validate and use the incoming data's sof_abi_hdr.size\nfrom ucontrol before copying. Fix bytes_get to subtract sizeof(*cdata)\nfrom the bounds check to match the actual available space.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72302": {
+                "cve_id": "CVE-2026-72302",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SOF: ipc3-control: Use overflow checks in control_update size calc\n\nIn sof_ipc3_control_update(), the expected_size calculation uses\nfirmware-provided cdata->num_elems in arithmetic that could overflow\non 32-bit platforms, wrapping to a small value. This would allow the\ncdata->rhdr.hdr.size comparison to pass with mismatched sizes,\npotentially leading to out-of-bounds access in snd_sof_update_control.\n\nUse check_mul_overflow() and check_add_overflow() to detect and reject\noverflowed size calculations.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72303": {
                 "cve_id": "CVE-2026-72303",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SOF: ipc4-control: Validate notification payload size\n\nValidate MODULE_NOTIFICATION payload length before reading\nbytes/channel data in control update handling.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72304": {
+                "cve_id": "CVE-2026-72304",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SOF: ipc4-control: Fix TOCTOU in sof_ipc4_bytes_put\n\nIn sof_ipc4_bytes_put(), the copy size is derived from the old\ndata->size in the buffer rather than the incoming new data's size\nfield from ucontrol. If the new data has a different size, the copy\nuses the wrong length: it may truncate valid data or copy stale bytes.\n\nFix by validating and using the incoming data's sof_abi_hdr.size from\nucontrol before copying.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -49231,6 +49316,108 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: fix overflow in passthrough ioctl bounds check\n\nsmb2_ioctl_query_info() validates the PASSTHRU_FSCTL response payload\nbefore copying it to userspace.\n\nThe payload offset and length both come from 32-bit fields. The bounds\ncheck currently adds OutputOffset and qi.input_buffer_length directly, so\nthe addition can wrap in 32-bit arithmetic before the result is compared\nagainst the response buffer length.\n\nA malicious server can use a large OutputOffset and a small OutputCount\nto make the wrapped sum pass the bounds check. The later copy_to_user()\nthen reads from io_rsp + OutputOffset, outside the response buffer.\n\nUse size_add() for the offset plus length check so overflow is treated as\nout of bounds.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72312": {
+                "cve_id": "CVE-2026-72312",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nocteontx2-af: fix VF bringup affecting PF promiscuous state\n\nMbox handling of nix_set_rx_mode for a VF with promiscuous and\nall_multi flags set to false causes deletion of the PF's promiscuous\nand allmulti MCAM rules. This occurs because the APIs that\nenable/disable these rules operate only on the PF, even when the\nmbox request is made via a VF interface.\n\nGuard both rvu_npc_enable_allmulti_entry() and\nrvu_npc_enable_promisc_entry() disable paths with an is_vf() check so\nthat a VF bringing up or tearing down its interface cannot inadvertently\nclear the PF's MCAM rules.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72317": {
+                "cve_id": "CVE-2026-72317",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nSUNRPC: pin upper rpc_clnt across the TLS connect_worker\n\nThe TLS connect path has a use-after-free: nothing pins the\nupper rpc_clnt across the delayed connect_worker. xs_connect()\nstores task->tk_client in sock_xprt::clnt as a raw pointer\nand queues the worker; for TLS-secured transports that worker\nis xs_tcp_tls_setup_socket(), which reads several fields out\nof the saved pointer (cl_timeout, cl_program, cl_prog,\ncl_vers, cl_cred, cl_stats) to construct the args for the\ninner handshake rpc_clnt.\n\nThe xprt does not reference the rpc_clnt; the rpc_clnt\nreferences the xprt. xs_destroy() does cancel the\nconnect_worker, but it runs only when the xprt's refcount\ndrops to zero, which cannot happen until the rpc_clnt\nreleases its cl_xprt reference in rpc_free_client_work().\nWhen a TLS handshake fails fatally (for example, an mTLS\nmount whose client cert does not match the server), the\nconnecting task is woken with -EACCES and exits, the mount\ncaller invokes rpc_shutdown_client(), and the upper rpc_clnt\nis freed before the queued connect_worker fires.\nxs_tcp_tls_setup_socket() then dereferences the freed clnt,\nproducing the refcount_t underflow Michael Nemanov reported.\n\nTake a reference on the upper rpc_clnt in xs_connect() for\nTLS transports via a new rpc_hold_client() helper, and drop\nit in the connect_worker's exit path with rpc_release_client().\nThe xprt_lock_connect() / xprt_unlock_connect() pairing\nalready serialises xs_connect() with xs_tcp_tls_setup_socket(),\nso the take and release are balanced one-for-one.\n\nThe non-TLS connect worker (xs_tcp_setup_socket) never reads\nsock_xprt::clnt, so leave that path alone and avoid the\nclnt-holds-xprt-holds-clnt cycle that would otherwise prevent\nxprt destruction.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72318": {
+                "cve_id": "CVE-2026-72318",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncifs: validate DFS referral string offsets\n\nparse_dfs_referrals() validates that the response header and referral\narray fit in the received buffer, but each referral also contains string\noffsets supplied by the server.\n\nThose offsets are used to compute the DfsPath and NetworkAddress string\npointers without checking whether they still point inside the response\nbuffer. A malformed referral can therefore make the computed pointer\nexceed the end of the buffer. The resulting negative max_len is then\npassed to cifs_strndup_from_utf16(), and the non-Unicode path forwards it\nto kstrndup() as a size_t, allowing strnlen() to read out of bounds.\n\nValidate each string offset before deriving the string pointer.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72319": {
+                "cve_id": "CVE-2026-72319",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipvs: ensure inner headers in ICMP errors are in headroom\n\nSashiko points out that after stripping the outer headers\nwith pskb_pull() we should ensure the inner IP headers\nin ICMP errors from tunnels are present in the skb headroom\nfor functions like ipv4_update_pmtu(), icmp_send() and\nIP_VS_DBG().\n\nAlso, add more checks for the length of the inner headers.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72320": {
+                "cve_id": "CVE-2026-72320",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nft_lookup: fix catchall element handling with inverted lookups\n\nnft_lookup_eval() decides whether a lookup matched (`found`) from the\ndirect set lookup and priv->invert before falling back to the\ncatchall element used by interval sets (e.g. nft_set_rbtree) for the\nopen-ended default range. Since `found` is never recomputed after\n`ext` is replaced by the catchall lookup, inverted lookups\n(NFT_LOOKUP_F_INV, \"!= @set\") can wrongly match or wrongly skip the\ncatchall element, producing the wrong verdict. Fold the catchall\nlookup into `ext` before computing `found`, matching the order\nalready used by nft_objref_map_eval().",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72323": {
+                "cve_id": "CVE-2026-72323",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv4: igmp: Fix potential UAF in igmp_gq_start_timer()\n\nA race condition exists between device teardown (inetdev_destroy) and\nincoming IGMP query processing (igmp_rcv), leading to a Use-After-Free\nin the IGMP timer callback.\n\nDuring device destruction, inetdev_destroy() drops the primary reference\nto in_device, which can drop its refcount to 0. The actual freeing of\nin_device memory is deferred via RCU (using call_rcu()).\n\nConcurrently, igmp_rcv() runs under RCU read lock and obtains the\nin_device pointer. Because the memory is RCU-protected, CPU-0 can safely\ndereference in_device even if its refcount has hit 0.\n\nHowever, if CPU-0 calls igmp_gq_start_timer() and re-arms the timer, it\nattempts to acquire a reference using in_dev_hold(). This increments the\nrefcount from 0 to 1, triggering a \"refcount_t: addition on 0\" warning.\nSince the in_device memory is still scheduled to be freed after the RCU\ngrace period (as the free callback does not check the refcount again),\nthe device is freed while the timer is still armed. When the timer\nexpires, it accesses the freed memory, causing a kernel panic.\n\nFix this by using refcount_inc_not_zero() (via a new helper\nin_dev_hold_safe()) to prevent acquiring a reference if the device is\nalready being destroyed. If the refcount is 0, we do not arm the timer.\n\nA similar issue in IPv6 MLD is fixed in a subsequent patch.",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
@@ -105349,6 +105536,40 @@
                     }
                 ]
             },
+            "CVE-2026-72298": {
+                "cve_id": "CVE-2026-72298",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: qrtr: fix 32-bit integer overflow in qrtr_endpoint_post()\n\nqrtr_endpoint_post() validates an incoming packet with\n\n\tif (!size || len != ALIGN(size, 4) + hdrlen)\n\t\tgoto err;\n\nwhere size comes from the wire. On 32-bit, size_t is 32 bits and\nALIGN(size, 4) wraps to 0 for size >= 0xfffffffd, so the check\npasses and skb_put_data(skb, data + hdrlen, size) writes past the\nhdrlen-sized skb and oopses the kernel. 64-bit is unaffected.\n\nThis is the 32-bit residual of ad9d24c9429e2 (\"net: qrtr: fix OOB\nRead in qrtr_endpoint_post\"), which fixed only the 64-bit case.\n\nReject any size that cannot fit the buffer before the ALIGN.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72299": {
+                "cve_id": "CVE-2026-72299",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntipc: restrict socket queue dumps in enqueue tracepoints\n\ntipc_sk_enqueue() runs with sk->sk_lock.slock held while the socket is\nowned by user context. The spinlock protects the backlog queue in this\npath, but it does not serialize against the socket owner consuming or\npurging sk_receive_queue.\n\nKASAN reported:\n\n  CPU: 14 UID: 0 PID: 1050 Comm: tipc3 Not tainted 7.1.0-rc6+ #126 PREEMPT(lazy)\n  Hardware name: QEMU Standard PC (i440FX + PIIX, 1996), BIOS 1.15.0-1 04/01/2014\n  Call Trace:\n    <TASK>\n    dump_stack_lvl+0x76/0xa0 lib/dump_stack.c:123\n    print_report+0xce/0x5b0 mm/kasan/report.c:482\n    kasan_report+0xc6/0x100 mm/kasan/report.c:597\n    __asan_report_load4_noabort+0x14/0x30 mm/kasan/report_generic.c:380\n    tipc_skb_dump+0x1327/0x16f0 net/tipc/trace.c:73\n    tipc_list_dump+0x208/0x2e0 net/tipc/trace.c:187\n    tipc_sk_dump+0xaf6/0xd60 net/tipc/socket.c:3996\n    trace_event_raw_event_tipc_sk_class+0x312/0x5a0 net/tipc/trace.h:188\n    tipc_sk_rcv+0xb1d/0x1d50 net/tipc/socket.c:2497\n    tipc_node_xmit+0x1c3/0x1440 net/tipc/node.c:1689\n    __tipc_sendmsg+0x97a/0x1440 net/tipc/socket.c:1512\n    tipc_sendmsg+0x52/0x80 net/tipc/socket.c:1400\n    sock_sendmsg+0x2f6/0x3e0 net/socket.c:825\n    splice_to_socket+0x7f9/0x1010 fs/splice.c:884\n    do_splice+0xe21/0x2330 fs/splice.c:936\n    __do_splice+0x153/0x260 fs/splice.c:1431\n    __x64_sys_splice+0x150/0x230 fs/splice.c:1616\n    x64_sys_call+0xeb5/0x2790 arch/x86/entry/syscall_64.c:41\n    do_syscall_64+0xf3/0x620 arch/x86/entry/syscall_64.c:63\n    entry_SYSCALL_64_after_hwframe+0x76/0x7e arch/x86/entry/entry_64.S:130\n  RIP: 0033:0x71624e8aafe2\n  Code: 08 0f 85 71 3a ff ff 49 89 fb 48 89 f0 48 89 d7 48 89 ce 4c 89 c2 4d 89 ca 4c 8b 44 24 08 4c 8b 4c 24 10 4c 89 5c 24 08 0f 05 <c3> 66 2e 0f 1f 84 00 00 00 00 00 66 2e 0f 1f 84 00 00 00 00 00 66\n  RSP: 002b:0000716157ffed68 EFLAGS: 00000246 ORIG_RAX: 0000000000000113\n  RAX: ffffffffffffffda RBX: 0000716157fff6c0 RCX: 000071624e8aafe2\n  RDX: 000000000000005f RSI: 0000000000000000 RDI: 0000000000000066\n  RBP: 0000716157ffed90 R08: 0000000000008000 R09: 0000000000000001\n  R10: 0000000000000000 R11: 0000000000000246 R12: ffffffffffffff00\n  R13: 0000000000000021 R14: 0000000000000000 R15: 00007fff89799c40\n    </TASK>\n\nThe TIPC_DUMP_ALL tracepoints in tipc_sk_enqueue() also dump\nsk_receive_queue and can therefore dereference skbs that the socket\nowner has already dequeued or freed. Restrict these dumps to\nTIPC_DUMP_SK_BKLGQ, which matches the queue protected by the held\nspinlock.\n\nKeep the change limited to the enqueue path, where the unsafe queue dump\nis reachable while the socket is owned by user context.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72300": {
                 "cve_id": "CVE-2026-72300",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -105366,10 +105587,61 @@
                     }
                 ]
             },
+            "CVE-2026-72301": {
+                "cve_id": "CVE-2026-72301",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SOF: ipc3-control: Fix TOCTOU in bytes_put and bytes_get\n\nIn sof_ipc3_bytes_put(), the size used for the memcpy is derived from\nthe old data->size already in the buffer, not the incoming new data's\nsize field. If the new data has a different size, the copy length is\nwrong: it may truncate valid data or copy stale bytes.\n\nSimilarly, sof_ipc3_bytes_get() checks data->size against max_size\nwithout accounting for the sizeof(struct sof_ipc_ctrl_data) offset\nof the flex array within the allocation.\n\nFix bytes_put to validate and use the incoming data's sof_abi_hdr.size\nfrom ucontrol before copying. Fix bytes_get to subtract sizeof(*cdata)\nfrom the bounds check to match the actual available space.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72302": {
+                "cve_id": "CVE-2026-72302",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SOF: ipc3-control: Use overflow checks in control_update size calc\n\nIn sof_ipc3_control_update(), the expected_size calculation uses\nfirmware-provided cdata->num_elems in arithmetic that could overflow\non 32-bit platforms, wrapping to a small value. This would allow the\ncdata->rhdr.hdr.size comparison to pass with mismatched sizes,\npotentially leading to out-of-bounds access in snd_sof_update_control.\n\nUse check_mul_overflow() and check_add_overflow() to detect and reject\noverflowed size calculations.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-72303": {
                 "cve_id": "CVE-2026-72303",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SOF: ipc4-control: Validate notification payload size\n\nValidate MODULE_NOTIFICATION payload length before reading\nbytes/channel data in control update handling.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72304": {
+                "cve_id": "CVE-2026-72304",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nASoC: SOF: ipc4-control: Fix TOCTOU in sof_ipc4_bytes_put\n\nIn sof_ipc4_bytes_put(), the copy size is derived from the old\ndata->size in the buffer rather than the incoming new data's size\nfield from ucontrol. If the new data has a different size, the copy\nuses the wrong length: it may truncate valid data or copy stale bytes.\n\nFix by validating and using the incoming data's sof_abi_hdr.size from\nucontrol before copying.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -105405,6 +105677,108 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: fix overflow in passthrough ioctl bounds check\n\nsmb2_ioctl_query_info() validates the PASSTHRU_FSCTL response payload\nbefore copying it to userspace.\n\nThe payload offset and length both come from 32-bit fields. The bounds\ncheck currently adds OutputOffset and qi.input_buffer_length directly, so\nthe addition can wrap in 32-bit arithmetic before the result is compared\nagainst the response buffer length.\n\nA malicious server can use a large OutputOffset and a small OutputCount\nto make the wrapped sum pass the bounds check. The later copy_to_user()\nthen reads from io_rsp + OutputOffset, outside the response buffer.\n\nUse size_add() for the offset plus length check so overflow is treated as\nout of bounds.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72312": {
+                "cve_id": "CVE-2026-72312",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nocteontx2-af: fix VF bringup affecting PF promiscuous state\n\nMbox handling of nix_set_rx_mode for a VF with promiscuous and\nall_multi flags set to false causes deletion of the PF's promiscuous\nand allmulti MCAM rules. This occurs because the APIs that\nenable/disable these rules operate only on the PF, even when the\nmbox request is made via a VF interface.\n\nGuard both rvu_npc_enable_allmulti_entry() and\nrvu_npc_enable_promisc_entry() disable paths with an is_vf() check so\nthat a VF bringing up or tearing down its interface cannot inadvertently\nclear the PF's MCAM rules.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72317": {
+                "cve_id": "CVE-2026-72317",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nSUNRPC: pin upper rpc_clnt across the TLS connect_worker\n\nThe TLS connect path has a use-after-free: nothing pins the\nupper rpc_clnt across the delayed connect_worker. xs_connect()\nstores task->tk_client in sock_xprt::clnt as a raw pointer\nand queues the worker; for TLS-secured transports that worker\nis xs_tcp_tls_setup_socket(), which reads several fields out\nof the saved pointer (cl_timeout, cl_program, cl_prog,\ncl_vers, cl_cred, cl_stats) to construct the args for the\ninner handshake rpc_clnt.\n\nThe xprt does not reference the rpc_clnt; the rpc_clnt\nreferences the xprt. xs_destroy() does cancel the\nconnect_worker, but it runs only when the xprt's refcount\ndrops to zero, which cannot happen until the rpc_clnt\nreleases its cl_xprt reference in rpc_free_client_work().\nWhen a TLS handshake fails fatally (for example, an mTLS\nmount whose client cert does not match the server), the\nconnecting task is woken with -EACCES and exits, the mount\ncaller invokes rpc_shutdown_client(), and the upper rpc_clnt\nis freed before the queued connect_worker fires.\nxs_tcp_tls_setup_socket() then dereferences the freed clnt,\nproducing the refcount_t underflow Michael Nemanov reported.\n\nTake a reference on the upper rpc_clnt in xs_connect() for\nTLS transports via a new rpc_hold_client() helper, and drop\nit in the connect_worker's exit path with rpc_release_client().\nThe xprt_lock_connect() / xprt_unlock_connect() pairing\nalready serialises xs_connect() with xs_tcp_tls_setup_socket(),\nso the take and release are balanced one-for-one.\n\nThe non-TLS connect worker (xs_tcp_setup_socket) never reads\nsock_xprt::clnt, so leave that path alone and avoid the\nclnt-holds-xprt-holds-clnt cycle that would otherwise prevent\nxprt destruction.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72318": {
+                "cve_id": "CVE-2026-72318",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncifs: validate DFS referral string offsets\n\nparse_dfs_referrals() validates that the response header and referral\narray fit in the received buffer, but each referral also contains string\noffsets supplied by the server.\n\nThose offsets are used to compute the DfsPath and NetworkAddress string\npointers without checking whether they still point inside the response\nbuffer. A malformed referral can therefore make the computed pointer\nexceed the end of the buffer. The resulting negative max_len is then\npassed to cifs_strndup_from_utf16(), and the non-Unicode path forwards it\nto kstrndup() as a size_t, allowing strnlen() to read out of bounds.\n\nValidate each string offset before deriving the string pointer.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72319": {
+                "cve_id": "CVE-2026-72319",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipvs: ensure inner headers in ICMP errors are in headroom\n\nSashiko points out that after stripping the outer headers\nwith pskb_pull() we should ensure the inner IP headers\nin ICMP errors from tunnels are present in the skb headroom\nfor functions like ipv4_update_pmtu(), icmp_send() and\nIP_VS_DBG().\n\nAlso, add more checks for the length of the inner headers.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72320": {
+                "cve_id": "CVE-2026-72320",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: nft_lookup: fix catchall element handling with inverted lookups\n\nnft_lookup_eval() decides whether a lookup matched (`found`) from the\ndirect set lookup and priv->invert before falling back to the\ncatchall element used by interval sets (e.g. nft_set_rbtree) for the\nopen-ended default range. Since `found` is never recomputed after\n`ext` is replaced by the catchall lookup, inverted lookups\n(NFT_LOOKUP_F_INV, \"!= @set\") can wrongly match or wrongly skip the\ncatchall element, producing the wrong verdict. Fold the catchall\nlookup into `ext` before computing `found`, matching the order\nalready used by nft_objref_map_eval().",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-72323": {
+                "cve_id": "CVE-2026-72323",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv4: igmp: Fix potential UAF in igmp_gq_start_timer()\n\nA race condition exists between device teardown (inetdev_destroy) and\nincoming IGMP query processing (igmp_rcv), leading to a Use-After-Free\nin the IGMP timer callback.\n\nDuring device destruction, inetdev_destroy() drops the primary reference\nto in_device, which can drop its refcount to 0. The actual freeing of\nin_device memory is deferred via RCU (using call_rcu()).\n\nConcurrently, igmp_rcv() runs under RCU read lock and obtains the\nin_device pointer. Because the memory is RCU-protected, CPU-0 can safely\ndereference in_device even if its refcount has hit 0.\n\nHowever, if CPU-0 calls igmp_gq_start_timer() and re-arms the timer, it\nattempts to acquire a reference using in_dev_hold(). This increments the\nrefcount from 0 to 1, triggering a \"refcount_t: addition on 0\" warning.\nSince the in_device memory is still scheduled to be freed after the RCU\ngrace period (as the free callback does not check the refcount again),\nthe device is freed while the timer is still armed. When the timer\nexpires, it accesses the freed memory, causing a kernel panic.\n\nFix this by using refcount_inc_not_zero() (via a new helper\nin_dev_hold_safe()) to prevent acquiring a reference if the device is\nalready being destroyed. If the refcount is 0, we do not arm the timer.\n\nA similar issue in IPv6 MLD is fixed in a subsequent patch.",
+                "severity": "CRITICAL",
                 "status": "open",
                 "events": [
                     {
