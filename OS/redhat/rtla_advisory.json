@@ -50931,6 +50931,23 @@
                     }
                 ]
             },
+            "CVE-2026-74444": {
+                "cve_id": "CVE-2026-74444",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/vmwgfx: validate DRAW_PRIMITIVES header size before division\n\nvmw_cmd_draw() computes\n\n\tmaxnum = (header->size - sizeof(cmd->body)) / sizeof(*decl);\n\nwhere header->size is u32 and is taken straight from the user-supplied\ncommand stream.  When header->size is less than sizeof(cmd->body) the\nunsigned subtraction wraps to nearly 4 GiB, producing a huge maxnum.\nAny user-controlled cmd->body.numVertexDecls then passes the bound and\nthe loop dereferences decl[i] far past the end of the kernel command\nbounce buffer, producing an out-of-bounds read of kernel memory.\n\nReject undersized headers up front.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74445": {
                 "cve_id": "CVE-2026-74445",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -51820,6 +51837,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: x86: Cancel delayed I/O APIC EOI handling before destroying vCPUs\n\nCancel (and flush) the I/O APIC's delayed EOI handling work during the\n\"pre VM destroy\" phase, before vCPUs are destroyed, as processing the EOI\nbroadcast will inject another IRQ if the line is asserted, i.e. will try\nto deliver an IRQ to the target vCPU(s).  Canceling the work after vCPUs\nare destroyed leads to UAF if the delayed work is processed after vCPUs are\ndestroyed.\n\n  BUG: KASAN: slab-use-after-free in __kvm_irq_delivery_to_apic_fast+0x9bf/0xa20 arch/x86/kvm/lapic.c:1250\n  Read of size 8 at addr ffff8880499abea0 by task kworker/1:2/1218\n\n  CPU: 1 UID: 0 PID: 1218 Comm: kworker/1:2 Not tainted 7.1.0-rc7 #5 PREEMPT(lazy)\n  Hardware name: QEMU Ubuntu 25.10 PC v2 (i440FX + PIIX, + 10.1 machine, 1996), BIOS 1.16.3-debian-1.16.3-2 04/01/2014\n  Workqueue: events kvm_ioapic_eoi_inject_work\n  Call Trace:\n   <TASK>\n   __dump_stack lib/dump_stack.c:94\n   dump_stack_lvl+0x100/0x190 lib/dump_stack.c:120\n   print_address_description mm/kasan/report.c:378\n   print_report+0x139/0x4ad mm/kasan/report.c:482\n   kasan_report+0xe4/0x1d0 mm/kasan/report.c:595\n   __kvm_irq_delivery_to_apic_fast+0x9bf/0xa20 arch/x86/kvm/lapic.c:1250\n   __kvm_irq_delivery_to_apic+0xd8/0xbf0 arch/x86/kvm/lapic.c:1345\n   kvm_irq_delivery_to_apic arch/x86/kvm/lapic.h:129\n   ioapic_service+0x308/0x590 arch/x86/kvm/ioapic.c:492\n   kvm_ioapic_eoi_inject_work+0x13c/0x190 arch/x86/kvm/ioapic.c:532\n   process_one_work+0xa59/0x19a0 kernel/workqueue.c:3314\n   process_scheduled_works kernel/workqueue.c:3397\n   worker_thread+0x5eb/0xe50 kernel/workqueue.c:3478\n   kthread+0x370/0x450 kernel/kthread.c:436\n   ret_from_fork+0x72b/0xd30 arch/x86/kernel/process.c:158\n   ret_from_fork_asm+0x1a/0x30 arch/x86/entry/entry_64.S:245\n   </TASK>\n\nNote, the VM is unreachable once kvm_destroy_vm() starts, and scheduling\nnew work via kvm_ioapic_send_eoi() can only be done via KVM_RUN, i.e.\nrequires a live vCPU.\n\nAlternatively, KVM could simply destroy the I/O APIC during the \"pre\" phase\nof VM destruction, but that gets more than a bit sketchy as KVM expects the\nI/O APIC to exist if ioapic_in_kernel() is true, and nested virtualization\nin particular has a bad habit of touching VM-scope state during vCPU\ndestruction.  E.g. attempting to free the PIC during the pre phase would\nlead to a NULL pointer dereference in kvm_cpu_has_extint(), and it's not\nhard to imagine the I/O APIC having a similar flaw.",
                 "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74518": {
+                "cve_id": "CVE-2026-74518",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmm/hugetlb: fix list corruption in allocate_file_region_entries()\n\nallocate_file_region_entries() tops up resv->region_cache with freshly\nallocated file_region descriptors.  The allocation uses GFP_KERNEL, so\nresv->lock is dropped around it: the new entries are gathered on a\nstack-local list head, allocated_regions, and spliced into\nresv->region_cache once the lock is re-acquired.\n\nThe splice used list_splice(), which moves the entries but does not\nre-initialize the source head, so allocated_regions is left pointing at an\nentry that now lives on resv->region_cache.  The top-up runs in a while\nloop that re-checks the cache deficit after re-acquiring the lock.  For a\nshared mapping the resv_map is shared by every mapper of the hugetlbfs\ninode, so a concurrent region_chg()/region_add()/region_del() on the same\nresv_map can consume cache entries during the unlocked window and force a\nsecond iteration.  That iteration calls list_add() on the stale head and\ncorrupts the list; with CONFIG_DEBUG_LIST the __list_add_valid() check\ntrips:\n\n  list_add corruption. next->prev should be prev (ffffc900011ff7f8),\n  but was ffff88814c281460. (next=ffff88814c545640).\n  kernel BUG at lib/list_debug.c:31!\n   allocate_file_region_entries+0x191/0x420\n   region_chg+0x267/0x300\n   hugetlb_reserve_pages+0x387/0xc80\n   hugetlbfs_file_mmap+0x2ce/0x3f0\n   mmap_region+0x1348/0x1a80\n   do_mmap+0x85e/0xb90\n   vm_mmap_pgoff+0x18c/0x330\n   ksys_mmap_pgoff+0x2a1/0x3e0\n   do_syscall_64+0xd7/0x420\n\nWithout CONFIG_DEBUG_LIST the bad list_add() silently links a kernel-stack\naddress into resv->region_cache, leading to later use-after-free.\n\nThis was observed as a real host panic on a dense KVM host where a QEMU\nguest-RAM hugetlbfs file was mapped MAP_SHARED by both QEMU and a separate\nSPDK/DPDK vhost-user target, generating concurrent region_* traffic on one\nshared resv_map.\n\nUse list_splice_init() so the source head is re-initialized empty after\neach splice, making the retry loop safe.",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
@@ -103416,6 +103450,23 @@
                     }
                 ]
             },
+            "CVE-2026-74444": {
+                "cve_id": "CVE-2026-74444",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/vmwgfx: validate DRAW_PRIMITIVES header size before division\n\nvmw_cmd_draw() computes\n\n\tmaxnum = (header->size - sizeof(cmd->body)) / sizeof(*decl);\n\nwhere header->size is u32 and is taken straight from the user-supplied\ncommand stream.  When header->size is less than sizeof(cmd->body) the\nunsigned subtraction wraps to nearly 4 GiB, producing a huge maxnum.\nAny user-controlled cmd->body.numVertexDecls then passes the bound and\nthe loop dereferences decl[i] far past the end of the kernel command\nbounce buffer, producing an out-of-bounds read of kernel memory.\n\nReject undersized headers up front.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74445": {
                 "cve_id": "CVE-2026-74445",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -104305,6 +104356,23 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: x86: Cancel delayed I/O APIC EOI handling before destroying vCPUs\n\nCancel (and flush) the I/O APIC's delayed EOI handling work during the\n\"pre VM destroy\" phase, before vCPUs are destroyed, as processing the EOI\nbroadcast will inject another IRQ if the line is asserted, i.e. will try\nto deliver an IRQ to the target vCPU(s).  Canceling the work after vCPUs\nare destroyed leads to UAF if the delayed work is processed after vCPUs are\ndestroyed.\n\n  BUG: KASAN: slab-use-after-free in __kvm_irq_delivery_to_apic_fast+0x9bf/0xa20 arch/x86/kvm/lapic.c:1250\n  Read of size 8 at addr ffff8880499abea0 by task kworker/1:2/1218\n\n  CPU: 1 UID: 0 PID: 1218 Comm: kworker/1:2 Not tainted 7.1.0-rc7 #5 PREEMPT(lazy)\n  Hardware name: QEMU Ubuntu 25.10 PC v2 (i440FX + PIIX, + 10.1 machine, 1996), BIOS 1.16.3-debian-1.16.3-2 04/01/2014\n  Workqueue: events kvm_ioapic_eoi_inject_work\n  Call Trace:\n   <TASK>\n   __dump_stack lib/dump_stack.c:94\n   dump_stack_lvl+0x100/0x190 lib/dump_stack.c:120\n   print_address_description mm/kasan/report.c:378\n   print_report+0x139/0x4ad mm/kasan/report.c:482\n   kasan_report+0xe4/0x1d0 mm/kasan/report.c:595\n   __kvm_irq_delivery_to_apic_fast+0x9bf/0xa20 arch/x86/kvm/lapic.c:1250\n   __kvm_irq_delivery_to_apic+0xd8/0xbf0 arch/x86/kvm/lapic.c:1345\n   kvm_irq_delivery_to_apic arch/x86/kvm/lapic.h:129\n   ioapic_service+0x308/0x590 arch/x86/kvm/ioapic.c:492\n   kvm_ioapic_eoi_inject_work+0x13c/0x190 arch/x86/kvm/ioapic.c:532\n   process_one_work+0xa59/0x19a0 kernel/workqueue.c:3314\n   process_scheduled_works kernel/workqueue.c:3397\n   worker_thread+0x5eb/0xe50 kernel/workqueue.c:3478\n   kthread+0x370/0x450 kernel/kthread.c:436\n   ret_from_fork+0x72b/0xd30 arch/x86/kernel/process.c:158\n   ret_from_fork_asm+0x1a/0x30 arch/x86/entry/entry_64.S:245\n   </TASK>\n\nNote, the VM is unreachable once kvm_destroy_vm() starts, and scheduling\nnew work via kvm_ioapic_send_eoi() can only be done via KVM_RUN, i.e.\nrequires a live vCPU.\n\nAlternatively, KVM could simply destroy the I/O APIC during the \"pre\" phase\nof VM destruction, but that gets more than a bit sketchy as KVM expects the\nI/O APIC to exist if ioapic_in_kernel() is true, and nested virtualization\nin particular has a bad habit of touching VM-scope state during vCPU\ndestruction.  E.g. attempting to free the PIC during the pre phase would\nlead to a NULL pointer dereference in kvm_cpu_has_extint(), and it's not\nhard to imagine the I/O APIC having a similar flaw.",
                 "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74518": {
+                "cve_id": "CVE-2026-74518",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmm/hugetlb: fix list corruption in allocate_file_region_entries()\n\nallocate_file_region_entries() tops up resv->region_cache with freshly\nallocated file_region descriptors.  The allocation uses GFP_KERNEL, so\nresv->lock is dropped around it: the new entries are gathered on a\nstack-local list head, allocated_regions, and spliced into\nresv->region_cache once the lock is re-acquired.\n\nThe splice used list_splice(), which moves the entries but does not\nre-initialize the source head, so allocated_regions is left pointing at an\nentry that now lives on resv->region_cache.  The top-up runs in a while\nloop that re-checks the cache deficit after re-acquiring the lock.  For a\nshared mapping the resv_map is shared by every mapper of the hugetlbfs\ninode, so a concurrent region_chg()/region_add()/region_del() on the same\nresv_map can consume cache entries during the unlocked window and force a\nsecond iteration.  That iteration calls list_add() on the stale head and\ncorrupts the list; with CONFIG_DEBUG_LIST the __list_add_valid() check\ntrips:\n\n  list_add corruption. next->prev should be prev (ffffc900011ff7f8),\n  but was ffff88814c281460. (next=ffff88814c545640).\n  kernel BUG at lib/list_debug.c:31!\n   allocate_file_region_entries+0x191/0x420\n   region_chg+0x267/0x300\n   hugetlb_reserve_pages+0x387/0xc80\n   hugetlbfs_file_mmap+0x2ce/0x3f0\n   mmap_region+0x1348/0x1a80\n   do_mmap+0x85e/0xb90\n   vm_mmap_pgoff+0x18c/0x330\n   ksys_mmap_pgoff+0x2a1/0x3e0\n   do_syscall_64+0xd7/0x420\n\nWithout CONFIG_DEBUG_LIST the bad list_add() silently links a kernel-stack\naddress into resv->region_cache, leading to later use-after-free.\n\nThis was observed as a real host panic on a dense KVM host where a QEMU\nguest-RAM hugetlbfs file was mapped MAP_SHARED by both QEMU and a separate\nSPDK/DPDK vhost-user target, generating concurrent region_* traffic on one\nshared resv_map.\n\nUse list_splice_init() so the source head is re-initialized empty after\neach splice, making the retry loop safe.",
+                "severity": "HIGH",
                 "status": "open",
                 "events": [
                     {
