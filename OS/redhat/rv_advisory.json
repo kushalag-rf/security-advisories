@@ -35850,7 +35850,7 @@
                 "cve_id": "CVE-2026-63871",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: ISO: Fix data-race on iso_pi fields in hci_get_route calls\n\niso_connect_bis(), iso_connect_cis(), iso_listen_bis(), and\niso_conn_big_sync() call hci_get_route() using iso_pi(sk)->dst,\niso_pi(sk)->src, and iso_pi(sk)->src_type without holding lock_sock().\n\nThese fields may be modified concurrently by connect() or setsockopt()\non the same socket, resulting in data-races reported by KCSAN.\n\nFix this by snapshotting the required fields under lock_sock() before\ncalling hci_get_route().\n\nBUG: KCSAN: data-race in memcmp+0x45/0xb0\n\nrace at unknown origin, with read to 0xffff8880122135cf of 1 bytes\nby task 333 on cpu 1:\n memcmp+0x45/0xb0\n hci_get_route+0x27e/0x490\n iso_connect_cis+0x4c/0xa10\n iso_sock_connect+0x60e/0xb30\n __sys_connect_file+0xbd/0xe0\n __sys_connect+0xe0/0x110\n __x64_sys_connect+0x40/0x50\n x64_sys_call+0xcad/0x1c60\n do_syscall_64+0x133/0x590\n entry_SYSCALL_64_after_hwframe+0x77/0x7f",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -52533,6 +52533,32 @@
                         "introduced": "0",
                         "fixed": "7.0.4-200.fc44",
                         "identifier": "fc44"
+                    }
+                ]
+            },
+            "CVE-2026-74581": {
+                "cve_id": "CVE-2026-74581",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: ipv6: clear suppressed fib6 rule result\n\nfib6_rule_suppress() drops a suppressed route with ip6_rt_put_flags(),\nbut leaves res->rt6 pointing at the released rt6_info.\n\nIf no later rule supplies a replacement, fib6_rule_lookup() still sees\nres.rt6 and returns that stale dst to its caller. A suppressing rule can\ntherefore leak a released route back to rt6_lookup(), and the next put\nhits rcuref_put_slowpath() from dst_release().\n\nClear res->rt6 when suppressing the route so suppressed lookups fall\nthrough to the null dst instead of reusing the released one.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74582": {
+                "cve_id": "CVE-2026-74582",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npacket: use consistent hard_header_len in non-ring send paths\n\npacket_snd() reads dev->hard_header_len multiple times while allocating\nand constructing an skb. Device reconfiguration can change this value\nconcurrently, for example through bonding device type changes.\n\nFor SOCK_RAW, packet_snd() can save a larger value in reserve and later\nallocate headroom using a smaller value. Moving skb->data back by reserve\nthen places it before skb->head, and the following copy from userspace can\nattempt an out-of-bounds write.\n\npacket_sendmsg_spkt() has the same issue because it calculates its\nreservation and header offset from separate reads before dropping the RCU\nread lock to allocate the skb.\n\nAdd LL_RESERVED_SPACE_EX() for callers that already saved a header length.\nRead hard_header_len once in packet_snd() and use it for allocation and\nconstruction. In packet_sendmsg_spkt(), preserve the allocation-time value\nthrough the device lookup retry.\n\nThe separate SOCK_DGRAM consistency problem between hard_header_len and\nheader_ops->create is not addressed here.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
                     }
                 ]
             }
@@ -88386,7 +88412,7 @@
                 "cve_id": "CVE-2026-63871",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: ISO: Fix data-race on iso_pi fields in hci_get_route calls\n\niso_connect_bis(), iso_connect_cis(), iso_listen_bis(), and\niso_conn_big_sync() call hci_get_route() using iso_pi(sk)->dst,\niso_pi(sk)->src, and iso_pi(sk)->src_type without holding lock_sock().\n\nThese fields may be modified concurrently by connect() or setsockopt()\non the same socket, resulting in data-races reported by KCSAN.\n\nFix this by snapshotting the required fields under lock_sock() before\ncalling hci_get_route().\n\nBUG: KCSAN: data-race in memcmp+0x45/0xb0\n\nrace at unknown origin, with read to 0xffff8880122135cf of 1 bytes\nby task 333 on cpu 1:\n memcmp+0x45/0xb0\n hci_get_route+0x27e/0x490\n iso_connect_cis+0x4c/0xa10\n iso_sock_connect+0x60e/0xb30\n __sys_connect_file+0xbd/0xe0\n __sys_connect+0xe0/0x110\n __x64_sys_connect+0x40/0x50\n x64_sys_call+0xcad/0x1c60\n do_syscall_64+0x133/0x590\n entry_SYSCALL_64_after_hwframe+0x77/0x7f",
-                "severity": "LOW",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -105069,6 +105095,32 @@
                         "introduced": "0",
                         "fixed": "7.0.4-200.fc44",
                         "identifier": "fc44"
+                    }
+                ]
+            },
+            "CVE-2026-74581": {
+                "cve_id": "CVE-2026-74581",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: ipv6: clear suppressed fib6 rule result\n\nfib6_rule_suppress() drops a suppressed route with ip6_rt_put_flags(),\nbut leaves res->rt6 pointing at the released rt6_info.\n\nIf no later rule supplies a replacement, fib6_rule_lookup() still sees\nres.rt6 and returns that stale dst to its caller. A suppressing rule can\ntherefore leak a released route back to rt6_lookup(), and the next put\nhits rcuref_put_slowpath() from dst_release().\n\nClear res->rt6 when suppressing the route so suppressed lookups fall\nthrough to the null dst instead of reusing the released one.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74582": {
+                "cve_id": "CVE-2026-74582",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npacket: use consistent hard_header_len in non-ring send paths\n\npacket_snd() reads dev->hard_header_len multiple times while allocating\nand constructing an skb. Device reconfiguration can change this value\nconcurrently, for example through bonding device type changes.\n\nFor SOCK_RAW, packet_snd() can save a larger value in reserve and later\nallocate headroom using a smaller value. Moving skb->data back by reserve\nthen places it before skb->head, and the following copy from userspace can\nattempt an out-of-bounds write.\n\npacket_sendmsg_spkt() has the same issue because it calculates its\nreservation and header offset from separate reads before dropping the RCU\nread lock to allocate the skb.\n\nAdd LL_RESERVED_SPACE_EX() for callers that already saved a header length.\nRead hard_header_len once in packet_snd() and use it for allocation and\nconstruction. In packet_sendmsg_spkt(), preserve the allocation-time value\nthrough the device lookup retry.\n\nThe separate SOCK_DGRAM consistency problem between hard_header_len and\nheader_ops->create is not addressed here.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
                     }
                 ]
             }
