@@ -82018,6 +82018,40 @@
                     }
                 ]
             },
+            "CVE-2026-74586": {
+                "cve_id": "CVE-2026-74586",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: clear new_transport when removing a peer\n\nsctp_process_asconf_param() stores a newly added peer transport in\nasoc->new_transport. After all parameters in the ASCONF chunk have been\nprocessed, sctp_sf_do_asconf() uses this pointer to send a HEARTBEAT to the\nnew transport.\n\nAn authenticated ASCONF from a remote SCTP peer can add a transport and\nremove it again with a wildcard DEL-IP parameter in the same chunk. The\nwildcard deletion preserves the transport on which the ASCONF arrived, but\nremoves the newly added transport through\nsctp_assoc_del_nonprimary_peers(). The removal does not clear\nasoc->new_transport, leaving it pointing to the removed transport.\n\nsctp_sf_do_asconf() then creates a HEARTBEAT whose chunk->transport points\nto the removed transport without holding a transport reference. During\nlocal address replacement, src_out_of_asoc_ok keeps this HEARTBEAT on\ncontrol_chunk_list. After the transport is freed by RCU, a successful\nASCONF_ACK for the replacement address releases the queued HEARTBEAT and\nsctp_outq_select_transport() reads the freed transport's state.\n\nThe issue was found during a static audit of SCTP objects. With an\nauthenticated peer, the reproducer triggered the same KASAN report in 2\nof 2 unpatched runs on a KASAN-enabled netdev/main kernel:\n\n  BUG: KASAN: slab-use-after-free in sctp_outq_select_transport\n  Read of size 4 at addr ffff88800b9bd95c by task python3/197\n\n  Call Trace:\n   sctp_outq_select_transport+0x549/0x8b0 [sctp]\n   sctp_outq_flush+0x306/0x2c60 [sctp]\n   sctp_transport_immediate_rtx+0xaf/0x260 [sctp]\n   sctp_process_asconf_ack+0xa48/0xf70 [sctp]\n\n  Allocated by task 197:\n   sctp_transport_new+0x68/0x650 [sctp]\n   sctp_assoc_add_peer+0x258/0x12a0 [sctp]\n   sctp_process_asconf+0x5e9/0x1090 [sctp]\n\n  Last potentially related work creation:\n   __call_rcu_common.constprop.0+0x77/0xb70\n   sctp_assoc_del_nonprimary_peers+0x7c/0xd0 [sctp]\n   sctp_process_asconf+0xd9c/0x1090 [sctp]\n\nThe first invalid access was a four-byte read of transport->state at\nnet/sctp/outqueue.c:833. The same reproducer completed the full\nauthenticated ASCONF and local-address replacement sequence with this\nchange without a KASAN report or oops.\n\nClear new_transport when its peer is removed, before it can be used to\ncreate the HEARTBEAT.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74587": {
+                "cve_id": "CVE-2026-74587",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: fix use-after-free of cached ASCONF chunk\n\naddip_last_asconf caches the outstanding outbound ASCONF chunk. The normal\nASCONF-ACK completion path releases the chunk and clears the pointer.\n\nHowever, sctp_asconf_queue_teardown() releases the cached chunk without\nclearing addip_last_asconf. During peer restart handling,\nsctp_sf_do_dupcook_a() queues SCTP_CMD_PURGE_ASCONF_QUEUE, which invokes\nsctp_asconf_queue_teardown() while the association remains alive and leaves\nthe pointer dangling.\n\nA delayed authenticated ASCONF-ACK can then reach sctp_sf_do_asconf_ack(),\nwhich accesses the stale chunk and passes it to sctp_process_asconf_ack(),\ncausing a use-after-free and a second release.\n\nClearing the pointer exposes a race with T4 expiry. Peer restart handling\nqueues the timer stop before the purge, but SCTP_CMD_TIMER_STOP uses\ntimer_delete(), which does not wait for a callback already running on\nanother CPU. Such a callback can reach sctp_sf_t4_timer_expire() after\nthe purge and dereference NULL.\n\nClear addip_last_asconf after releasing the cached chunk, and make\nsctp_sf_t4_timer_expire() consume a stale T4 expiry if no outstanding\nASCONF remains.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74588": {
                 "cve_id": "CVE-2026-74588",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -82052,10 +82086,78 @@
                     }
                 ]
             },
+            "CVE-2026-74590": {
+                "cve_id": "CVE-2026-74590",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfsverity: Fix bpf_get_fsverity_digest() dynptr assumptions\n\nThe BPF verifier and the dynptr abstraction ensure that the memory space\nreferenced by a dynptr remains valid.  They do not, however, provide any\nguarantee that the contents of the memory are stable.  kfuncs are\nexpected to remain memory-safe even if concurrent modifications occur.\n\nbpf_get_fsverity_digest() didn't follow that: it could crash if\narg->digest_size was concurrently modified.\n\nFix that by using the known-good value hash_alg->digest_size instead.\n\nAlso widen 'dynptr_sz' and 'out_digest_sz' to u64 to match the return\ntype of __bpf_dynptr_size().  It doesn't appear that it can actually be\nmore than INT_MAX currently (since __bpf_dynptr_data_rw() excludes\nfile-based pointers), but the correct type might as well be used.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74592": {
+                "cve_id": "CVE-2026-74592",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nima: Instantiate file_truncate and path_truncate hooks\n\nInstantiate the file_truncate and path_truncate LSM hooks to reset the\naction cache flags (IMA_DONE_MASK) as soon as truncation is requested,\nso the file, based on policy, is re-collected, re-measured, re-audited,\nand re-appraised on next access.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74595": {
                 "cve_id": "CVE-2026-74595",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfscrypt: use the mount idmap for the owner check in fscrypt_ioctl_set_policy()\n\nfscrypt_ioctl_set_policy() calls inode_owner_or_capable() with\n&nop_mnt_idmap before allowing an encryption policy to be set, instead\nof the idmap of the mount the ioctl was issued on.\n\nfscrypt is used by filesystems that support idmapped mounts (e.g. ext4,\nf2fs), so on such a mount this compares the caller's fsuid against the\nunmapped on-disk owner rather than the mapped owner: the actual owner\ncan be wrongly denied with -EACCES and an unrelated caller wrongly\nallowed.  Use file_mnt_idmap(filp) instead.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74597": {
+                "cve_id": "CVE-2026-74597",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nip6_tunnel: clear skb2->cb[] in ip6ip6_err()\n\nip6ip6_err() clones an outer IPv6 ICMP error skb, pulls it to the\nquoted inner IPv6 packet, and then passes the clone to icmpv6_send().\nThe clone still carries the outer packet's inet6_skb_parm in skb->cb.\n\nIf the outer packet had a Home Address Option, IP6CB(skb2)->dsthao\nremains non-zero after skb_pull(). icmpv6_send() later calls\nmip6_addr_swap(), which uses that stale dsthao offset against the quoted\ninner packet. A malformed inner destination-options header can then make\nthe HAO lookup and address swap run past the end of the quoted packet\nand corrupt skb_shared_info.\n\nClear skb2->cb[] before pulling the quoted inner IPv6 packet so the\nreply path does not reuse metadata left by the outer IPv6 stack.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74598": {
+                "cve_id": "CVE-2026-74598",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix Route Information option length validation\n\nrt6_route_rcv() validates the Route Information option (RFC 4191) length\nagainst the prefix length, but both checks are off by one.\n\nrinfo->length is the ND option length in units of 8 octets and it\n*includes* the 8-byte option header, so an option carrying N bytes of\nprefix has length == 1 + N/8.  RFC 4191 section 2.3 requires length 3\nwhen Prefix Length is greater than 64, and 2 or 3 when it is greater\nthan 0.  The code accepts length >= 2 and length >= 1 respectively.\n\nipv6_addr_prefix() then copies prefix_len/8 bytes out of rinfo->prefix,\nso a Router Advertisement with (prefix_len=128, length=2) or\n(prefix_len=64, length=1) makes the kernel read up to 8 bytes past the\nend of the option.  Those bytes end up in the prefix of the route that\ngets installed, so they are visible to userspace:\n\n  # RA with a Route Information option (prefix_len=128, length=2)\n  # followed by a source link-layer address option, 01 01 de ad be ef ca fe\n  $ ip -6 route show\n  2001:db8:dead:beef:101:dead:beef:cafe via fe80::1234 dev veth0 proto ra\n                     ^^^^^^^^^^^^^^^^^^ the next option, read out of bounds\n\nWhen the Route Information option is the last one in the packet, those\neight bytes come from the skb tail room instead.\n\nReject the option lengths RFC 4191 does not allow.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -82086,6 +82188,23 @@
                     }
                 ]
             },
+            "CVE-2026-74604": {
+                "cve_id": "CVE-2026-74604",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nRevert \"thermal/drivers/hwmon: Cleanup coding style a bit\"\n\nRevert commit 030a48b0f6ce (\"thermal/drivers/hwmon: Cleanup coding style\na bit\") that introduced a use-after-free into the error path of\nthermal_add_hwmon_sysfs() by removing a valid check from it.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74607": {
                 "cve_id": "CVE-2026-74607",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -82103,10 +82222,112 @@
                     }
                 ]
             },
+            "CVE-2026-74608": {
+                "cve_id": "CVE-2026-74608",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: Fix use-after-free in cifs_try_adding_channels()\n\ncifs_try_adding_channels() takes a temporary reference to an interface\nbefore dropping iface_lock. If cifs_ses_add_channel() fails, it drops\nthat reference and then increments iface->weight_fulfilled.\n\nA concurrent interface list refresh can remove the list reference while\nchannel creation is in progress. In that case, the failure-path\nkref_put() releases the last reference and frees iface. Updating\nweight_fulfilled afterward then accesses freed memory.\n\nIncrement weight_fulfilled before dropping the temporary reference,\nkeeping iface alive for the final access.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74609": {
+                "cve_id": "CVE-2026-74609",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntipc: read le->link under the node lock in tipc_node_link_down()\n\ntipc_node_link_down() caches the link pointer before taking n->lock:\n\n\tstruct tipc_link *l = le->link;\t\t/* unlocked */\n\n\tif (!l)\n\t\treturn;\n\ttipc_node_write_lock(n);\n\tif (!tipc_link_is_establishing(l)) {\t/* deref l */\n\t...\n\t\ttipc_link_reset(l);\t\t/* write into l */\n\tif (delete) {\n\t\tkfree(l);\n\t\tle->link = NULL;\n\nThe delete=true caller frees that very object under n->lock, so the lock\ndoes not protect the cached pointer against it:\n\n - CPU A, delete=false: tipc_rcv() on TIPC_LINK_DOWN_EVT, or the link\n   supervision timer via tipc_node_timeout(), reads l unlocked and then\n   dereferences it under n->lock;\n - CPU B, delete=true: netlink TIPC_NL_BEARER_DISABLE -> bearer_disable()\n   -> tipc_node_delete_links() -> tipc_node_link_down(n, bearer_id, true)\n   -> kfree(l).\n\nThe link is freed with plain kfree(), not kfree_rcu(), and for UDP bearers\ndisable_media() only schedules the asynchronous cleanup_bearer() work, so\nits synchronize_net() runs after the links are already gone.  An in-flight\nCPU A that has read l therefore dereferences freed memory once B frees it:\na use-after-free read in tipc_link_is_establishing(), and a use-after-free\nwrite via tipc_link_reset() on the establishing branch.\n\nThe following trace was captured on 7.2.0-rc5-00284-gaf39eb111ce6:\n\n  BUG: KASAN: slab-use-after-free in tipc_link_is_establishing (net/tipc/link.c:285)\n  Read of size 4 at addr ffff88802e2aa068 by task swapper/2/0\n   tipc_link_is_establishing (net/tipc/link.c:285)\n   tipc_node_link_down (net/tipc/node.c:1076)\n   tipc_node_timeout (net/tipc/node.c:843)\n  Allocated by task 9549:\n   tipc_link_create (net/tipc/link.c:490)\n   tipc_node_check_dest (net/tipc/node.c:1279)\n   tipc_disc_rcv (net/tipc/discover.c:252)\n   tipc_udp_recv (net/tipc/udp_media.c:389)\n  Freed by task 9549:\n   tipc_node_link_down (net/tipc/node.c:1084)\n   tipc_node_delete_links (net/tipc/node.c:1320)\n   bearer_disable (net/tipc/bearer.c:414)\n   __tipc_nl_bearer_disable (net/tipc/bearer.c:992)\n\nMove the le->link read inside tipc_node_write_lock(), so it is serialised\nagainst the kfree() in the delete path.  A racing teardown now either has\nnot run yet, and we see a valid link, or has already run, and we see NULL.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74611": {
+                "cve_id": "CVE-2026-74611",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntls: rx: restore msg_iter before TLS 1.3 optimistic retry\n\ntls_decrypt_sg() advances msg->msg_iter when it maps user pages for\nthe optimistic TLS 1.3 zero-copy path. If the decrypted record turns\nout not to be unpadded application data, tls_decrypt_sw() retries into\na kernel skb, but leaves the iterator advanced.\n\nThe subsequent copy from the skb then writes decrypted bytes again at\na later point in the caller iovecs while recvmsg() reports only the\npost-retry length. A TLS peer can trigger this after the receiver\nenables TLS_RX_EXPECT_NO_PAD.\n\nRevert the iterator by the number of bytes consumed by the optimistic\nmapping before retrying without zero-copy.\n\nAdd a selftest which sends a TLS 1.3 control record with\nTLS_RX_EXPECT_NO_PAD enabled and verifies that recvmsg() does not\noverwrite later iovecs beyond the returned length.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74613": {
+                "cve_id": "CVE-2026-74613",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: avoid refilling the RX queue after teardown\n\nCommit b917507e5ad9 (\"vsock/virtio: stop workers during the .remove()\")\nmade the RX worker jump to its common exit when rx_run is clear.  That\nexit still refills the RX queue when the buffer count is low, so work\nqueued across virtio_vsock_vqs_del() can add buffers after the virtqueues\nhave been deleted.\n\nBUG: KASAN: slab-use-after-free in virtqueue_add_sgs\nRead of size 4 by task kworker/0:1\nWorkqueue: virtio_vsock virtio_transport_rx_work\nCall Trace:\n virtqueue_add_sgs (drivers/virtio/virtio_ring.c:2796)\n virtio_vsock_rx_fill (net/vmw_vsock/virtio_transport.c:332)\n virtio_transport_rx_work (net/vmw_vsock/virtio_transport.c:701)\n process_one_work (kernel/workqueue.c:3314)\n worker_thread (kernel/workqueue.c:3478)\n kthread (kernel/kthread.c:436)\n ret_from_fork (arch/x86/kernel/process.c:158)\n ret_from_fork_asm (arch/x86/entry/entry_64.S:245)\n...\nFreed by task 141:\n kfree (mm/slub.c:6566)\n vp_del_vq (drivers/virtio/virtio_pci_common.c:259)\n vp_del_vqs (drivers/virtio/virtio_pci_common.c:285)\n virtio_vsock_freeze (net/vmw_vsock/virtio_transport.c:912)\n virtio_device_freeze (drivers/virtio/virtio.c:658)\n virtio_pci_freeze (drivers/virtio/virtio_pci_common.c:601)\n pci_pm_freeze (drivers/pci/pci-driver.c:1098)\n device_suspend (drivers/base/power/main.c:1968)\nKernel panic - not syncing: KASAN: panic_on_warn set ...\n\nJump to a no-refill exit when rx_run is clear, leaving the normal exit\nto replenish a running queue.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74614": {
                 "cve_id": "CVE-2026-74614",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: read virtqueues under worker locks\n\nCommit bd50c5dc182b (\"vsock/virtio: add support for device\nsuspend/resume\") made the *_run flags transition from false to true when\nrestore installs replacement virtqueues.  The RX, TX and event workers\nread their virtqueue before locking and checking the corresponding flag,\nso a worker delayed across freeze and restore can observe the replacement\nqueue's running state while retaining a pointer to the deleted queue.\n\nRead each virtqueue under its mutex after checking the run flag, keeping\nthe pointer and state in the same queue generation.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74615": {
+                "cve_id": "CVE-2026-74615",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvxlan: do not arm the ageing timer on a device that is down\n\nvxlan_changelink() arms vxlan->age_timer whenever the requested ageing\ninterval differs from the configured one:\n\n\tif (conf.age_interval != vxlan->cfg.age_interval)\n\t\tmod_timer(&vxlan->age_timer, jiffies);\n\nThere is no netif_running() test, so the timer is armed even on a device\nthat was never brought up.  The only synchronous cancel in the driver is\nthe timer_delete_sync() in vxlan_stop(), which is .ndo_stop.\nnetif_close_many() drops devices without IFF_UP before\n__dev_close_many() runs, so that cancel is skipped for such a device.\n\nvxlan_setup() sets dev->needs_free_netdev = true and age_timer is a\nmember of struct vxlan_dev, so free_netdev() releases the allocation the\ntimer lives in while it is still queued on a timer_base.\nexpire_timers() unlinks the entry before it loads timer->function, so\nthe timer core writes through the freed object's list pointers:\n\n  BUG: KASAN: slab-use-after-free in __run_timers+0x208/0x654\n  Write of size 8 at addr ffff00001adace68 by task true/192\n   __asan_store8+0x84/0xac\n   __run_timers+0x208/0x654\n   run_timer_softirq+0x154/0x18c\n  Allocated by task 189:\n   alloc_netdev_mqs+0x64/0x720\n   rtnl_create_link+0x4ac/0x520\n   rtnl_newlink+0x758/0xd00\n  Freed by task 191:\n   netdev_release+0x40/0x58\n   netdev_run_todo+0x4a4/0x8c0\n   rtnl_dellink+0x200/0x4e8\n\nThe rtnl operations involved are netns-scoped, so an unprivileged user\ncan perform them in a new user and network namespace.\n\nArming the timer on a down device never had an effect: vxlan_cleanup()\nreturns early on !netif_running(), and vxlan_open() arms the timer for\nany non-zero interval once the device is brought up.  Add the missing\ntest.\n\nDiscovered by XBOW, triaged by Baul Lee <baul.lee@xbow.com>",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74617": {
+                "cve_id": "CVE-2026-74617",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndibs: initialise dibs->lock in dibs_dev_alloc()\n\ndibs->lock is initialised by dibs_dev_add(), but a dibs device can\nalready take interrupts before that call: ism_probe() runs\nism_dev_init(), and hence request_irq(), before it calls\ndibs_dev_add(). No client can have registered a dmb at that point, so\nno dmb interrupt can occur, but a GID event interrupt can, and\nism_handle_irq() takes dibs->lock unconditionally on entry, before it\ninspects anything else.\n\nInitialise the lock in dibs_dev_alloc() instead, so that it is valid as\nsoon as a driver can publish the device to its interrupt handler.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -82171,6 +82392,57 @@
                     }
                 ]
             },
+            "CVE-2026-74626": {
+                "cve_id": "CVE-2026-74626",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nNTB: ntb_netdev: Preserve RX queue depth on allocation failure\n\nntb_netdev_rx_handler() hands the received skb to the network stack\nbefore allocating its replacement. If the allocation fails, nothing is\nreposted. Every failure therefore takes one buffer out of the RX queue\nwhile the interface remains up, and enough failures eventually stall\nreception.\n\nA retry path could refill the queue later, but ntb_netdev has none.\nAllocate the replacement first instead. If that fails, drop the packet\nand repost the same skb. This keeps the queue full and lets packet\ndelivery resume as soon as memory is available again.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74629": {
+                "cve_id": "CVE-2026-74629",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/dibs: Correct freeing of dmb_clientid_arr\n\nA dibs device interrupt handler can be active after dibs_dev_del() and\nmay still access dmb_clientid_arr. (UAF)\n\nIn case of a failure in dibs_dev_add() being called by dibs_lo_dev_probe()\ndmb_clientid_arr is freed twice (double free).\n\nFree dmb_clientid_arr in dibs_dev_release() after last reference is gone.\nNote that allocating in dibs_dev_add() instead of dibs_dev_alloc() is ok\nfor now, because no dmbs can be registered before dibs_dev_add().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74631": {
+                "cve_id": "CVE-2026-74631",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: smc: fix splice entry lifetime imbalance in smc_rx_splice\n\nsmc_rx_splice() passes pages to splice_to_pipe() before taking the\nreferences that cover the lifetime of each splice entry. In the\nVM-backed RMB path, splice_to_pipe() may drop unqueued entries through\nsmc_rx_spd_release(), while queued entries are released later via the\npipe buffer callback.\n\nThe old post-splice accounting also derives the number of queued VM pages\nfrom an offset mutated while building the descriptor, and a multi-page\nsplice pairs one sock_hold() with multiple sock_put() calls.\n\nTake the page and socket references for every candidate entry before\nsplice_to_pipe(), and drop the matching private state, page reference,\nand socket reference from smc_rx_spd_release() for entries that never\nget queued. This fixes a refcount imbalance that can underflow page\nrefcounts and trigger a use-after-free.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74632": {
                 "cve_id": "CVE-2026-74632",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -82188,10 +82460,61 @@
                     }
                 ]
             },
+            "CVE-2026-74635": {
+                "cve_id": "CVE-2026-74635",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfbdev: bitblit: bound-check glyph index in bit_cursor()\n\nbit_cursor() fetches the glyph under the cursor with\n\n\tc = scr_readw(vc_pos);\n\tsrc = vc_font.data + ((c & charmask) * w * height);\n\nwhere charmask is 0x1ff when vc_hi_font_mask is set. The screen buffer\nvalue comes directly from scr_readw() and may be larger than the current\nfont's glyph count.\n\nSyzkaller triggers this via vcs_write(). The Call Trace shows\nvcs_write() in vc_screen.c writing an arbitrary 16-bit value with\nwritev() to /dev/vcsa, which vcs_write_buf() in vc_screen.c stores via\nvcs_scr_writew() without checking charcount. The stored value is later\nread in bit_cursor() in bitblit.c.\n\nWhen the font is changed from a font with 512 glyphs to a font with\n256 glyphs, the screen buffer can retain characters with the high\nbit set from the previous mode, which could also produce the same\nout-of-bounds access.\n\n  BUG: KASAN: global-out-of-bounds in soft_cursor+0x378/0x6bc drivers/video/fbdev/core/softcursor.c:70\n  Read of size 16 at addr ffff800086c57970\n\n  Call Trace:\n   soft_cursor+0x378/0x6bc drivers/video/fbdev/core/softcursor.c:70\n   bit_cursor+0xa90/0x1108 drivers/video/fbdev/core/bitblit.c:365\n   fbcon_cursor+0x344/0x498 drivers/video/fbdev/core/fbcon.c:1427\n   hide_cursor+0xdc/0x2d0 drivers/tty/vt/vt.c:883\n   update_region+0x100/0x18c drivers/tty/vt/vt.c:669\n   vcs_write+0x8ec/0xaf0 drivers/tty/vt/vc_screen.c:685\n\nbit_putcs_aligned() and bit_putcs_unaligned() already clamp the glyph\nindex to vc_font.charcount. Apply the same clamp in bit_cursor() after\nextracting the attribute and masking, before indexing fontdata.\n\nThe fix completes the bounds checking started in commit 18c4ef4e765a\n(\"fbdev: bitblit: bound-check glyph index in bit_putcs*\"), which missed\nthe cursor path.\n\nThis change should be safe because the clamp reuses the existing\ncontract from fbcon: charcount is maintained under console_lock in\ncon_font_set() and fbcon_font_set(), and hi_font_mask is cleared when\nswitching from 512 to 256 glyphs. When stale screen data with high bits\nremains after a font switch, or when vcs_write() stores an arbitrary\nvalue, clamping the index to 0 prevents the out-of-bounds read without\nchanging cursor semantics \u2014 the same fallback bit_putcs uses.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74642": {
+                "cve_id": "CVE-2026-74642",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: usb: Fix UAF at delayed release of MIDI2 EPs\n\nThe recent fix for UAF in ump_to_endpoint() caused another UAF because\nit tries to dereference the UMP endpoint object, but this might be\nexecuted at a delayed context where the endpoint has been already\nreleased.\n\nAdd private_free to clear the associated data for avoiding the further\ndereference for delayed releases.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74657": {
                 "cve_id": "CVE-2026-74657",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv4: Fix fib_nlmsg_size() for RTA_VIA nexthops\n\nfib_nlmsg_size() still estimates nexthop space as if every gateway is\nencoded as an IPv4 RTA_GATEWAY attribute. IPv4 routes can also carry an\nIPv6 gateway, which fib_nexthop_info() dumps as RTA_VIA.\n\nAs a result, route notifications can allocate an skb that is too small.\nfib_dump_info() then fails with -EMSGSIZE and rtmsg_fib() hits the\nWARN_ON() that marks such failures as a fib_nlmsg_size() bug. With\npanic_on_warn set, this becomes a kernel panic.\n\nMirror the actual nexthop dump layout in fib_nlmsg_size(): account for\nIPv6 nexthop gateways dumped as RTA_VIA, for the no-header rtnexthop\nlayout used inside RTA_MULTIPATH, and for RTA_FLOW only when it is\nactually present.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74660": {
+                "cve_id": "CVE-2026-74660",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: ebt_nflog: pin the NFLOG backend\n\nnf_log_unregister() runs after the per-net teardown so its final RCU\ngrace period also drains readers that obtained the logger from a per-net\nbinding.  However, ebt_nflog passes an explicit ULOG log type to\nnf_log_packet() without holding a reference on the selected logger module,\nunlike the xt_NFLOG and nft_log frontends.\n\nAn ebtables nflog rule can therefore remain callable while nfnetlink_log\nis unloaded.  The resulting interleaving is:\n\n  CPU 0                               CPU 1\n  nfnetlink_log_fini()\n    unregister_pernet_subsys()\n      kfree(nfnl_log_pernet(net))\n                                      ebt_nflog_tg()\n                                        nf_log_packet()\n                                          nfulnl_log_packet()\n                                            instance_lookup_get_rcu()\n\nThe global ULOG logger is still registered at this point, so CPU 1\ndereferences the per-net state after CPU 0 has freed it.  KASAN reported:\n\n  BUG: KASAN: slab-use-after-free in instance_lookup_get_rcu\n  Read of size 8 at addr ff110001052e6210 by task poc/92\n  Call Trace:\n   instance_lookup_get_rcu+0x1ce/0x1f0 [nfnetlink_log]\n   nfulnl_log_packet+0x248/0x2fb0 [nfnetlink_log]\n   nf_log_packet+0x204/0x300\n   ebt_nflog_tg+0x351/0x550\n   ebt_do_table+0xedf/0x22b0\n  Allocated by task 90:\n   __kmalloc_noprof+0x186/0x470\n   ops_init+0x6d/0x420\n   register_pernet_operations+0x2f6/0x670\n   register_pernet_subsys+0x23/0x40\n  Freed by task 93:\n   kfree+0x131/0x3c0\n   ops_undo_list+0x3e3/0x700\n   unregister_pernet_operations+0x232/0x490\n   unregister_pernet_subsys+0x1c/0x30\n   nfnetlink_log_fini+0x34/0x450 [nfnetlink_log]\n\nAcquire the ULOG logger module reference when an ebt_nflog rule is\nvalidated and release it when the rule is destroyed.  Request the NFLOG\nbackend for legacy callers when needed, matching xt_NFLOG.  This prevents\nmodule teardown until all ebt_nflog rules have stopped using the logger.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -82226,6 +82549,23 @@
                 "cve_id": "CVE-2026-74666",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npacket: synchronize pressure clearing with ring reconfiguration\n\npacket_set_ring() updates the RX ring state under sk_receive_queue.lock,\nbut used to publish the tpacket receive mode through po->prot_hook.func\nafter releasing that lock. packet_poll() and packet_recvmsg() can then\nrun the pressure clearing path after the ring has been cleared while\nstill seeing tpacket_rcv, causing __packet_rcv_has_room() to dereference\nstale or NULL ring storage.\n\nMove the existing receive hook assignment into the same\nsk_receive_queue.lock section as the ring state update. Keep the\nassignment otherwise unchanged, including on TX ring reconfiguration, to\navoid adding behavior changes that are not required for the fix.\n\nSerialize packet_recvmsg() pressure clearing with the same queue lock\nonly after PACKET_SOCK_PRESSURE has been observed. If the flag is clear\nand the socket has moved away from tpacket_rcv, packet_set_ring() has\nalready detached the socket and waited for synchronize_net(), so no new\npacket input can set the flag again.\n\npacket_poll() already holds sk_receive_queue.lock, so it uses the new\nunlocked helper directly.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74667": {
+                "cve_id": "CVE-2026-74667",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/packet: reset the MAC header on the packet-socket transmit path\n\npacket_parse_headers() resets the MAC header only for a SOCK_RAW frame\nwhose socket did not bind a protocol. A protocol-bound SOCK_RAW socket,\nany SOCK_DGRAM frame, and the legacy SOCK_PACKET path therefore leave\nskb->mac_header unset here.\n\nFor frames sent via __dev_queue_xmit() this is harmless: it resets the\nMAC header unconditionally. But the packet-socket PACKET_QDISC_BYPASS\npath uses dev_direct_xmit(), which does not, so the frame reaches\nndo_start_xmit() with the MAC header unset. A driver that reads\neth_hdr(skb) on transmit then dereferences skb->head + (u16)~0, an\nout-of-bounds access ~64 KiB past the head -- the same class fixed for\none consumer in commit f5089008f90c (\"macsec: do not read an unset MAC\nheader in macsec_encrypt()\").\n\npacket_parse_headers() runs only on the transmit path, where skb->data\npoints at the start of the L2 header for every packet-socket type\nregardless of its length: SOCK_RAW and SOCK_PACKET carry a user-supplied\nheader and SOCK_DGRAM has one built by dev_hard_header(). Reset the MAC\nheader unconditionally, mirroring __dev_queue_xmit(), so the frame is\nanchored on the bypass path too.\n\nFound by 0sec (https://0sec.ai) using automated source analysis;\nverified against source and matched to the macsec KASAN report in\nf5089008f90c. Compile-tested.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -82358,6 +82698,23 @@
                     }
                 ]
             },
+            "CVE-2026-74692": {
+                "cve_id": "CVE-2026-74692",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/smc: fix TOCTOU race between smc_listen_out() and listener close\n\nsmc_listen_out() reads lsmc->sk.sk_state without the listener lock,\nthen acquires lock_sock_nested() only after the check passes. This\nopens a window where smc_close_active() can transition the listener\nto SMC_CLOSED, call smc_close_cleanup_listen() to drain the accept\nqueue, and release the lock, all between the lockless read and the\ndelayed lock acquisition:\n\n  smc_listen_work (smc_hs_wq)          smc_close_active()\n  -------------------------------      -------------------------\n  release_sock(child)\n  if (sk_state == SMC_LISTEN) TRUE\n                                        lock_sock(listener)\n                                        sk_state = SMC_CLOSED\n                                        smc_close_cleanup_listen()\n                                        release_sock(listener)\n                                        flush_work(tcp_listen_work)\n  lock_sock_nested(listener)\n  smc_accept_enqueue(listener, child) /* child enqueued on dead listener */\n\nsmc_close_active() flushes only tcp_listen_work. Work items already\ndispatched onto smc_hs_wq for the CLC handshake continue running\nunguarded. smc_accept_enqueue() takes a sock_hold() on the child that\nis never released, so the child smc_sock, its clcsock, and the\nreference all leak. A remote peer that opens TCP connections while the\nserver calls close() can exhaust kernel memory.\n\nMove lock_sock_nested() to before the sk_state check so that the test\nand the enqueue are atomic under the listener lock.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74695": {
                 "cve_id": "CVE-2026-74695",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -82409,10 +82766,10 @@
                     }
                 ]
             },
-            "CVE-2026-74711": {
-                "cve_id": "CVE-2026-74711",
+            "CVE-2026-74705": {
+                "cve_id": "CVE-2026-74705",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (pmbus) Fix type confusion in notification logic\n\nSashiko reports:\n\nAt the start of the loop in pmbus_notify(), the code unconditionally casts\nevery attribute to a struct sensor_device_attribute:\n\ndrivers/hwmon/pmbus/pmbus_core.c:pmbus_notify() {\n    for (i = 0; i < data->num_attributes; i++) {\n        struct device_attribute *da = to_dev_attr(data->group.attrs[i]);\n        struct sensor_device_attribute *attr = to_sensor_dev_attr(da);\n        int index = attr->index;\n...\n}\n\nHowever, data->group.attrs can contain other types like struct\npmbus_samples_reg or struct pmbus_sensor, which only embed a base\nstruct device_attribute.\n\nIf da is a struct pmbus_samples_reg, dev_attr is the last member. Casting\nit to struct sensor_device_attribute and reading the index field appears\nto access memory past the end of the allocation, which might trigger a\nslab-out-of-bounds read.\n\nAdditionally, if da is a struct pmbus_sensor, casting it causes the index\nfield to overlap with the page, phase, and reg fields. Could this produce\na garbage mask on little-endian systems that spuriously matches the target\nreg, page, and flags during an alert?\n\nFix the problem by using struct sensor_device_attr in struct pmbus_sensor\nand struct pmbus_label. Since those attributes never trigger a\nnotification, set the value of attr->index to -1 for them. Use this value\nto distinguish from boolean attributes which _can_ trigger a notification\nand use the index field to encode mask, page, and register values.",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nudp: fix potential use-after-free in tunnel segmentation\n\n__skb_udp_tunnel_segment() gets the UDP header before ensuring the\ntunnel header is in the skb head. If the pull reallocates skb->head,\nthe saved UDP header pointer is no longer valid.\n\nGet the UDP header after the pull to avoid a potential use-after-free.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -82473,10 +82830,61 @@
                     }
                 ]
             },
+            "CVE-2026-74725": {
+                "cve_id": "CVE-2026-74725",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nenic: fix tx_hang_reset use-after-free on device removal\n\nenic_remove() cancels the reset and change_mtu_work items but does not\ncancel tx_hang_reset. A TX timeout that fires while the device is being\nremoved can schedule enic_tx_hang_reset() so that it runs after\nfree_netdev(), resulting in a use-after-free.\n\ncancel_work_sync() alone is not sufficient here: the still-live watchdog\nand notify paths can re-schedule these work items in the window between\nthe cancel and unregister_netdev(). Use disable_work_sync(), which\ncancels the work and blocks any subsequent schedule_work() from\nrequeuing it, and apply it to the reset and change_mtu_work items as\nwell so the same requeue race is closed for all teardown work.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74726": {
+                "cve_id": "CVE-2026-74726",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbonding: alb: re-check primary_is_promisc under RTNL in bond_alb_monitor\n\nbond_alb_monitor() reads primary_is_promisc under RCU, then drops RCU and\ntakes RTNL via rtnl_trylock() before undoing the promiscuity it set on the\nactive slave. In that window the active slave can change under RTNL\n(RTM_DELLINK -> __bond_release_one() -> bond_alb_handle_active_change()),\nwhich already drops the promiscuity and clears primary_is_promisc. The\nmonitor still acts on the stale decision: if the slave was removed with no\nfailover, curr_active_slave is now NULL and the deref faults; if it failed\nover, the stale dev_set_promiscuity(-1) underflows the new slave's\npromiscuity counter and pins it in IFF_PROMISC.\n\n  Oops: general protection fault, probably for non-canonical address ...\n  KASAN: null-ptr-deref in range [0x0000000000000000-0x0000000000000007]\n  Workqueue: b42 bond_alb_monitor\n  RIP: 0010:bond_alb_monitor (drivers/net/bonding/bond_alb.c:1600)\n   process_one_work (kernel/workqueue.c:3322)\n   worker_thread (kernel/workqueue.c:3486)\n   kthread (kernel/kthread.c:436)\n   ret_from_fork (arch/x86/kernel/process.c:158)\n  Kernel panic - not syncing: Fatal exception\n\nRe-check primary_is_promisc (and curr_active_slave) after taking RTNL so\nthe monitor only undoes an increment it still owns. The other bonding\nmonitors already re-read state under RTNL in their commit phase\n(bond_miimon_commit/bond_ab_arp_commit); bond_alb_monitor() was the only\none acting on the pre-trylock decision.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74730": {
                 "cve_id": "CVE-2026-74730",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nNFS: Pin the 'struct nfs_server' during a FREE_STATEID call\n\nDan Aloni reports that he was able to hit a use-after-free bug if a\nFREE_STATEID operation gets delayed for whatever reason. Fix this by\nbumping the refcount of the 'struct nfs_server' object for the duration\nof the FREE_STATEID so it doesn't get cleaned up from underneath us\nwhile operations are still in flight.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74732": {
+                "cve_id": "CVE-2026-74732",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Check for tg ops in dce110_set_avmute\n\nSome older DCE timing generators do not implement is_tg_enabled in\ntheir ops table. Calling it unconditionally when waiting for AV mute\nframes causes a NULL pointer dereference on Southern Islands dGPUs\nwhen turning the display off over HDMI.\n\nCheck that tg and the required ops exist before waiting for frames.\n\n(cherry picked from commit 2686a0c0aaa07bec2e24131835cf27b5fd4935a5)",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -135664,6 +136072,40 @@
                     }
                 ]
             },
+            "CVE-2026-74586": {
+                "cve_id": "CVE-2026-74586",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: clear new_transport when removing a peer\n\nsctp_process_asconf_param() stores a newly added peer transport in\nasoc->new_transport. After all parameters in the ASCONF chunk have been\nprocessed, sctp_sf_do_asconf() uses this pointer to send a HEARTBEAT to the\nnew transport.\n\nAn authenticated ASCONF from a remote SCTP peer can add a transport and\nremove it again with a wildcard DEL-IP parameter in the same chunk. The\nwildcard deletion preserves the transport on which the ASCONF arrived, but\nremoves the newly added transport through\nsctp_assoc_del_nonprimary_peers(). The removal does not clear\nasoc->new_transport, leaving it pointing to the removed transport.\n\nsctp_sf_do_asconf() then creates a HEARTBEAT whose chunk->transport points\nto the removed transport without holding a transport reference. During\nlocal address replacement, src_out_of_asoc_ok keeps this HEARTBEAT on\ncontrol_chunk_list. After the transport is freed by RCU, a successful\nASCONF_ACK for the replacement address releases the queued HEARTBEAT and\nsctp_outq_select_transport() reads the freed transport's state.\n\nThe issue was found during a static audit of SCTP objects. With an\nauthenticated peer, the reproducer triggered the same KASAN report in 2\nof 2 unpatched runs on a KASAN-enabled netdev/main kernel:\n\n  BUG: KASAN: slab-use-after-free in sctp_outq_select_transport\n  Read of size 4 at addr ffff88800b9bd95c by task python3/197\n\n  Call Trace:\n   sctp_outq_select_transport+0x549/0x8b0 [sctp]\n   sctp_outq_flush+0x306/0x2c60 [sctp]\n   sctp_transport_immediate_rtx+0xaf/0x260 [sctp]\n   sctp_process_asconf_ack+0xa48/0xf70 [sctp]\n\n  Allocated by task 197:\n   sctp_transport_new+0x68/0x650 [sctp]\n   sctp_assoc_add_peer+0x258/0x12a0 [sctp]\n   sctp_process_asconf+0x5e9/0x1090 [sctp]\n\n  Last potentially related work creation:\n   __call_rcu_common.constprop.0+0x77/0xb70\n   sctp_assoc_del_nonprimary_peers+0x7c/0xd0 [sctp]\n   sctp_process_asconf+0xd9c/0x1090 [sctp]\n\nThe first invalid access was a four-byte read of transport->state at\nnet/sctp/outqueue.c:833. The same reproducer completed the full\nauthenticated ASCONF and local-address replacement sequence with this\nchange without a KASAN report or oops.\n\nClear new_transport when its peer is removed, before it can be used to\ncreate the HEARTBEAT.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74587": {
+                "cve_id": "CVE-2026-74587",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: fix use-after-free of cached ASCONF chunk\n\naddip_last_asconf caches the outstanding outbound ASCONF chunk. The normal\nASCONF-ACK completion path releases the chunk and clears the pointer.\n\nHowever, sctp_asconf_queue_teardown() releases the cached chunk without\nclearing addip_last_asconf. During peer restart handling,\nsctp_sf_do_dupcook_a() queues SCTP_CMD_PURGE_ASCONF_QUEUE, which invokes\nsctp_asconf_queue_teardown() while the association remains alive and leaves\nthe pointer dangling.\n\nA delayed authenticated ASCONF-ACK can then reach sctp_sf_do_asconf_ack(),\nwhich accesses the stale chunk and passes it to sctp_process_asconf_ack(),\ncausing a use-after-free and a second release.\n\nClearing the pointer exposes a race with T4 expiry. Peer restart handling\nqueues the timer stop before the purge, but SCTP_CMD_TIMER_STOP uses\ntimer_delete(), which does not wait for a callback already running on\nanother CPU. Such a callback can reach sctp_sf_t4_timer_expire() after\nthe purge and dereference NULL.\n\nClear addip_last_asconf after releasing the cached chunk, and make\nsctp_sf_t4_timer_expire() consume a stale T4 expiry if no outstanding\nASCONF remains.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74588": {
                 "cve_id": "CVE-2026-74588",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -135698,10 +136140,78 @@
                     }
                 ]
             },
+            "CVE-2026-74590": {
+                "cve_id": "CVE-2026-74590",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfsverity: Fix bpf_get_fsverity_digest() dynptr assumptions\n\nThe BPF verifier and the dynptr abstraction ensure that the memory space\nreferenced by a dynptr remains valid.  They do not, however, provide any\nguarantee that the contents of the memory are stable.  kfuncs are\nexpected to remain memory-safe even if concurrent modifications occur.\n\nbpf_get_fsverity_digest() didn't follow that: it could crash if\narg->digest_size was concurrently modified.\n\nFix that by using the known-good value hash_alg->digest_size instead.\n\nAlso widen 'dynptr_sz' and 'out_digest_sz' to u64 to match the return\ntype of __bpf_dynptr_size().  It doesn't appear that it can actually be\nmore than INT_MAX currently (since __bpf_dynptr_data_rw() excludes\nfile-based pointers), but the correct type might as well be used.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74592": {
+                "cve_id": "CVE-2026-74592",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nima: Instantiate file_truncate and path_truncate hooks\n\nInstantiate the file_truncate and path_truncate LSM hooks to reset the\naction cache flags (IMA_DONE_MASK) as soon as truncation is requested,\nso the file, based on policy, is re-collected, re-measured, re-audited,\nand re-appraised on next access.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74595": {
                 "cve_id": "CVE-2026-74595",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfscrypt: use the mount idmap for the owner check in fscrypt_ioctl_set_policy()\n\nfscrypt_ioctl_set_policy() calls inode_owner_or_capable() with\n&nop_mnt_idmap before allowing an encryption policy to be set, instead\nof the idmap of the mount the ioctl was issued on.\n\nfscrypt is used by filesystems that support idmapped mounts (e.g. ext4,\nf2fs), so on such a mount this compares the caller's fsuid against the\nunmapped on-disk owner rather than the mapped owner: the actual owner\ncan be wrongly denied with -EACCES and an unrelated caller wrongly\nallowed.  Use file_mnt_idmap(filp) instead.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74597": {
+                "cve_id": "CVE-2026-74597",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nip6_tunnel: clear skb2->cb[] in ip6ip6_err()\n\nip6ip6_err() clones an outer IPv6 ICMP error skb, pulls it to the\nquoted inner IPv6 packet, and then passes the clone to icmpv6_send().\nThe clone still carries the outer packet's inet6_skb_parm in skb->cb.\n\nIf the outer packet had a Home Address Option, IP6CB(skb2)->dsthao\nremains non-zero after skb_pull(). icmpv6_send() later calls\nmip6_addr_swap(), which uses that stale dsthao offset against the quoted\ninner packet. A malformed inner destination-options header can then make\nthe HAO lookup and address swap run past the end of the quoted packet\nand corrupt skb_shared_info.\n\nClear skb2->cb[] before pulling the quoted inner IPv6 packet so the\nreply path does not reuse metadata left by the outer IPv6 stack.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74598": {
+                "cve_id": "CVE-2026-74598",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix Route Information option length validation\n\nrt6_route_rcv() validates the Route Information option (RFC 4191) length\nagainst the prefix length, but both checks are off by one.\n\nrinfo->length is the ND option length in units of 8 octets and it\n*includes* the 8-byte option header, so an option carrying N bytes of\nprefix has length == 1 + N/8.  RFC 4191 section 2.3 requires length 3\nwhen Prefix Length is greater than 64, and 2 or 3 when it is greater\nthan 0.  The code accepts length >= 2 and length >= 1 respectively.\n\nipv6_addr_prefix() then copies prefix_len/8 bytes out of rinfo->prefix,\nso a Router Advertisement with (prefix_len=128, length=2) or\n(prefix_len=64, length=1) makes the kernel read up to 8 bytes past the\nend of the option.  Those bytes end up in the prefix of the route that\ngets installed, so they are visible to userspace:\n\n  # RA with a Route Information option (prefix_len=128, length=2)\n  # followed by a source link-layer address option, 01 01 de ad be ef ca fe\n  $ ip -6 route show\n  2001:db8:dead:beef:101:dead:beef:cafe via fe80::1234 dev veth0 proto ra\n                     ^^^^^^^^^^^^^^^^^^ the next option, read out of bounds\n\nWhen the Route Information option is the last one in the packet, those\neight bytes come from the skb tail room instead.\n\nReject the option lengths RFC 4191 does not allow.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -135732,6 +136242,23 @@
                     }
                 ]
             },
+            "CVE-2026-74604": {
+                "cve_id": "CVE-2026-74604",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nRevert \"thermal/drivers/hwmon: Cleanup coding style a bit\"\n\nRevert commit 030a48b0f6ce (\"thermal/drivers/hwmon: Cleanup coding style\na bit\") that introduced a use-after-free into the error path of\nthermal_add_hwmon_sysfs() by removing a valid check from it.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74607": {
                 "cve_id": "CVE-2026-74607",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -135749,10 +136276,112 @@
                     }
                 ]
             },
+            "CVE-2026-74608": {
+                "cve_id": "CVE-2026-74608",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: Fix use-after-free in cifs_try_adding_channels()\n\ncifs_try_adding_channels() takes a temporary reference to an interface\nbefore dropping iface_lock. If cifs_ses_add_channel() fails, it drops\nthat reference and then increments iface->weight_fulfilled.\n\nA concurrent interface list refresh can remove the list reference while\nchannel creation is in progress. In that case, the failure-path\nkref_put() releases the last reference and frees iface. Updating\nweight_fulfilled afterward then accesses freed memory.\n\nIncrement weight_fulfilled before dropping the temporary reference,\nkeeping iface alive for the final access.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74609": {
+                "cve_id": "CVE-2026-74609",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntipc: read le->link under the node lock in tipc_node_link_down()\n\ntipc_node_link_down() caches the link pointer before taking n->lock:\n\n\tstruct tipc_link *l = le->link;\t\t/* unlocked */\n\n\tif (!l)\n\t\treturn;\n\ttipc_node_write_lock(n);\n\tif (!tipc_link_is_establishing(l)) {\t/* deref l */\n\t...\n\t\ttipc_link_reset(l);\t\t/* write into l */\n\tif (delete) {\n\t\tkfree(l);\n\t\tle->link = NULL;\n\nThe delete=true caller frees that very object under n->lock, so the lock\ndoes not protect the cached pointer against it:\n\n - CPU A, delete=false: tipc_rcv() on TIPC_LINK_DOWN_EVT, or the link\n   supervision timer via tipc_node_timeout(), reads l unlocked and then\n   dereferences it under n->lock;\n - CPU B, delete=true: netlink TIPC_NL_BEARER_DISABLE -> bearer_disable()\n   -> tipc_node_delete_links() -> tipc_node_link_down(n, bearer_id, true)\n   -> kfree(l).\n\nThe link is freed with plain kfree(), not kfree_rcu(), and for UDP bearers\ndisable_media() only schedules the asynchronous cleanup_bearer() work, so\nits synchronize_net() runs after the links are already gone.  An in-flight\nCPU A that has read l therefore dereferences freed memory once B frees it:\na use-after-free read in tipc_link_is_establishing(), and a use-after-free\nwrite via tipc_link_reset() on the establishing branch.\n\nThe following trace was captured on 7.2.0-rc5-00284-gaf39eb111ce6:\n\n  BUG: KASAN: slab-use-after-free in tipc_link_is_establishing (net/tipc/link.c:285)\n  Read of size 4 at addr ffff88802e2aa068 by task swapper/2/0\n   tipc_link_is_establishing (net/tipc/link.c:285)\n   tipc_node_link_down (net/tipc/node.c:1076)\n   tipc_node_timeout (net/tipc/node.c:843)\n  Allocated by task 9549:\n   tipc_link_create (net/tipc/link.c:490)\n   tipc_node_check_dest (net/tipc/node.c:1279)\n   tipc_disc_rcv (net/tipc/discover.c:252)\n   tipc_udp_recv (net/tipc/udp_media.c:389)\n  Freed by task 9549:\n   tipc_node_link_down (net/tipc/node.c:1084)\n   tipc_node_delete_links (net/tipc/node.c:1320)\n   bearer_disable (net/tipc/bearer.c:414)\n   __tipc_nl_bearer_disable (net/tipc/bearer.c:992)\n\nMove the le->link read inside tipc_node_write_lock(), so it is serialised\nagainst the kfree() in the delete path.  A racing teardown now either has\nnot run yet, and we see a valid link, or has already run, and we see NULL.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74611": {
+                "cve_id": "CVE-2026-74611",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntls: rx: restore msg_iter before TLS 1.3 optimistic retry\n\ntls_decrypt_sg() advances msg->msg_iter when it maps user pages for\nthe optimistic TLS 1.3 zero-copy path. If the decrypted record turns\nout not to be unpadded application data, tls_decrypt_sw() retries into\na kernel skb, but leaves the iterator advanced.\n\nThe subsequent copy from the skb then writes decrypted bytes again at\na later point in the caller iovecs while recvmsg() reports only the\npost-retry length. A TLS peer can trigger this after the receiver\nenables TLS_RX_EXPECT_NO_PAD.\n\nRevert the iterator by the number of bytes consumed by the optimistic\nmapping before retrying without zero-copy.\n\nAdd a selftest which sends a TLS 1.3 control record with\nTLS_RX_EXPECT_NO_PAD enabled and verifies that recvmsg() does not\noverwrite later iovecs beyond the returned length.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74613": {
+                "cve_id": "CVE-2026-74613",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: avoid refilling the RX queue after teardown\n\nCommit b917507e5ad9 (\"vsock/virtio: stop workers during the .remove()\")\nmade the RX worker jump to its common exit when rx_run is clear.  That\nexit still refills the RX queue when the buffer count is low, so work\nqueued across virtio_vsock_vqs_del() can add buffers after the virtqueues\nhave been deleted.\n\nBUG: KASAN: slab-use-after-free in virtqueue_add_sgs\nRead of size 4 by task kworker/0:1\nWorkqueue: virtio_vsock virtio_transport_rx_work\nCall Trace:\n virtqueue_add_sgs (drivers/virtio/virtio_ring.c:2796)\n virtio_vsock_rx_fill (net/vmw_vsock/virtio_transport.c:332)\n virtio_transport_rx_work (net/vmw_vsock/virtio_transport.c:701)\n process_one_work (kernel/workqueue.c:3314)\n worker_thread (kernel/workqueue.c:3478)\n kthread (kernel/kthread.c:436)\n ret_from_fork (arch/x86/kernel/process.c:158)\n ret_from_fork_asm (arch/x86/entry/entry_64.S:245)\n...\nFreed by task 141:\n kfree (mm/slub.c:6566)\n vp_del_vq (drivers/virtio/virtio_pci_common.c:259)\n vp_del_vqs (drivers/virtio/virtio_pci_common.c:285)\n virtio_vsock_freeze (net/vmw_vsock/virtio_transport.c:912)\n virtio_device_freeze (drivers/virtio/virtio.c:658)\n virtio_pci_freeze (drivers/virtio/virtio_pci_common.c:601)\n pci_pm_freeze (drivers/pci/pci-driver.c:1098)\n device_suspend (drivers/base/power/main.c:1968)\nKernel panic - not syncing: KASAN: panic_on_warn set ...\n\nJump to a no-refill exit when rx_run is clear, leaving the normal exit\nto replenish a running queue.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74614": {
                 "cve_id": "CVE-2026-74614",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: read virtqueues under worker locks\n\nCommit bd50c5dc182b (\"vsock/virtio: add support for device\nsuspend/resume\") made the *_run flags transition from false to true when\nrestore installs replacement virtqueues.  The RX, TX and event workers\nread their virtqueue before locking and checking the corresponding flag,\nso a worker delayed across freeze and restore can observe the replacement\nqueue's running state while retaining a pointer to the deleted queue.\n\nRead each virtqueue under its mutex after checking the run flag, keeping\nthe pointer and state in the same queue generation.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74615": {
+                "cve_id": "CVE-2026-74615",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvxlan: do not arm the ageing timer on a device that is down\n\nvxlan_changelink() arms vxlan->age_timer whenever the requested ageing\ninterval differs from the configured one:\n\n\tif (conf.age_interval != vxlan->cfg.age_interval)\n\t\tmod_timer(&vxlan->age_timer, jiffies);\n\nThere is no netif_running() test, so the timer is armed even on a device\nthat was never brought up.  The only synchronous cancel in the driver is\nthe timer_delete_sync() in vxlan_stop(), which is .ndo_stop.\nnetif_close_many() drops devices without IFF_UP before\n__dev_close_many() runs, so that cancel is skipped for such a device.\n\nvxlan_setup() sets dev->needs_free_netdev = true and age_timer is a\nmember of struct vxlan_dev, so free_netdev() releases the allocation the\ntimer lives in while it is still queued on a timer_base.\nexpire_timers() unlinks the entry before it loads timer->function, so\nthe timer core writes through the freed object's list pointers:\n\n  BUG: KASAN: slab-use-after-free in __run_timers+0x208/0x654\n  Write of size 8 at addr ffff00001adace68 by task true/192\n   __asan_store8+0x84/0xac\n   __run_timers+0x208/0x654\n   run_timer_softirq+0x154/0x18c\n  Allocated by task 189:\n   alloc_netdev_mqs+0x64/0x720\n   rtnl_create_link+0x4ac/0x520\n   rtnl_newlink+0x758/0xd00\n  Freed by task 191:\n   netdev_release+0x40/0x58\n   netdev_run_todo+0x4a4/0x8c0\n   rtnl_dellink+0x200/0x4e8\n\nThe rtnl operations involved are netns-scoped, so an unprivileged user\ncan perform them in a new user and network namespace.\n\nArming the timer on a down device never had an effect: vxlan_cleanup()\nreturns early on !netif_running(), and vxlan_open() arms the timer for\nany non-zero interval once the device is brought up.  Add the missing\ntest.\n\nDiscovered by XBOW, triaged by Baul Lee <baul.lee@xbow.com>",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74617": {
+                "cve_id": "CVE-2026-74617",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndibs: initialise dibs->lock in dibs_dev_alloc()\n\ndibs->lock is initialised by dibs_dev_add(), but a dibs device can\nalready take interrupts before that call: ism_probe() runs\nism_dev_init(), and hence request_irq(), before it calls\ndibs_dev_add(). No client can have registered a dmb at that point, so\nno dmb interrupt can occur, but a GID event interrupt can, and\nism_handle_irq() takes dibs->lock unconditionally on entry, before it\ninspects anything else.\n\nInitialise the lock in dibs_dev_alloc() instead, so that it is valid as\nsoon as a driver can publish the device to its interrupt handler.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -135817,6 +136446,57 @@
                     }
                 ]
             },
+            "CVE-2026-74626": {
+                "cve_id": "CVE-2026-74626",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nNTB: ntb_netdev: Preserve RX queue depth on allocation failure\n\nntb_netdev_rx_handler() hands the received skb to the network stack\nbefore allocating its replacement. If the allocation fails, nothing is\nreposted. Every failure therefore takes one buffer out of the RX queue\nwhile the interface remains up, and enough failures eventually stall\nreception.\n\nA retry path could refill the queue later, but ntb_netdev has none.\nAllocate the replacement first instead. If that fails, drop the packet\nand repost the same skb. This keeps the queue full and lets packet\ndelivery resume as soon as memory is available again.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74629": {
+                "cve_id": "CVE-2026-74629",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/dibs: Correct freeing of dmb_clientid_arr\n\nA dibs device interrupt handler can be active after dibs_dev_del() and\nmay still access dmb_clientid_arr. (UAF)\n\nIn case of a failure in dibs_dev_add() being called by dibs_lo_dev_probe()\ndmb_clientid_arr is freed twice (double free).\n\nFree dmb_clientid_arr in dibs_dev_release() after last reference is gone.\nNote that allocating in dibs_dev_add() instead of dibs_dev_alloc() is ok\nfor now, because no dmbs can be registered before dibs_dev_add().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74631": {
+                "cve_id": "CVE-2026-74631",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: smc: fix splice entry lifetime imbalance in smc_rx_splice\n\nsmc_rx_splice() passes pages to splice_to_pipe() before taking the\nreferences that cover the lifetime of each splice entry. In the\nVM-backed RMB path, splice_to_pipe() may drop unqueued entries through\nsmc_rx_spd_release(), while queued entries are released later via the\npipe buffer callback.\n\nThe old post-splice accounting also derives the number of queued VM pages\nfrom an offset mutated while building the descriptor, and a multi-page\nsplice pairs one sock_hold() with multiple sock_put() calls.\n\nTake the page and socket references for every candidate entry before\nsplice_to_pipe(), and drop the matching private state, page reference,\nand socket reference from smc_rx_spd_release() for entries that never\nget queued. This fixes a refcount imbalance that can underflow page\nrefcounts and trigger a use-after-free.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74632": {
                 "cve_id": "CVE-2026-74632",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -135834,10 +136514,61 @@
                     }
                 ]
             },
+            "CVE-2026-74635": {
+                "cve_id": "CVE-2026-74635",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfbdev: bitblit: bound-check glyph index in bit_cursor()\n\nbit_cursor() fetches the glyph under the cursor with\n\n\tc = scr_readw(vc_pos);\n\tsrc = vc_font.data + ((c & charmask) * w * height);\n\nwhere charmask is 0x1ff when vc_hi_font_mask is set. The screen buffer\nvalue comes directly from scr_readw() and may be larger than the current\nfont's glyph count.\n\nSyzkaller triggers this via vcs_write(). The Call Trace shows\nvcs_write() in vc_screen.c writing an arbitrary 16-bit value with\nwritev() to /dev/vcsa, which vcs_write_buf() in vc_screen.c stores via\nvcs_scr_writew() without checking charcount. The stored value is later\nread in bit_cursor() in bitblit.c.\n\nWhen the font is changed from a font with 512 glyphs to a font with\n256 glyphs, the screen buffer can retain characters with the high\nbit set from the previous mode, which could also produce the same\nout-of-bounds access.\n\n  BUG: KASAN: global-out-of-bounds in soft_cursor+0x378/0x6bc drivers/video/fbdev/core/softcursor.c:70\n  Read of size 16 at addr ffff800086c57970\n\n  Call Trace:\n   soft_cursor+0x378/0x6bc drivers/video/fbdev/core/softcursor.c:70\n   bit_cursor+0xa90/0x1108 drivers/video/fbdev/core/bitblit.c:365\n   fbcon_cursor+0x344/0x498 drivers/video/fbdev/core/fbcon.c:1427\n   hide_cursor+0xdc/0x2d0 drivers/tty/vt/vt.c:883\n   update_region+0x100/0x18c drivers/tty/vt/vt.c:669\n   vcs_write+0x8ec/0xaf0 drivers/tty/vt/vc_screen.c:685\n\nbit_putcs_aligned() and bit_putcs_unaligned() already clamp the glyph\nindex to vc_font.charcount. Apply the same clamp in bit_cursor() after\nextracting the attribute and masking, before indexing fontdata.\n\nThe fix completes the bounds checking started in commit 18c4ef4e765a\n(\"fbdev: bitblit: bound-check glyph index in bit_putcs*\"), which missed\nthe cursor path.\n\nThis change should be safe because the clamp reuses the existing\ncontract from fbcon: charcount is maintained under console_lock in\ncon_font_set() and fbcon_font_set(), and hi_font_mask is cleared when\nswitching from 512 to 256 glyphs. When stale screen data with high bits\nremains after a font switch, or when vcs_write() stores an arbitrary\nvalue, clamping the index to 0 prevents the out-of-bounds read without\nchanging cursor semantics \u2014 the same fallback bit_putcs uses.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74642": {
+                "cve_id": "CVE-2026-74642",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: usb: Fix UAF at delayed release of MIDI2 EPs\n\nThe recent fix for UAF in ump_to_endpoint() caused another UAF because\nit tries to dereference the UMP endpoint object, but this might be\nexecuted at a delayed context where the endpoint has been already\nreleased.\n\nAdd private_free to clear the associated data for avoiding the further\ndereference for delayed releases.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74657": {
                 "cve_id": "CVE-2026-74657",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv4: Fix fib_nlmsg_size() for RTA_VIA nexthops\n\nfib_nlmsg_size() still estimates nexthop space as if every gateway is\nencoded as an IPv4 RTA_GATEWAY attribute. IPv4 routes can also carry an\nIPv6 gateway, which fib_nexthop_info() dumps as RTA_VIA.\n\nAs a result, route notifications can allocate an skb that is too small.\nfib_dump_info() then fails with -EMSGSIZE and rtmsg_fib() hits the\nWARN_ON() that marks such failures as a fib_nlmsg_size() bug. With\npanic_on_warn set, this becomes a kernel panic.\n\nMirror the actual nexthop dump layout in fib_nlmsg_size(): account for\nIPv6 nexthop gateways dumped as RTA_VIA, for the no-header rtnexthop\nlayout used inside RTA_MULTIPATH, and for RTA_FLOW only when it is\nactually present.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74660": {
+                "cve_id": "CVE-2026-74660",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: ebt_nflog: pin the NFLOG backend\n\nnf_log_unregister() runs after the per-net teardown so its final RCU\ngrace period also drains readers that obtained the logger from a per-net\nbinding.  However, ebt_nflog passes an explicit ULOG log type to\nnf_log_packet() without holding a reference on the selected logger module,\nunlike the xt_NFLOG and nft_log frontends.\n\nAn ebtables nflog rule can therefore remain callable while nfnetlink_log\nis unloaded.  The resulting interleaving is:\n\n  CPU 0                               CPU 1\n  nfnetlink_log_fini()\n    unregister_pernet_subsys()\n      kfree(nfnl_log_pernet(net))\n                                      ebt_nflog_tg()\n                                        nf_log_packet()\n                                          nfulnl_log_packet()\n                                            instance_lookup_get_rcu()\n\nThe global ULOG logger is still registered at this point, so CPU 1\ndereferences the per-net state after CPU 0 has freed it.  KASAN reported:\n\n  BUG: KASAN: slab-use-after-free in instance_lookup_get_rcu\n  Read of size 8 at addr ff110001052e6210 by task poc/92\n  Call Trace:\n   instance_lookup_get_rcu+0x1ce/0x1f0 [nfnetlink_log]\n   nfulnl_log_packet+0x248/0x2fb0 [nfnetlink_log]\n   nf_log_packet+0x204/0x300\n   ebt_nflog_tg+0x351/0x550\n   ebt_do_table+0xedf/0x22b0\n  Allocated by task 90:\n   __kmalloc_noprof+0x186/0x470\n   ops_init+0x6d/0x420\n   register_pernet_operations+0x2f6/0x670\n   register_pernet_subsys+0x23/0x40\n  Freed by task 93:\n   kfree+0x131/0x3c0\n   ops_undo_list+0x3e3/0x700\n   unregister_pernet_operations+0x232/0x490\n   unregister_pernet_subsys+0x1c/0x30\n   nfnetlink_log_fini+0x34/0x450 [nfnetlink_log]\n\nAcquire the ULOG logger module reference when an ebt_nflog rule is\nvalidated and release it when the rule is destroyed.  Request the NFLOG\nbackend for legacy callers when needed, matching xt_NFLOG.  This prevents\nmodule teardown until all ebt_nflog rules have stopped using the logger.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -135872,6 +136603,23 @@
                 "cve_id": "CVE-2026-74666",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npacket: synchronize pressure clearing with ring reconfiguration\n\npacket_set_ring() updates the RX ring state under sk_receive_queue.lock,\nbut used to publish the tpacket receive mode through po->prot_hook.func\nafter releasing that lock. packet_poll() and packet_recvmsg() can then\nrun the pressure clearing path after the ring has been cleared while\nstill seeing tpacket_rcv, causing __packet_rcv_has_room() to dereference\nstale or NULL ring storage.\n\nMove the existing receive hook assignment into the same\nsk_receive_queue.lock section as the ring state update. Keep the\nassignment otherwise unchanged, including on TX ring reconfiguration, to\navoid adding behavior changes that are not required for the fix.\n\nSerialize packet_recvmsg() pressure clearing with the same queue lock\nonly after PACKET_SOCK_PRESSURE has been observed. If the flag is clear\nand the socket has moved away from tpacket_rcv, packet_set_ring() has\nalready detached the socket and waited for synchronize_net(), so no new\npacket input can set the flag again.\n\npacket_poll() already holds sk_receive_queue.lock, so it uses the new\nunlocked helper directly.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74667": {
+                "cve_id": "CVE-2026-74667",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/packet: reset the MAC header on the packet-socket transmit path\n\npacket_parse_headers() resets the MAC header only for a SOCK_RAW frame\nwhose socket did not bind a protocol. A protocol-bound SOCK_RAW socket,\nany SOCK_DGRAM frame, and the legacy SOCK_PACKET path therefore leave\nskb->mac_header unset here.\n\nFor frames sent via __dev_queue_xmit() this is harmless: it resets the\nMAC header unconditionally. But the packet-socket PACKET_QDISC_BYPASS\npath uses dev_direct_xmit(), which does not, so the frame reaches\nndo_start_xmit() with the MAC header unset. A driver that reads\neth_hdr(skb) on transmit then dereferences skb->head + (u16)~0, an\nout-of-bounds access ~64 KiB past the head -- the same class fixed for\none consumer in commit f5089008f90c (\"macsec: do not read an unset MAC\nheader in macsec_encrypt()\").\n\npacket_parse_headers() runs only on the transmit path, where skb->data\npoints at the start of the L2 header for every packet-socket type\nregardless of its length: SOCK_RAW and SOCK_PACKET carry a user-supplied\nheader and SOCK_DGRAM has one built by dev_hard_header(). Reset the MAC\nheader unconditionally, mirroring __dev_queue_xmit(), so the frame is\nanchored on the bypass path too.\n\nFound by 0sec (https://0sec.ai) using automated source analysis;\nverified against source and matched to the macsec KASAN report in\nf5089008f90c. Compile-tested.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -136004,6 +136752,23 @@
                     }
                 ]
             },
+            "CVE-2026-74692": {
+                "cve_id": "CVE-2026-74692",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/smc: fix TOCTOU race between smc_listen_out() and listener close\n\nsmc_listen_out() reads lsmc->sk.sk_state without the listener lock,\nthen acquires lock_sock_nested() only after the check passes. This\nopens a window where smc_close_active() can transition the listener\nto SMC_CLOSED, call smc_close_cleanup_listen() to drain the accept\nqueue, and release the lock, all between the lockless read and the\ndelayed lock acquisition:\n\n  smc_listen_work (smc_hs_wq)          smc_close_active()\n  -------------------------------      -------------------------\n  release_sock(child)\n  if (sk_state == SMC_LISTEN) TRUE\n                                        lock_sock(listener)\n                                        sk_state = SMC_CLOSED\n                                        smc_close_cleanup_listen()\n                                        release_sock(listener)\n                                        flush_work(tcp_listen_work)\n  lock_sock_nested(listener)\n  smc_accept_enqueue(listener, child) /* child enqueued on dead listener */\n\nsmc_close_active() flushes only tcp_listen_work. Work items already\ndispatched onto smc_hs_wq for the CLC handshake continue running\nunguarded. smc_accept_enqueue() takes a sock_hold() on the child that\nis never released, so the child smc_sock, its clcsock, and the\nreference all leak. A remote peer that opens TCP connections while the\nserver calls close() can exhaust kernel memory.\n\nMove lock_sock_nested() to before the sk_state check so that the test\nand the enqueue are atomic under the listener lock.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74695": {
                 "cve_id": "CVE-2026-74695",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -136055,10 +136820,10 @@
                     }
                 ]
             },
-            "CVE-2026-74711": {
-                "cve_id": "CVE-2026-74711",
+            "CVE-2026-74705": {
+                "cve_id": "CVE-2026-74705",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (pmbus) Fix type confusion in notification logic\n\nSashiko reports:\n\nAt the start of the loop in pmbus_notify(), the code unconditionally casts\nevery attribute to a struct sensor_device_attribute:\n\ndrivers/hwmon/pmbus/pmbus_core.c:pmbus_notify() {\n    for (i = 0; i < data->num_attributes; i++) {\n        struct device_attribute *da = to_dev_attr(data->group.attrs[i]);\n        struct sensor_device_attribute *attr = to_sensor_dev_attr(da);\n        int index = attr->index;\n...\n}\n\nHowever, data->group.attrs can contain other types like struct\npmbus_samples_reg or struct pmbus_sensor, which only embed a base\nstruct device_attribute.\n\nIf da is a struct pmbus_samples_reg, dev_attr is the last member. Casting\nit to struct sensor_device_attribute and reading the index field appears\nto access memory past the end of the allocation, which might trigger a\nslab-out-of-bounds read.\n\nAdditionally, if da is a struct pmbus_sensor, casting it causes the index\nfield to overlap with the page, phase, and reg fields. Could this produce\na garbage mask on little-endian systems that spuriously matches the target\nreg, page, and flags during an alert?\n\nFix the problem by using struct sensor_device_attr in struct pmbus_sensor\nand struct pmbus_label. Since those attributes never trigger a\nnotification, set the value of attr->index to -1 for them. Use this value\nto distinguish from boolean attributes which _can_ trigger a notification\nand use the index field to encode mask, page, and register values.",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nudp: fix potential use-after-free in tunnel segmentation\n\n__skb_udp_tunnel_segment() gets the UDP header before ensuring the\ntunnel header is in the skb head. If the pull reallocates skb->head,\nthe saved UDP header pointer is no longer valid.\n\nGet the UDP header after the pull to avoid a potential use-after-free.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -136106,10 +136871,61 @@
                     }
                 ]
             },
+            "CVE-2026-74725": {
+                "cve_id": "CVE-2026-74725",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nenic: fix tx_hang_reset use-after-free on device removal\n\nenic_remove() cancels the reset and change_mtu_work items but does not\ncancel tx_hang_reset. A TX timeout that fires while the device is being\nremoved can schedule enic_tx_hang_reset() so that it runs after\nfree_netdev(), resulting in a use-after-free.\n\ncancel_work_sync() alone is not sufficient here: the still-live watchdog\nand notify paths can re-schedule these work items in the window between\nthe cancel and unregister_netdev(). Use disable_work_sync(), which\ncancels the work and blocks any subsequent schedule_work() from\nrequeuing it, and apply it to the reset and change_mtu_work items as\nwell so the same requeue race is closed for all teardown work.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74726": {
+                "cve_id": "CVE-2026-74726",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbonding: alb: re-check primary_is_promisc under RTNL in bond_alb_monitor\n\nbond_alb_monitor() reads primary_is_promisc under RCU, then drops RCU and\ntakes RTNL via rtnl_trylock() before undoing the promiscuity it set on the\nactive slave. In that window the active slave can change under RTNL\n(RTM_DELLINK -> __bond_release_one() -> bond_alb_handle_active_change()),\nwhich already drops the promiscuity and clears primary_is_promisc. The\nmonitor still acts on the stale decision: if the slave was removed with no\nfailover, curr_active_slave is now NULL and the deref faults; if it failed\nover, the stale dev_set_promiscuity(-1) underflows the new slave's\npromiscuity counter and pins it in IFF_PROMISC.\n\n  Oops: general protection fault, probably for non-canonical address ...\n  KASAN: null-ptr-deref in range [0x0000000000000000-0x0000000000000007]\n  Workqueue: b42 bond_alb_monitor\n  RIP: 0010:bond_alb_monitor (drivers/net/bonding/bond_alb.c:1600)\n   process_one_work (kernel/workqueue.c:3322)\n   worker_thread (kernel/workqueue.c:3486)\n   kthread (kernel/kthread.c:436)\n   ret_from_fork (arch/x86/kernel/process.c:158)\n  Kernel panic - not syncing: Fatal exception\n\nRe-check primary_is_promisc (and curr_active_slave) after taking RTNL so\nthe monitor only undoes an increment it still owns. The other bonding\nmonitors already re-read state under RTNL in their commit phase\n(bond_miimon_commit/bond_ab_arp_commit); bond_alb_monitor() was the only\none acting on the pre-trylock decision.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74730": {
                 "cve_id": "CVE-2026-74730",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nNFS: Pin the 'struct nfs_server' during a FREE_STATEID call\n\nDan Aloni reports that he was able to hit a use-after-free bug if a\nFREE_STATEID operation gets delayed for whatever reason. Fix this by\nbumping the refcount of the 'struct nfs_server' object for the duration\nof the FREE_STATEID so it doesn't get cleaned up from underneath us\nwhile operations are still in flight.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74732": {
+                "cve_id": "CVE-2026-74732",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Check for tg ops in dce110_set_avmute\n\nSome older DCE timing generators do not implement is_tg_enabled in\ntheir ops table. Calling it unconditionally when waiting for AV mute\nframes causes a NULL pointer dereference on Southern Islands dGPUs\nwhen turning the display off over HDMI.\n\nCheck that tg and the required ops exist before waiting for frames.\n\n(cherry picked from commit 2686a0c0aaa07bec2e24131835cf27b5fd4935a5)",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -176633,6 +177449,32 @@
                     }
                 ]
             },
+            "CVE-2026-74586": {
+                "cve_id": "CVE-2026-74586",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: clear new_transport when removing a peer\n\nsctp_process_asconf_param() stores a newly added peer transport in\nasoc->new_transport. After all parameters in the ASCONF chunk have been\nprocessed, sctp_sf_do_asconf() uses this pointer to send a HEARTBEAT to the\nnew transport.\n\nAn authenticated ASCONF from a remote SCTP peer can add a transport and\nremove it again with a wildcard DEL-IP parameter in the same chunk. The\nwildcard deletion preserves the transport on which the ASCONF arrived, but\nremoves the newly added transport through\nsctp_assoc_del_nonprimary_peers(). The removal does not clear\nasoc->new_transport, leaving it pointing to the removed transport.\n\nsctp_sf_do_asconf() then creates a HEARTBEAT whose chunk->transport points\nto the removed transport without holding a transport reference. During\nlocal address replacement, src_out_of_asoc_ok keeps this HEARTBEAT on\ncontrol_chunk_list. After the transport is freed by RCU, a successful\nASCONF_ACK for the replacement address releases the queued HEARTBEAT and\nsctp_outq_select_transport() reads the freed transport's state.\n\nThe issue was found during a static audit of SCTP objects. With an\nauthenticated peer, the reproducer triggered the same KASAN report in 2\nof 2 unpatched runs on a KASAN-enabled netdev/main kernel:\n\n  BUG: KASAN: slab-use-after-free in sctp_outq_select_transport\n  Read of size 4 at addr ffff88800b9bd95c by task python3/197\n\n  Call Trace:\n   sctp_outq_select_transport+0x549/0x8b0 [sctp]\n   sctp_outq_flush+0x306/0x2c60 [sctp]\n   sctp_transport_immediate_rtx+0xaf/0x260 [sctp]\n   sctp_process_asconf_ack+0xa48/0xf70 [sctp]\n\n  Allocated by task 197:\n   sctp_transport_new+0x68/0x650 [sctp]\n   sctp_assoc_add_peer+0x258/0x12a0 [sctp]\n   sctp_process_asconf+0x5e9/0x1090 [sctp]\n\n  Last potentially related work creation:\n   __call_rcu_common.constprop.0+0x77/0xb70\n   sctp_assoc_del_nonprimary_peers+0x7c/0xd0 [sctp]\n   sctp_process_asconf+0xd9c/0x1090 [sctp]\n\nThe first invalid access was a four-byte read of transport->state at\nnet/sctp/outqueue.c:833. The same reproducer completed the full\nauthenticated ASCONF and local-address replacement sequence with this\nchange without a KASAN report or oops.\n\nClear new_transport when its peer is removed, before it can be used to\ncreate the HEARTBEAT.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74587": {
+                "cve_id": "CVE-2026-74587",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: fix use-after-free of cached ASCONF chunk\n\naddip_last_asconf caches the outstanding outbound ASCONF chunk. The normal\nASCONF-ACK completion path releases the chunk and clears the pointer.\n\nHowever, sctp_asconf_queue_teardown() releases the cached chunk without\nclearing addip_last_asconf. During peer restart handling,\nsctp_sf_do_dupcook_a() queues SCTP_CMD_PURGE_ASCONF_QUEUE, which invokes\nsctp_asconf_queue_teardown() while the association remains alive and leaves\nthe pointer dangling.\n\nA delayed authenticated ASCONF-ACK can then reach sctp_sf_do_asconf_ack(),\nwhich accesses the stale chunk and passes it to sctp_process_asconf_ack(),\ncausing a use-after-free and a second release.\n\nClearing the pointer exposes a race with T4 expiry. Peer restart handling\nqueues the timer stop before the purge, but SCTP_CMD_TIMER_STOP uses\ntimer_delete(), which does not wait for a callback already running on\nanother CPU. Such a callback can reach sctp_sf_t4_timer_expire() after\nthe purge and dereference NULL.\n\nClear addip_last_asconf after releasing the cached chunk, and make\nsctp_sf_t4_timer_expire() consume a stale T4 expiry if no outstanding\nASCONF remains.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74588": {
                 "cve_id": "CVE-2026-74588",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -176659,10 +177501,62 @@
                     }
                 ]
             },
+            "CVE-2026-74590": {
+                "cve_id": "CVE-2026-74590",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfsverity: Fix bpf_get_fsverity_digest() dynptr assumptions\n\nThe BPF verifier and the dynptr abstraction ensure that the memory space\nreferenced by a dynptr remains valid.  They do not, however, provide any\nguarantee that the contents of the memory are stable.  kfuncs are\nexpected to remain memory-safe even if concurrent modifications occur.\n\nbpf_get_fsverity_digest() didn't follow that: it could crash if\narg->digest_size was concurrently modified.\n\nFix that by using the known-good value hash_alg->digest_size instead.\n\nAlso widen 'dynptr_sz' and 'out_digest_sz' to u64 to match the return\ntype of __bpf_dynptr_size().  It doesn't appear that it can actually be\nmore than INT_MAX currently (since __bpf_dynptr_data_rw() excludes\nfile-based pointers), but the correct type might as well be used.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74592": {
+                "cve_id": "CVE-2026-74592",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nima: Instantiate file_truncate and path_truncate hooks\n\nInstantiate the file_truncate and path_truncate LSM hooks to reset the\naction cache flags (IMA_DONE_MASK) as soon as truncation is requested,\nso the file, based on policy, is re-collected, re-measured, re-audited,\nand re-appraised on next access.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74595": {
                 "cve_id": "CVE-2026-74595",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfscrypt: use the mount idmap for the owner check in fscrypt_ioctl_set_policy()\n\nfscrypt_ioctl_set_policy() calls inode_owner_or_capable() with\n&nop_mnt_idmap before allowing an encryption policy to be set, instead\nof the idmap of the mount the ioctl was issued on.\n\nfscrypt is used by filesystems that support idmapped mounts (e.g. ext4,\nf2fs), so on such a mount this compares the caller's fsuid against the\nunmapped on-disk owner rather than the mapped owner: the actual owner\ncan be wrongly denied with -EACCES and an unrelated caller wrongly\nallowed.  Use file_mnt_idmap(filp) instead.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74597": {
+                "cve_id": "CVE-2026-74597",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nip6_tunnel: clear skb2->cb[] in ip6ip6_err()\n\nip6ip6_err() clones an outer IPv6 ICMP error skb, pulls it to the\nquoted inner IPv6 packet, and then passes the clone to icmpv6_send().\nThe clone still carries the outer packet's inet6_skb_parm in skb->cb.\n\nIf the outer packet had a Home Address Option, IP6CB(skb2)->dsthao\nremains non-zero after skb_pull(). icmpv6_send() later calls\nmip6_addr_swap(), which uses that stale dsthao offset against the quoted\ninner packet. A malformed inner destination-options header can then make\nthe HAO lookup and address swap run past the end of the quoted packet\nand corrupt skb_shared_info.\n\nClear skb2->cb[] before pulling the quoted inner IPv6 packet so the\nreply path does not reuse metadata left by the outer IPv6 stack.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74598": {
+                "cve_id": "CVE-2026-74598",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv6: fix Route Information option length validation\n\nrt6_route_rcv() validates the Route Information option (RFC 4191) length\nagainst the prefix length, but both checks are off by one.\n\nrinfo->length is the ND option length in units of 8 octets and it\n*includes* the 8-byte option header, so an option carrying N bytes of\nprefix has length == 1 + N/8.  RFC 4191 section 2.3 requires length 3\nwhen Prefix Length is greater than 64, and 2 or 3 when it is greater\nthan 0.  The code accepts length >= 2 and length >= 1 respectively.\n\nipv6_addr_prefix() then copies prefix_len/8 bytes out of rinfo->prefix,\nso a Router Advertisement with (prefix_len=128, length=2) or\n(prefix_len=64, length=1) makes the kernel read up to 8 bytes past the\nend of the option.  Those bytes end up in the prefix of the route that\ngets installed, so they are visible to userspace:\n\n  # RA with a Route Information option (prefix_len=128, length=2)\n  # followed by a source link-layer address option, 01 01 de ad be ef ca fe\n  $ ip -6 route show\n  2001:db8:dead:beef:101:dead:beef:cafe via fe80::1234 dev veth0 proto ra\n                     ^^^^^^^^^^^^^^^^^^ the next option, read out of bounds\n\nWhen the Route Information option is the last one in the packet, those\neight bytes come from the skb tail room instead.\n\nReject the option lengths RFC 4191 does not allow.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -176685,6 +177579,19 @@
                     }
                 ]
             },
+            "CVE-2026-74604": {
+                "cve_id": "CVE-2026-74604",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nRevert \"thermal/drivers/hwmon: Cleanup coding style a bit\"\n\nRevert commit 030a48b0f6ce (\"thermal/drivers/hwmon: Cleanup coding style\na bit\") that introduced a use-after-free into the error path of\nthermal_add_hwmon_sysfs() by removing a valid check from it.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74607": {
                 "cve_id": "CVE-2026-74607",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -176698,10 +177605,88 @@
                     }
                 ]
             },
+            "CVE-2026-74608": {
+                "cve_id": "CVE-2026-74608",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsmb: client: Fix use-after-free in cifs_try_adding_channels()\n\ncifs_try_adding_channels() takes a temporary reference to an interface\nbefore dropping iface_lock. If cifs_ses_add_channel() fails, it drops\nthat reference and then increments iface->weight_fulfilled.\n\nA concurrent interface list refresh can remove the list reference while\nchannel creation is in progress. In that case, the failure-path\nkref_put() releases the last reference and frees iface. Updating\nweight_fulfilled afterward then accesses freed memory.\n\nIncrement weight_fulfilled before dropping the temporary reference,\nkeeping iface alive for the final access.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74609": {
+                "cve_id": "CVE-2026-74609",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntipc: read le->link under the node lock in tipc_node_link_down()\n\ntipc_node_link_down() caches the link pointer before taking n->lock:\n\n\tstruct tipc_link *l = le->link;\t\t/* unlocked */\n\n\tif (!l)\n\t\treturn;\n\ttipc_node_write_lock(n);\n\tif (!tipc_link_is_establishing(l)) {\t/* deref l */\n\t...\n\t\ttipc_link_reset(l);\t\t/* write into l */\n\tif (delete) {\n\t\tkfree(l);\n\t\tle->link = NULL;\n\nThe delete=true caller frees that very object under n->lock, so the lock\ndoes not protect the cached pointer against it:\n\n - CPU A, delete=false: tipc_rcv() on TIPC_LINK_DOWN_EVT, or the link\n   supervision timer via tipc_node_timeout(), reads l unlocked and then\n   dereferences it under n->lock;\n - CPU B, delete=true: netlink TIPC_NL_BEARER_DISABLE -> bearer_disable()\n   -> tipc_node_delete_links() -> tipc_node_link_down(n, bearer_id, true)\n   -> kfree(l).\n\nThe link is freed with plain kfree(), not kfree_rcu(), and for UDP bearers\ndisable_media() only schedules the asynchronous cleanup_bearer() work, so\nits synchronize_net() runs after the links are already gone.  An in-flight\nCPU A that has read l therefore dereferences freed memory once B frees it:\na use-after-free read in tipc_link_is_establishing(), and a use-after-free\nwrite via tipc_link_reset() on the establishing branch.\n\nThe following trace was captured on 7.2.0-rc5-00284-gaf39eb111ce6:\n\n  BUG: KASAN: slab-use-after-free in tipc_link_is_establishing (net/tipc/link.c:285)\n  Read of size 4 at addr ffff88802e2aa068 by task swapper/2/0\n   tipc_link_is_establishing (net/tipc/link.c:285)\n   tipc_node_link_down (net/tipc/node.c:1076)\n   tipc_node_timeout (net/tipc/node.c:843)\n  Allocated by task 9549:\n   tipc_link_create (net/tipc/link.c:490)\n   tipc_node_check_dest (net/tipc/node.c:1279)\n   tipc_disc_rcv (net/tipc/discover.c:252)\n   tipc_udp_recv (net/tipc/udp_media.c:389)\n  Freed by task 9549:\n   tipc_node_link_down (net/tipc/node.c:1084)\n   tipc_node_delete_links (net/tipc/node.c:1320)\n   bearer_disable (net/tipc/bearer.c:414)\n   __tipc_nl_bearer_disable (net/tipc/bearer.c:992)\n\nMove the le->link read inside tipc_node_write_lock(), so it is serialised\nagainst the kfree() in the delete path.  A racing teardown now either has\nnot run yet, and we see a valid link, or has already run, and we see NULL.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74611": {
+                "cve_id": "CVE-2026-74611",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntls: rx: restore msg_iter before TLS 1.3 optimistic retry\n\ntls_decrypt_sg() advances msg->msg_iter when it maps user pages for\nthe optimistic TLS 1.3 zero-copy path. If the decrypted record turns\nout not to be unpadded application data, tls_decrypt_sw() retries into\na kernel skb, but leaves the iterator advanced.\n\nThe subsequent copy from the skb then writes decrypted bytes again at\na later point in the caller iovecs while recvmsg() reports only the\npost-retry length. A TLS peer can trigger this after the receiver\nenables TLS_RX_EXPECT_NO_PAD.\n\nRevert the iterator by the number of bytes consumed by the optimistic\nmapping before retrying without zero-copy.\n\nAdd a selftest which sends a TLS 1.3 control record with\nTLS_RX_EXPECT_NO_PAD enabled and verifies that recvmsg() does not\noverwrite later iovecs beyond the returned length.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74613": {
+                "cve_id": "CVE-2026-74613",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: avoid refilling the RX queue after teardown\n\nCommit b917507e5ad9 (\"vsock/virtio: stop workers during the .remove()\")\nmade the RX worker jump to its common exit when rx_run is clear.  That\nexit still refills the RX queue when the buffer count is low, so work\nqueued across virtio_vsock_vqs_del() can add buffers after the virtqueues\nhave been deleted.\n\nBUG: KASAN: slab-use-after-free in virtqueue_add_sgs\nRead of size 4 by task kworker/0:1\nWorkqueue: virtio_vsock virtio_transport_rx_work\nCall Trace:\n virtqueue_add_sgs (drivers/virtio/virtio_ring.c:2796)\n virtio_vsock_rx_fill (net/vmw_vsock/virtio_transport.c:332)\n virtio_transport_rx_work (net/vmw_vsock/virtio_transport.c:701)\n process_one_work (kernel/workqueue.c:3314)\n worker_thread (kernel/workqueue.c:3478)\n kthread (kernel/kthread.c:436)\n ret_from_fork (arch/x86/kernel/process.c:158)\n ret_from_fork_asm (arch/x86/entry/entry_64.S:245)\n...\nFreed by task 141:\n kfree (mm/slub.c:6566)\n vp_del_vq (drivers/virtio/virtio_pci_common.c:259)\n vp_del_vqs (drivers/virtio/virtio_pci_common.c:285)\n virtio_vsock_freeze (net/vmw_vsock/virtio_transport.c:912)\n virtio_device_freeze (drivers/virtio/virtio.c:658)\n virtio_pci_freeze (drivers/virtio/virtio_pci_common.c:601)\n pci_pm_freeze (drivers/pci/pci-driver.c:1098)\n device_suspend (drivers/base/power/main.c:1968)\nKernel panic - not syncing: KASAN: panic_on_warn set ...\n\nJump to a no-refill exit when rx_run is clear, leaving the normal exit\nto replenish a running queue.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74614": {
                 "cve_id": "CVE-2026-74614",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: read virtqueues under worker locks\n\nCommit bd50c5dc182b (\"vsock/virtio: add support for device\nsuspend/resume\") made the *_run flags transition from false to true when\nrestore installs replacement virtqueues.  The RX, TX and event workers\nread their virtqueue before locking and checking the corresponding flag,\nso a worker delayed across freeze and restore can observe the replacement\nqueue's running state while retaining a pointer to the deleted queue.\n\nRead each virtqueue under its mutex after checking the run flag, keeping\nthe pointer and state in the same queue generation.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74615": {
+                "cve_id": "CVE-2026-74615",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvxlan: do not arm the ageing timer on a device that is down\n\nvxlan_changelink() arms vxlan->age_timer whenever the requested ageing\ninterval differs from the configured one:\n\n\tif (conf.age_interval != vxlan->cfg.age_interval)\n\t\tmod_timer(&vxlan->age_timer, jiffies);\n\nThere is no netif_running() test, so the timer is armed even on a device\nthat was never brought up.  The only synchronous cancel in the driver is\nthe timer_delete_sync() in vxlan_stop(), which is .ndo_stop.\nnetif_close_many() drops devices without IFF_UP before\n__dev_close_many() runs, so that cancel is skipped for such a device.\n\nvxlan_setup() sets dev->needs_free_netdev = true and age_timer is a\nmember of struct vxlan_dev, so free_netdev() releases the allocation the\ntimer lives in while it is still queued on a timer_base.\nexpire_timers() unlinks the entry before it loads timer->function, so\nthe timer core writes through the freed object's list pointers:\n\n  BUG: KASAN: slab-use-after-free in __run_timers+0x208/0x654\n  Write of size 8 at addr ffff00001adace68 by task true/192\n   __asan_store8+0x84/0xac\n   __run_timers+0x208/0x654\n   run_timer_softirq+0x154/0x18c\n  Allocated by task 189:\n   alloc_netdev_mqs+0x64/0x720\n   rtnl_create_link+0x4ac/0x520\n   rtnl_newlink+0x758/0xd00\n  Freed by task 191:\n   netdev_release+0x40/0x58\n   netdev_run_todo+0x4a4/0x8c0\n   rtnl_dellink+0x200/0x4e8\n\nThe rtnl operations involved are netns-scoped, so an unprivileged user\ncan perform them in a new user and network namespace.\n\nArming the timer on a down device never had an effect: vxlan_cleanup()\nreturns early on !netif_running(), and vxlan_open() arms the timer for\nany non-zero interval once the device is brought up.  Add the missing\ntest.\n\nDiscovered by XBOW, triaged by Baul Lee <baul.lee@xbow.com>",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74617": {
+                "cve_id": "CVE-2026-74617",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndibs: initialise dibs->lock in dibs_dev_alloc()\n\ndibs->lock is initialised by dibs_dev_add(), but a dibs device can\nalready take interrupts before that call: ism_probe() runs\nism_dev_init(), and hence request_irq(), before it calls\ndibs_dev_add(). No client can have registered a dmb at that point, so\nno dmb interrupt can occur, but a GID event interrupt can, and\nism_handle_irq() takes dibs->lock unconditionally on entry, before it\ninspects anything else.\n\nInitialise the lock in dibs_dev_alloc() instead, so that it is valid as\nsoon as a driver can publish the device to its interrupt handler.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -176750,6 +177735,45 @@
                     }
                 ]
             },
+            "CVE-2026-74626": {
+                "cve_id": "CVE-2026-74626",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nNTB: ntb_netdev: Preserve RX queue depth on allocation failure\n\nntb_netdev_rx_handler() hands the received skb to the network stack\nbefore allocating its replacement. If the allocation fails, nothing is\nreposted. Every failure therefore takes one buffer out of the RX queue\nwhile the interface remains up, and enough failures eventually stall\nreception.\n\nA retry path could refill the queue later, but ntb_netdev has none.\nAllocate the replacement first instead. If that fails, drop the packet\nand repost the same skb. This keeps the queue full and lets packet\ndelivery resume as soon as memory is available again.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74629": {
+                "cve_id": "CVE-2026-74629",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/dibs: Correct freeing of dmb_clientid_arr\n\nA dibs device interrupt handler can be active after dibs_dev_del() and\nmay still access dmb_clientid_arr. (UAF)\n\nIn case of a failure in dibs_dev_add() being called by dibs_lo_dev_probe()\ndmb_clientid_arr is freed twice (double free).\n\nFree dmb_clientid_arr in dibs_dev_release() after last reference is gone.\nNote that allocating in dibs_dev_add() instead of dibs_dev_alloc() is ok\nfor now, because no dmbs can be registered before dibs_dev_add().",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74631": {
+                "cve_id": "CVE-2026-74631",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: smc: fix splice entry lifetime imbalance in smc_rx_splice\n\nsmc_rx_splice() passes pages to splice_to_pipe() before taking the\nreferences that cover the lifetime of each splice entry. In the\nVM-backed RMB path, splice_to_pipe() may drop unqueued entries through\nsmc_rx_spd_release(), while queued entries are released later via the\npipe buffer callback.\n\nThe old post-splice accounting also derives the number of queued VM pages\nfrom an offset mutated while building the descriptor, and a multi-page\nsplice pairs one sock_hold() with multiple sock_put() calls.\n\nTake the page and socket references for every candidate entry before\nsplice_to_pipe(), and drop the matching private state, page reference,\nand socket reference from smc_rx_spd_release() for entries that never\nget queued. This fixes a refcount imbalance that can underflow page\nrefcounts and trigger a use-after-free.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74632": {
                 "cve_id": "CVE-2026-74632",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -176763,10 +177787,49 @@
                     }
                 ]
             },
+            "CVE-2026-74635": {
+                "cve_id": "CVE-2026-74635",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfbdev: bitblit: bound-check glyph index in bit_cursor()\n\nbit_cursor() fetches the glyph under the cursor with\n\n\tc = scr_readw(vc_pos);\n\tsrc = vc_font.data + ((c & charmask) * w * height);\n\nwhere charmask is 0x1ff when vc_hi_font_mask is set. The screen buffer\nvalue comes directly from scr_readw() and may be larger than the current\nfont's glyph count.\n\nSyzkaller triggers this via vcs_write(). The Call Trace shows\nvcs_write() in vc_screen.c writing an arbitrary 16-bit value with\nwritev() to /dev/vcsa, which vcs_write_buf() in vc_screen.c stores via\nvcs_scr_writew() without checking charcount. The stored value is later\nread in bit_cursor() in bitblit.c.\n\nWhen the font is changed from a font with 512 glyphs to a font with\n256 glyphs, the screen buffer can retain characters with the high\nbit set from the previous mode, which could also produce the same\nout-of-bounds access.\n\n  BUG: KASAN: global-out-of-bounds in soft_cursor+0x378/0x6bc drivers/video/fbdev/core/softcursor.c:70\n  Read of size 16 at addr ffff800086c57970\n\n  Call Trace:\n   soft_cursor+0x378/0x6bc drivers/video/fbdev/core/softcursor.c:70\n   bit_cursor+0xa90/0x1108 drivers/video/fbdev/core/bitblit.c:365\n   fbcon_cursor+0x344/0x498 drivers/video/fbdev/core/fbcon.c:1427\n   hide_cursor+0xdc/0x2d0 drivers/tty/vt/vt.c:883\n   update_region+0x100/0x18c drivers/tty/vt/vt.c:669\n   vcs_write+0x8ec/0xaf0 drivers/tty/vt/vc_screen.c:685\n\nbit_putcs_aligned() and bit_putcs_unaligned() already clamp the glyph\nindex to vc_font.charcount. Apply the same clamp in bit_cursor() after\nextracting the attribute and masking, before indexing fontdata.\n\nThe fix completes the bounds checking started in commit 18c4ef4e765a\n(\"fbdev: bitblit: bound-check glyph index in bit_putcs*\"), which missed\nthe cursor path.\n\nThis change should be safe because the clamp reuses the existing\ncontract from fbcon: charcount is maintained under console_lock in\ncon_font_set() and fbcon_font_set(), and hi_font_mask is cleared when\nswitching from 512 to 256 glyphs. When stale screen data with high bits\nremains after a font switch, or when vcs_write() stores an arbitrary\nvalue, clamping the index to 0 prevents the out-of-bounds read without\nchanging cursor semantics \u2014 the same fallback bit_putcs uses.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74642": {
+                "cve_id": "CVE-2026-74642",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: usb: Fix UAF at delayed release of MIDI2 EPs\n\nThe recent fix for UAF in ump_to_endpoint() caused another UAF because\nit tries to dereference the UMP endpoint object, but this might be\nexecuted at a delayed context where the endpoint has been already\nreleased.\n\nAdd private_free to clear the associated data for avoiding the further\ndereference for delayed releases.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74657": {
                 "cve_id": "CVE-2026-74657",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nipv4: Fix fib_nlmsg_size() for RTA_VIA nexthops\n\nfib_nlmsg_size() still estimates nexthop space as if every gateway is\nencoded as an IPv4 RTA_GATEWAY attribute. IPv4 routes can also carry an\nIPv6 gateway, which fib_nexthop_info() dumps as RTA_VIA.\n\nAs a result, route notifications can allocate an skb that is too small.\nfib_dump_info() then fails with -EMSGSIZE and rtmsg_fib() hits the\nWARN_ON() that marks such failures as a fib_nlmsg_size() bug. With\npanic_on_warn set, this becomes a kernel panic.\n\nMirror the actual nexthop dump layout in fib_nlmsg_size(): account for\nIPv6 nexthop gateways dumped as RTA_VIA, for the no-header rtnexthop\nlayout used inside RTA_MULTIPATH, and for RTA_FLOW only when it is\nactually present.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74660": {
+                "cve_id": "CVE-2026-74660",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnetfilter: ebt_nflog: pin the NFLOG backend\n\nnf_log_unregister() runs after the per-net teardown so its final RCU\ngrace period also drains readers that obtained the logger from a per-net\nbinding.  However, ebt_nflog passes an explicit ULOG log type to\nnf_log_packet() without holding a reference on the selected logger module,\nunlike the xt_NFLOG and nft_log frontends.\n\nAn ebtables nflog rule can therefore remain callable while nfnetlink_log\nis unloaded.  The resulting interleaving is:\n\n  CPU 0                               CPU 1\n  nfnetlink_log_fini()\n    unregister_pernet_subsys()\n      kfree(nfnl_log_pernet(net))\n                                      ebt_nflog_tg()\n                                        nf_log_packet()\n                                          nfulnl_log_packet()\n                                            instance_lookup_get_rcu()\n\nThe global ULOG logger is still registered at this point, so CPU 1\ndereferences the per-net state after CPU 0 has freed it.  KASAN reported:\n\n  BUG: KASAN: slab-use-after-free in instance_lookup_get_rcu\n  Read of size 8 at addr ff110001052e6210 by task poc/92\n  Call Trace:\n   instance_lookup_get_rcu+0x1ce/0x1f0 [nfnetlink_log]\n   nfulnl_log_packet+0x248/0x2fb0 [nfnetlink_log]\n   nf_log_packet+0x204/0x300\n   ebt_nflog_tg+0x351/0x550\n   ebt_do_table+0xedf/0x22b0\n  Allocated by task 90:\n   __kmalloc_noprof+0x186/0x470\n   ops_init+0x6d/0x420\n   register_pernet_operations+0x2f6/0x670\n   register_pernet_subsys+0x23/0x40\n  Freed by task 93:\n   kfree+0x131/0x3c0\n   ops_undo_list+0x3e3/0x700\n   unregister_pernet_operations+0x232/0x490\n   unregister_pernet_subsys+0x1c/0x30\n   nfnetlink_log_fini+0x34/0x450 [nfnetlink_log]\n\nAcquire the ULOG logger module reference when an ebt_nflog rule is\nvalidated and release it when the rule is destroyed.  Request the NFLOG\nbackend for legacy callers when needed, matching xt_NFLOG.  This prevents\nmodule teardown until all ebt_nflog rules have stopped using the logger.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -176793,6 +177856,19 @@
                 "cve_id": "CVE-2026-74666",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\npacket: synchronize pressure clearing with ring reconfiguration\n\npacket_set_ring() updates the RX ring state under sk_receive_queue.lock,\nbut used to publish the tpacket receive mode through po->prot_hook.func\nafter releasing that lock. packet_poll() and packet_recvmsg() can then\nrun the pressure clearing path after the ring has been cleared while\nstill seeing tpacket_rcv, causing __packet_rcv_has_room() to dereference\nstale or NULL ring storage.\n\nMove the existing receive hook assignment into the same\nsk_receive_queue.lock section as the ring state update. Keep the\nassignment otherwise unchanged, including on TX ring reconfiguration, to\navoid adding behavior changes that are not required for the fix.\n\nSerialize packet_recvmsg() pressure clearing with the same queue lock\nonly after PACKET_SOCK_PRESSURE has been observed. If the flag is clear\nand the socket has moved away from tpacket_rcv, packet_set_ring() has\nalready detached the socket and waited for synchronize_net(), so no new\npacket input can set the flag again.\n\npacket_poll() already holds sk_receive_queue.lock, so it uses the new\nunlocked helper directly.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74667": {
+                "cve_id": "CVE-2026-74667",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/packet: reset the MAC header on the packet-socket transmit path\n\npacket_parse_headers() resets the MAC header only for a SOCK_RAW frame\nwhose socket did not bind a protocol. A protocol-bound SOCK_RAW socket,\nany SOCK_DGRAM frame, and the legacy SOCK_PACKET path therefore leave\nskb->mac_header unset here.\n\nFor frames sent via __dev_queue_xmit() this is harmless: it resets the\nMAC header unconditionally. But the packet-socket PACKET_QDISC_BYPASS\npath uses dev_direct_xmit(), which does not, so the frame reaches\nndo_start_xmit() with the MAC header unset. A driver that reads\neth_hdr(skb) on transmit then dereferences skb->head + (u16)~0, an\nout-of-bounds access ~64 KiB past the head -- the same class fixed for\none consumer in commit f5089008f90c (\"macsec: do not read an unset MAC\nheader in macsec_encrypt()\").\n\npacket_parse_headers() runs only on the transmit path, where skb->data\npoints at the start of the L2 header for every packet-socket type\nregardless of its length: SOCK_RAW and SOCK_PACKET carry a user-supplied\nheader and SOCK_DGRAM has one built by dev_hard_header(). Reset the MAC\nheader unconditionally, mirroring __dev_queue_xmit(), so the frame is\nanchored on the bypass path too.\n\nFound by 0sec (https://0sec.ai) using automated source analysis;\nverified against source and matched to the macsec KASAN report in\nf5089008f90c. Compile-tested.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -176893,6 +177969,19 @@
                     }
                 ]
             },
+            "CVE-2026-74692": {
+                "cve_id": "CVE-2026-74692",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet/smc: fix TOCTOU race between smc_listen_out() and listener close\n\nsmc_listen_out() reads lsmc->sk.sk_state without the listener lock,\nthen acquires lock_sock_nested() only after the check passes. This\nopens a window where smc_close_active() can transition the listener\nto SMC_CLOSED, call smc_close_cleanup_listen() to drain the accept\nqueue, and release the lock, all between the lockless read and the\ndelayed lock acquisition:\n\n  smc_listen_work (smc_hs_wq)          smc_close_active()\n  -------------------------------      -------------------------\n  release_sock(child)\n  if (sk_state == SMC_LISTEN) TRUE\n                                        lock_sock(listener)\n                                        sk_state = SMC_CLOSED\n                                        smc_close_cleanup_listen()\n                                        release_sock(listener)\n                                        flush_work(tcp_listen_work)\n  lock_sock_nested(listener)\n  smc_accept_enqueue(listener, child) /* child enqueued on dead listener */\n\nsmc_close_active() flushes only tcp_listen_work. Work items already\ndispatched onto smc_hs_wq for the CLC handshake continue running\nunguarded. smc_accept_enqueue() takes a sock_hold() on the child that\nis never released, so the child smc_sock, its clcsock, and the\nreference all leak. A remote peer that opens TCP connections while the\nserver calls close() can exhaust kernel memory.\n\nMove lock_sock_nested() to before the sk_state check so that the test\nand the enqueue are atomic under the listener lock.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74695": {
                 "cve_id": "CVE-2026-74695",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -176932,10 +178021,10 @@
                     }
                 ]
             },
-            "CVE-2026-74711": {
-                "cve_id": "CVE-2026-74711",
+            "CVE-2026-74705": {
+                "cve_id": "CVE-2026-74705",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhwmon: (pmbus) Fix type confusion in notification logic\n\nSashiko reports:\n\nAt the start of the loop in pmbus_notify(), the code unconditionally casts\nevery attribute to a struct sensor_device_attribute:\n\ndrivers/hwmon/pmbus/pmbus_core.c:pmbus_notify() {\n    for (i = 0; i < data->num_attributes; i++) {\n        struct device_attribute *da = to_dev_attr(data->group.attrs[i]);\n        struct sensor_device_attribute *attr = to_sensor_dev_attr(da);\n        int index = attr->index;\n...\n}\n\nHowever, data->group.attrs can contain other types like struct\npmbus_samples_reg or struct pmbus_sensor, which only embed a base\nstruct device_attribute.\n\nIf da is a struct pmbus_samples_reg, dev_attr is the last member. Casting\nit to struct sensor_device_attribute and reading the index field appears\nto access memory past the end of the allocation, which might trigger a\nslab-out-of-bounds read.\n\nAdditionally, if da is a struct pmbus_sensor, casting it causes the index\nfield to overlap with the page, phase, and reg fields. Could this produce\na garbage mask on little-endian systems that spuriously matches the target\nreg, page, and flags during an alert?\n\nFix the problem by using struct sensor_device_attr in struct pmbus_sensor\nand struct pmbus_label. Since those attributes never trigger a\nnotification, set the value of attr->index to -1 for them. Use this value\nto distinguish from boolean attributes which _can_ trigger a notification\nand use the index field to encode mask, page, and register values.",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nudp: fix potential use-after-free in tunnel segmentation\n\n__skb_udp_tunnel_segment() gets the UDP header before ensuring the\ntunnel header is in the skb head. If the pull reallocates skb->head,\nthe saved UDP header pointer is no longer valid.\n\nGet the UDP header after the pull to avoid a potential use-after-free.",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
@@ -176971,10 +178060,49 @@
                     }
                 ]
             },
+            "CVE-2026-74725": {
+                "cve_id": "CVE-2026-74725",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nenic: fix tx_hang_reset use-after-free on device removal\n\nenic_remove() cancels the reset and change_mtu_work items but does not\ncancel tx_hang_reset. A TX timeout that fires while the device is being\nremoved can schedule enic_tx_hang_reset() so that it runs after\nfree_netdev(), resulting in a use-after-free.\n\ncancel_work_sync() alone is not sufficient here: the still-live watchdog\nand notify paths can re-schedule these work items in the window between\nthe cancel and unregister_netdev(). Use disable_work_sync(), which\ncancels the work and blocks any subsequent schedule_work() from\nrequeuing it, and apply it to the reset and change_mtu_work items as\nwell so the same requeue race is closed for all teardown work.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74726": {
+                "cve_id": "CVE-2026-74726",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nbonding: alb: re-check primary_is_promisc under RTNL in bond_alb_monitor\n\nbond_alb_monitor() reads primary_is_promisc under RCU, then drops RCU and\ntakes RTNL via rtnl_trylock() before undoing the promiscuity it set on the\nactive slave. In that window the active slave can change under RTNL\n(RTM_DELLINK -> __bond_release_one() -> bond_alb_handle_active_change()),\nwhich already drops the promiscuity and clears primary_is_promisc. The\nmonitor still acts on the stale decision: if the slave was removed with no\nfailover, curr_active_slave is now NULL and the deref faults; if it failed\nover, the stale dev_set_promiscuity(-1) underflows the new slave's\npromiscuity counter and pins it in IFF_PROMISC.\n\n  Oops: general protection fault, probably for non-canonical address ...\n  KASAN: null-ptr-deref in range [0x0000000000000000-0x0000000000000007]\n  Workqueue: b42 bond_alb_monitor\n  RIP: 0010:bond_alb_monitor (drivers/net/bonding/bond_alb.c:1600)\n   process_one_work (kernel/workqueue.c:3322)\n   worker_thread (kernel/workqueue.c:3486)\n   kthread (kernel/kthread.c:436)\n   ret_from_fork (arch/x86/kernel/process.c:158)\n  Kernel panic - not syncing: Fatal exception\n\nRe-check primary_is_promisc (and curr_active_slave) after taking RTNL so\nthe monitor only undoes an increment it still owns. The other bonding\nmonitors already re-read state under RTNL in their commit phase\n(bond_miimon_commit/bond_ab_arp_commit); bond_alb_monitor() was the only\none acting on the pre-trylock decision.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-74730": {
                 "cve_id": "CVE-2026-74730",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nNFS: Pin the 'struct nfs_server' during a FREE_STATEID call\n\nDan Aloni reports that he was able to hit a use-after-free bug if a\nFREE_STATEID operation gets delayed for whatever reason. Fix this by\nbumping the refcount of the 'struct nfs_server' object for the duration\nof the FREE_STATEID so it doesn't get cleaned up from underneath us\nwhile operations are still in flight.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-74732": {
+                "cve_id": "CVE-2026-74732",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ndrm/amd/display: Check for tg ops in dce110_set_avmute\n\nSome older DCE timing generators do not implement is_tg_enabled in\ntheir ops table. Calling it unconditionally when waiting for AV mute\nframes causes a NULL pointer dereference on Southern Islands dGPUs\nwhen turning the display off over HDMI.\n\nCheck that tg and the required ops exist before waiting for frames.\n\n(cherry picked from commit 2686a0c0aaa07bec2e24131835cf27b5fd4935a5)",
                 "severity": "MEDIUM",
                 "status": "open",
                 "events": [
