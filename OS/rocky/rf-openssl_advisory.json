@@ -7,11 +7,15 @@
                 "title": "Issue summary: An OpenSSL TLS 1.3 server may fail to negotiate th ...",
                 "description": "Issue summary: An OpenSSL TLS 1.3 server may fail to negotiate the expected\npreferred key exchange group when its key exchange group configuration includes\nthe default by using the 'DEFAULT' keyword.\n\nImpact summary: A less preferred key exchange may be used even when a more\npreferred group is supported by both client and server, if the group\nwas not included among the client's initial predicated keyshares.\nThis will sometimes be the case with the new hybrid post-quantum groups,\nif the client chooses to defer their use until specifically requested by\nthe server.\n\nIf an OpenSSL TLS 1.3 server's configuration uses the 'DEFAULT' keyword to\ninterpolate the built-in default group list into its own configuration, perhaps\nadding or removing specific elements, then an implementation defect causes the\n'DEFAULT' list to lose its 'tuple' structure, and all server-supported groups\nwere treated as a single sufficiently secure 'tuple', with the server not\nsending a Hello Retry Request (HRR) even when a group in a more preferred tuple\nwas mutually supported.\n\nAs a result, the client and server might fail to negotiate a mutually supported\npost-quantum key agreement group, such as 'X25519MLKEM768', if the client's\nconfiguration results in only 'classical' groups (such as 'X25519' being the\nonly ones in the client's initial keyshare prediction).\n\nOpenSSL 3.5 and later support a new syntax for selecting the most preferred TLS\n1.3 key agreement group on TLS servers.  The old syntax had a single 'flat'\nlist of groups, and treated all the supported groups as sufficiently secure.\nIf any of the keyshares predicted by the client were supported by the server\nthe most preferred among these was selected, even if other groups supported by\nthe client, but not included in the list of predicted keyshares would have been\nmore preferred, if included.\n\nThe new syntax partitions the groups into distinct 'tuples' of roughly\nequivalent security.  Within each tuple the most preferred group included among\nthe client's predicted keyshares is chosen, but if the client supports a group\nfrom a more preferred tuple, but did not predict any corresponding keyshares,\nthe server will ask the client to retry the ClientHello (by issuing a Hello\nRetry Request or HRR) with the most preferred mutually supported group.\n\nThe above works as expected when the server's configuration uses the built-in\ndefault group list, or explicitly defines its own list by directly defining the\nvarious desired groups and group 'tuples'.\n\nNo OpenSSL FIPS modules are affected by this issue, the code in question lies\noutside the FIPS boundary.\n\nOpenSSL 3.6 and 3.5 are vulnerable to this issue.\n\nOpenSSL 3.6 users should upgrade to OpenSSL 3.6.2 once it is released.\nOpenSSL 3.5 users should upgrade to OpenSSL 3.5.6 once it is released.\n\nOpenSSL 3.4, 3.3, 3.0, 1.0.2 and 1.1.1 are not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -82,6 +86,10 @@
                     {
                         "introduced": "1:3.5.7-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
                     }
                 ]
             },
@@ -90,11 +98,15 @@
                 "title": "Issue summary: An uncommon configuration of clients performing DA ...",
                 "description": "Issue summary: An uncommon configuration of clients performing DANE TLSA-based\nserver authentication, when paired with uncommon server DANE TLSA records, may\nresult in a use-after-free and/or double-free on the client side.\n\nImpact summary: A use after free can have a range of potential consequences\nsuch as the corruption of valid data, crashes or execution of arbitrary code.\n\nHowever, the issue only affects clients that make use of TLSA records with both\nthe PKIX-TA(0/PKIX-EE(1) certificate usages and the DANE-TA(2) certificate\nusage.\n\nBy far the most common deployment of DANE is in SMTP MTAs for which RFC7672\nrecommends that clients treat as 'unusable' any TLSA records that have the PKIX\ncertificate usages.  These SMTP (or other similar) clients are not vulnerable\nto this issue.  Conversely, any clients that support only the PKIX usages, and\nignore the DANE-TA(2) usage are also not vulnerable.\n\nThe client would also need to be communicating with a server that publishes a\nTLSA RRset with both types of TLSA records.\n\nNo FIPS modules are affected by this issue, the problem code is outside the\nFIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -114,11 +126,15 @@
                 "title": "Issue summary: When a delta CRL that contains a Delta CRL Indicat ...",
                 "description": "Issue summary: When a delta CRL that contains a Delta CRL Indicator extension\nis processed a NULL pointer dereference might happen if the required CRL\nNumber extension is missing.\n\nImpact summary: A NULL pointer dereference can trigger a crash which\nleads to a Denial of Service for an application.\n\nWhen CRL processing and delta CRL processing is enabled during X.509\ncertificate verification, the delta CRL processing does not check\nwhether the CRL Number extension is NULL before dereferencing it.\nWhen a malformed delta CRL file is being processed, this parameter\ncan be NULL, causing a NULL pointer dereference.\n\nExploiting this issue requires the X509_V_FLAG_USE_DELTAS flag to be enabled in\nthe verification context, the certificate being verified to contain a\nfreshestCRL extension or the base CRL to have the EXFLAG_FRESHEST flag set, and\nan attacker to provide a malformed CRL to an application that processes it.\n\nThe vulnerability is limited to Denial of Service and cannot be escalated to\nachieve code execution or memory disclosure. For that reason the issue was\nassessed as Low severity according to our Security Policy.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -138,11 +154,15 @@
                 "title": "Issue summary: During processing of a crafted CMS EnvelopedData m ...",
                 "description": "Issue summary: During processing of a crafted CMS EnvelopedData message\nwith KeyAgreeRecipientInfo a NULL pointer dereference can happen.\n\nImpact summary: Applications that process attacker-controlled CMS data may\ncrash before authentication or cryptographic operations occur resulting in\nDenial of Service.\n\nWhen a CMS EnvelopedData message that uses KeyAgreeRecipientInfo is\nprocessed, the optional parameters field of KeyEncryptionAlgorithmIdentifier\nis examined without checking for its presence. This results in a NULL\npointer dereference if the field is missing.\n\nApplications and services that call CMS_decrypt() on untrusted input\n(e.g., S/MIME processing or CMS-based protocols) are vulnerable.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -176,11 +196,15 @@
                 "title": "Issue summary: Converting an excessively large OCTET STRING value ...",
                 "description": "Issue summary: Converting an excessively large OCTET STRING value to\na hexadecimal string leads to a heap buffer overflow on 32 bit platforms.\n\nImpact summary: A heap buffer overflow may lead to a crash or possibly\nan attacker controlled code execution or other undefined behavior.\n\nIf an attacker can supply a crafted X.509 certificate with an excessively\nlarge OCTET STRING value in extensions such as the Subject Key Identifier\n(SKID) or Authority Key Identifier (AKID) which are being converted to hex,\nthe size of the buffer needed for the result is calculated as multiplication\nof the input length by 3. On 32 bit platforms, this multiplication may overflow\nresulting in the allocation of a smaller buffer and a heap buffer overflow.\n\nApplications and services that print or log contents of untrusted X.509\ncertificates are vulnerable to this issue. As the certificates would have\nto have sizes of over 1 Gigabyte, printing or logging such certificates\nis a fairly unlikely operation and only 32 bit platforms are affected,\nthis issue was assigned Low severity.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "CRITICAL",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -474,8 +498,12 @@
                 "title": "openssl: Timing side-channel in ECDSA signature computation",
                 "description": "A timing side-channel vulnerability was found in OpenSSL. This vulnerability allows an attacker to recover the private key. However, measuring the timing would require local access to the signing application or a fast network connection with low latency. There is a timing signal of around 300 nanoseconds when the top word of the inverted ECDSA nonce value is zero. This issue can happen with significant probability only for some of the supported elliptic curves. In particular, the NIST P-521 curve is affected.",
                 "severity": "LOW",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
+                    },
                     {
                         "introduced": "3.5.6",
                         "fixed": "1:3.5.6-11.rf",
@@ -493,8 +521,12 @@
                 "title": "openssl: Out-of-bounds read in HTTP client no_proxy handling",
                 "description": "A flaw was found in the OpenSSL HTTP client API no_proxy handling. This vulnerability allows an application level denial of service (application crash) via an attacker-controlled IPv6 URL when the no_proxy environment variable is set.",
                 "severity": "LOW",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
+                    },
                     {
                         "introduced": "3.5.6",
                         "fixed": "1:3.5.6-11.rf",
@@ -512,8 +544,12 @@
                 "title": "openssl: NULL Dereference in Certificate Verification with OCSP Checking",
                 "description": "A flaw was found in OpenSSL. When an application is configured with specific non-default settings for certificate verification, including both Online Certificate Status Protocol (OCSP) response checking and partial chain verification, a NULL dereference can occur. This vulnerability can be triggered if the certificate chain lacks a self-signed trusted anchor, causing the application to crash. This leads to a Denial of Service (DoS) for the affected application.",
                 "severity": "LOW",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
+                    },
                     {
                         "introduced": "3.5.6",
                         "fixed": "1:3.5.6-11.rf",
@@ -533,11 +569,15 @@
                 "title": "Issue summary: An OpenSSL TLS 1.3 server may fail to negotiate th ...",
                 "description": "Issue summary: An OpenSSL TLS 1.3 server may fail to negotiate the expected\npreferred key exchange group when its key exchange group configuration includes\nthe default by using the 'DEFAULT' keyword.\n\nImpact summary: A less preferred key exchange may be used even when a more\npreferred group is supported by both client and server, if the group\nwas not included among the client's initial predicated keyshares.\nThis will sometimes be the case with the new hybrid post-quantum groups,\nif the client chooses to defer their use until specifically requested by\nthe server.\n\nIf an OpenSSL TLS 1.3 server's configuration uses the 'DEFAULT' keyword to\ninterpolate the built-in default group list into its own configuration, perhaps\nadding or removing specific elements, then an implementation defect causes the\n'DEFAULT' list to lose its 'tuple' structure, and all server-supported groups\nwere treated as a single sufficiently secure 'tuple', with the server not\nsending a Hello Retry Request (HRR) even when a group in a more preferred tuple\nwas mutually supported.\n\nAs a result, the client and server might fail to negotiate a mutually supported\npost-quantum key agreement group, such as 'X25519MLKEM768', if the client's\nconfiguration results in only 'classical' groups (such as 'X25519' being the\nonly ones in the client's initial keyshare prediction).\n\nOpenSSL 3.5 and later support a new syntax for selecting the most preferred TLS\n1.3 key agreement group on TLS servers.  The old syntax had a single 'flat'\nlist of groups, and treated all the supported groups as sufficiently secure.\nIf any of the keyshares predicted by the client were supported by the server\nthe most preferred among these was selected, even if other groups supported by\nthe client, but not included in the list of predicted keyshares would have been\nmore preferred, if included.\n\nThe new syntax partitions the groups into distinct 'tuples' of roughly\nequivalent security.  Within each tuple the most preferred group included among\nthe client's predicted keyshares is chosen, but if the client supports a group\nfrom a more preferred tuple, but did not predict any corresponding keyshares,\nthe server will ask the client to retry the ClientHello (by issuing a Hello\nRetry Request or HRR) with the most preferred mutually supported group.\n\nThe above works as expected when the server's configuration uses the built-in\ndefault group list, or explicitly defines its own list by directly defining the\nvarious desired groups and group 'tuples'.\n\nNo OpenSSL FIPS modules are affected by this issue, the code in question lies\noutside the FIPS boundary.\n\nOpenSSL 3.6 and 3.5 are vulnerable to this issue.\n\nOpenSSL 3.6 users should upgrade to OpenSSL 3.6.2 once it is released.\nOpenSSL 3.5 users should upgrade to OpenSSL 3.5.6 once it is released.\n\nOpenSSL 3.4, 3.3, 3.0, 1.0.2 and 1.1.1 are not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -608,6 +648,10 @@
                     {
                         "introduced": "1:3.5.7-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
                     }
                 ]
             },
@@ -616,11 +660,15 @@
                 "title": "Issue summary: An uncommon configuration of clients performing DA ...",
                 "description": "Issue summary: An uncommon configuration of clients performing DANE TLSA-based\nserver authentication, when paired with uncommon server DANE TLSA records, may\nresult in a use-after-free and/or double-free on the client side.\n\nImpact summary: A use after free can have a range of potential consequences\nsuch as the corruption of valid data, crashes or execution of arbitrary code.\n\nHowever, the issue only affects clients that make use of TLSA records with both\nthe PKIX-TA(0/PKIX-EE(1) certificate usages and the DANE-TA(2) certificate\nusage.\n\nBy far the most common deployment of DANE is in SMTP MTAs for which RFC7672\nrecommends that clients treat as 'unusable' any TLSA records that have the PKIX\ncertificate usages.  These SMTP (or other similar) clients are not vulnerable\nto this issue.  Conversely, any clients that support only the PKIX usages, and\nignore the DANE-TA(2) usage are also not vulnerable.\n\nThe client would also need to be communicating with a server that publishes a\nTLSA RRset with both types of TLSA records.\n\nNo FIPS modules are affected by this issue, the problem code is outside the\nFIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -640,11 +688,15 @@
                 "title": "Issue summary: When a delta CRL that contains a Delta CRL Indicat ...",
                 "description": "Issue summary: When a delta CRL that contains a Delta CRL Indicator extension\nis processed a NULL pointer dereference might happen if the required CRL\nNumber extension is missing.\n\nImpact summary: A NULL pointer dereference can trigger a crash which\nleads to a Denial of Service for an application.\n\nWhen CRL processing and delta CRL processing is enabled during X.509\ncertificate verification, the delta CRL processing does not check\nwhether the CRL Number extension is NULL before dereferencing it.\nWhen a malformed delta CRL file is being processed, this parameter\ncan be NULL, causing a NULL pointer dereference.\n\nExploiting this issue requires the X509_V_FLAG_USE_DELTAS flag to be enabled in\nthe verification context, the certificate being verified to contain a\nfreshestCRL extension or the base CRL to have the EXFLAG_FRESHEST flag set, and\nan attacker to provide a malformed CRL to an application that processes it.\n\nThe vulnerability is limited to Denial of Service and cannot be escalated to\nachieve code execution or memory disclosure. For that reason the issue was\nassessed as Low severity according to our Security Policy.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -664,11 +716,15 @@
                 "title": "Issue summary: During processing of a crafted CMS EnvelopedData m ...",
                 "description": "Issue summary: During processing of a crafted CMS EnvelopedData message\nwith KeyAgreeRecipientInfo a NULL pointer dereference can happen.\n\nImpact summary: Applications that process attacker-controlled CMS data may\ncrash before authentication or cryptographic operations occur resulting in\nDenial of Service.\n\nWhen a CMS EnvelopedData message that uses KeyAgreeRecipientInfo is\nprocessed, the optional parameters field of KeyEncryptionAlgorithmIdentifier\nis examined without checking for its presence. This results in a NULL\npointer dereference if the field is missing.\n\nApplications and services that call CMS_decrypt() on untrusted input\n(e.g., S/MIME processing or CMS-based protocols) are vulnerable.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -702,11 +758,15 @@
                 "title": "Issue summary: Converting an excessively large OCTET STRING value ...",
                 "description": "Issue summary: Converting an excessively large OCTET STRING value to\na hexadecimal string leads to a heap buffer overflow on 32 bit platforms.\n\nImpact summary: A heap buffer overflow may lead to a crash or possibly\nan attacker controlled code execution or other undefined behavior.\n\nIf an attacker can supply a crafted X.509 certificate with an excessively\nlarge OCTET STRING value in extensions such as the Subject Key Identifier\n(SKID) or Authority Key Identifier (AKID) which are being converted to hex,\nthe size of the buffer needed for the result is calculated as multiplication\nof the input length by 3. On 32 bit platforms, this multiplication may overflow\nresulting in the allocation of a smaller buffer and a heap buffer overflow.\n\nApplications and services that print or log contents of untrusted X.509\ncertificates are vulnerable to this issue. As the certificates would have\nto have sizes of over 1 Gigabyte, printing or logging such certificates\nis a fairly unlikely operation and only 32 bit platforms are affected,\nthis issue was assigned Low severity.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "CRITICAL",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -1000,8 +1060,12 @@
                 "title": "openssl: Timing side-channel in ECDSA signature computation",
                 "description": "A timing side-channel vulnerability was found in OpenSSL. This vulnerability allows an attacker to recover the private key. However, measuring the timing would require local access to the signing application or a fast network connection with low latency. There is a timing signal of around 300 nanoseconds when the top word of the inverted ECDSA nonce value is zero. This issue can happen with significant probability only for some of the supported elliptic curves. In particular, the NIST P-521 curve is affected.",
                 "severity": "LOW",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
+                    },
                     {
                         "introduced": "3.5.6",
                         "fixed": "1:3.5.6-11.rf",
@@ -1019,8 +1083,12 @@
                 "title": "openssl: Out-of-bounds read in HTTP client no_proxy handling",
                 "description": "A flaw was found in the OpenSSL HTTP client API no_proxy handling. This vulnerability allows an application level denial of service (application crash) via an attacker-controlled IPv6 URL when the no_proxy environment variable is set.",
                 "severity": "LOW",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
+                    },
                     {
                         "introduced": "3.5.6",
                         "fixed": "1:3.5.6-11.rf",
@@ -1038,8 +1106,12 @@
                 "title": "openssl: NULL Dereference in Certificate Verification with OCSP Checking",
                 "description": "A flaw was found in OpenSSL. When an application is configured with specific non-default settings for certificate verification, including both Online Certificate Status Protocol (OCSP) response checking and partial chain verification, a NULL dereference can occur. This vulnerability can be triggered if the certificate chain lacks a self-signed trusted anchor, causing the application to crash. This leads to a Denial of Service (DoS) for the affected application.",
                 "severity": "LOW",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
+                    },
                     {
                         "introduced": "3.5.6",
                         "fixed": "1:3.5.6-11.rf",
@@ -1059,11 +1131,15 @@
                 "title": "Issue summary: An OpenSSL TLS 1.3 server may fail to negotiate th ...",
                 "description": "Issue summary: An OpenSSL TLS 1.3 server may fail to negotiate the expected\npreferred key exchange group when its key exchange group configuration includes\nthe default by using the 'DEFAULT' keyword.\n\nImpact summary: A less preferred key exchange may be used even when a more\npreferred group is supported by both client and server, if the group\nwas not included among the client's initial predicated keyshares.\nThis will sometimes be the case with the new hybrid post-quantum groups,\nif the client chooses to defer their use until specifically requested by\nthe server.\n\nIf an OpenSSL TLS 1.3 server's configuration uses the 'DEFAULT' keyword to\ninterpolate the built-in default group list into its own configuration, perhaps\nadding or removing specific elements, then an implementation defect causes the\n'DEFAULT' list to lose its 'tuple' structure, and all server-supported groups\nwere treated as a single sufficiently secure 'tuple', with the server not\nsending a Hello Retry Request (HRR) even when a group in a more preferred tuple\nwas mutually supported.\n\nAs a result, the client and server might fail to negotiate a mutually supported\npost-quantum key agreement group, such as 'X25519MLKEM768', if the client's\nconfiguration results in only 'classical' groups (such as 'X25519' being the\nonly ones in the client's initial keyshare prediction).\n\nOpenSSL 3.5 and later support a new syntax for selecting the most preferred TLS\n1.3 key agreement group on TLS servers.  The old syntax had a single 'flat'\nlist of groups, and treated all the supported groups as sufficiently secure.\nIf any of the keyshares predicted by the client were supported by the server\nthe most preferred among these was selected, even if other groups supported by\nthe client, but not included in the list of predicted keyshares would have been\nmore preferred, if included.\n\nThe new syntax partitions the groups into distinct 'tuples' of roughly\nequivalent security.  Within each tuple the most preferred group included among\nthe client's predicted keyshares is chosen, but if the client supports a group\nfrom a more preferred tuple, but did not predict any corresponding keyshares,\nthe server will ask the client to retry the ClientHello (by issuing a Hello\nRetry Request or HRR) with the most preferred mutually supported group.\n\nThe above works as expected when the server's configuration uses the built-in\ndefault group list, or explicitly defines its own list by directly defining the\nvarious desired groups and group 'tuples'.\n\nNo OpenSSL FIPS modules are affected by this issue, the code in question lies\noutside the FIPS boundary.\n\nOpenSSL 3.6 and 3.5 are vulnerable to this issue.\n\nOpenSSL 3.6 users should upgrade to OpenSSL 3.6.2 once it is released.\nOpenSSL 3.5 users should upgrade to OpenSSL 3.5.6 once it is released.\n\nOpenSSL 3.4, 3.3, 3.0, 1.0.2 and 1.1.1 are not affected by this issue.",
                 "severity": "MEDIUM",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -1134,6 +1210,10 @@
                     {
                         "introduced": "1:3.5.7-11.rf",
                         "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
                     }
                 ]
             },
@@ -1142,11 +1222,15 @@
                 "title": "Issue summary: An uncommon configuration of clients performing DA ...",
                 "description": "Issue summary: An uncommon configuration of clients performing DANE TLSA-based\nserver authentication, when paired with uncommon server DANE TLSA records, may\nresult in a use-after-free and/or double-free on the client side.\n\nImpact summary: A use after free can have a range of potential consequences\nsuch as the corruption of valid data, crashes or execution of arbitrary code.\n\nHowever, the issue only affects clients that make use of TLSA records with both\nthe PKIX-TA(0/PKIX-EE(1) certificate usages and the DANE-TA(2) certificate\nusage.\n\nBy far the most common deployment of DANE is in SMTP MTAs for which RFC7672\nrecommends that clients treat as 'unusable' any TLSA records that have the PKIX\ncertificate usages.  These SMTP (or other similar) clients are not vulnerable\nto this issue.  Conversely, any clients that support only the PKIX usages, and\nignore the DANE-TA(2) usage are also not vulnerable.\n\nThe client would also need to be communicating with a server that publishes a\nTLSA RRset with both types of TLSA records.\n\nNo FIPS modules are affected by this issue, the problem code is outside the\nFIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -1166,11 +1250,15 @@
                 "title": "Issue summary: When a delta CRL that contains a Delta CRL Indicat ...",
                 "description": "Issue summary: When a delta CRL that contains a Delta CRL Indicator extension\nis processed a NULL pointer dereference might happen if the required CRL\nNumber extension is missing.\n\nImpact summary: A NULL pointer dereference can trigger a crash which\nleads to a Denial of Service for an application.\n\nWhen CRL processing and delta CRL processing is enabled during X.509\ncertificate verification, the delta CRL processing does not check\nwhether the CRL Number extension is NULL before dereferencing it.\nWhen a malformed delta CRL file is being processed, this parameter\ncan be NULL, causing a NULL pointer dereference.\n\nExploiting this issue requires the X509_V_FLAG_USE_DELTAS flag to be enabled in\nthe verification context, the certificate being verified to contain a\nfreshestCRL extension or the base CRL to have the EXFLAG_FRESHEST flag set, and\nan attacker to provide a malformed CRL to an application that processes it.\n\nThe vulnerability is limited to Denial of Service and cannot be escalated to\nachieve code execution or memory disclosure. For that reason the issue was\nassessed as Low severity according to our Security Policy.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -1190,11 +1278,15 @@
                 "title": "Issue summary: During processing of a crafted CMS EnvelopedData m ...",
                 "description": "Issue summary: During processing of a crafted CMS EnvelopedData message\nwith KeyAgreeRecipientInfo a NULL pointer dereference can happen.\n\nImpact summary: Applications that process attacker-controlled CMS data may\ncrash before authentication or cryptographic operations occur resulting in\nDenial of Service.\n\nWhen a CMS EnvelopedData message that uses KeyAgreeRecipientInfo is\nprocessed, the optional parameters field of KeyEncryptionAlgorithmIdentifier\nis examined without checking for its presence. This results in a NULL\npointer dereference if the field is missing.\n\nApplications and services that call CMS_decrypt() on untrusted input\n(e.g., S/MIME processing or CMS-based protocols) are vulnerable.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -1228,11 +1320,15 @@
                 "title": "Issue summary: Converting an excessively large OCTET STRING value ...",
                 "description": "Issue summary: Converting an excessively large OCTET STRING value to\na hexadecimal string leads to a heap buffer overflow on 32 bit platforms.\n\nImpact summary: A heap buffer overflow may lead to a crash or possibly\nan attacker controlled code execution or other undefined behavior.\n\nIf an attacker can supply a crafted X.509 certificate with an excessively\nlarge OCTET STRING value in extensions such as the Subject Key Identifier\n(SKID) or Authority Key Identifier (AKID) which are being converted to hex,\nthe size of the buffer needed for the result is calculated as multiplication\nof the input length by 3. On 32 bit platforms, this multiplication may overflow\nresulting in the allocation of a smaller buffer and a heap buffer overflow.\n\nApplications and services that print or log contents of untrusted X.509\ncertificates are vulnerable to this issue. As the certificates would have\nto have sizes of over 1 Gigabyte, printing or logging such certificates\nis a fairly unlikely operation and only 32 bit platforms are affected,\nthis issue was assigned Low severity.\n\nThe FIPS modules in 3.6, 3.5, 3.4, 3.3 and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
                 "severity": "CRITICAL",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "1:3.5.5-11.rf",
                         "fixed": "1:3.5.6-11.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     },
                     {
@@ -1526,8 +1622,12 @@
                 "title": "openssl: Timing side-channel in ECDSA signature computation",
                 "description": "A timing side-channel vulnerability was found in OpenSSL. This vulnerability allows an attacker to recover the private key. However, measuring the timing would require local access to the signing application or a fast network connection with low latency. There is a timing signal of around 300 nanoseconds when the top word of the inverted ECDSA nonce value is zero. This issue can happen with significant probability only for some of the supported elliptic curves. In particular, the NIST P-521 curve is affected.",
                 "severity": "LOW",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
+                    },
                     {
                         "introduced": "3.5.6",
                         "fixed": "1:3.5.6-11.rf",
@@ -1545,8 +1645,12 @@
                 "title": "openssl: Out-of-bounds read in HTTP client no_proxy handling",
                 "description": "A flaw was found in the OpenSSL HTTP client API no_proxy handling. This vulnerability allows an application level denial of service (application crash) via an attacker-controlled IPv6 URL when the no_proxy environment variable is set.",
                 "severity": "LOW",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
+                    },
                     {
                         "introduced": "3.5.6",
                         "fixed": "1:3.5.6-11.rf",
@@ -1564,8 +1668,12 @@
                 "title": "openssl: NULL Dereference in Certificate Verification with OCSP Checking",
                 "description": "A flaw was found in OpenSSL. When an application is configured with specific non-default settings for certificate verification, including both Online Certificate Status Protocol (OCSP) response checking and partial chain verification, a NULL dereference can occur. This vulnerability can be triggered if the certificate chain lacks a self-signed trusted anchor, causing the application to crash. This leads to a Denial of Service (DoS) for the affected application.",
                 "severity": "LOW",
-                "status": "fixed",
+                "status": "open",
                 "events": [
+                    {
+                        "introduced": "1:3.5.7-12.rf",
+                        "identifier": "rf"
+                    },
                     {
                         "introduced": "3.5.6",
                         "fixed": "1:3.5.6-11.rf",
