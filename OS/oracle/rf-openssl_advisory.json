@@ -206,9 +206,9 @@
             },
             "CVE-2026-7383": {
                 "cve_id": "CVE-2026-7383",
-                "title": "openssl: OpenSSL: Heap buffer overflow due to signed integer overflow in Unicode output sizing",
-                "description": "A flaw was found in OpenSSL. A signed integer overflow vulnerability exists when sizing the destination buffer for Unicode output. This can lead to a heap buffer overflow, which may result in a crash or potentially allow an attacker to execute arbitrary code. Exploitation requires an application to directly call specific functions with a large amount of attacker-controlled input.",
-                "severity": "LOW",
+                "title": "Possible Heap Buffer Overflow in ASN.1 Multibyte String Conversion",
+                "description": "Issue summary: A signed integer overflow when sizing the destination\nbuffer for Unicode output in ASN1_mbstring_ncopy() can lead to a heap\nbuffer overflow.\n\nImpact summary: A heap buffer overflow may lead to a crash or possibly\nattacker controlled code execution or other undefined behaviour.\n\nIn ASN1_mbstring_copy() and ASN1_mbstring_ncopy() the destination\nsize for Unicode output is computed in a signed int: by left shift\nof the input character count for BMPSTRING (UTF-16) and\nUNIVERSALSTRING (UTF-32), and by summing per-character byte counts\nfor UTF8STRING. The calculation overflows when the input reaches\naround 2^30 characters. In the worst case (UNIVERSALSTRING at 2^30\ncharacters) the size wraps to zero, OPENSSL_malloc(1) is called, and\nthe subsequent character copy writes several gigabytes past the\none-byte allocation.\n\nX.509 certificate processing routes through ASN1_STRING_set_by_NID(),\nwhose DIRSTRING_TYPE mask excludes UNIVERSALSTRING and whose per-NID\nsize limits cap the input length; no network protocol or\ncertificate-handling path in OpenSSL exercises the overflow.\nTriggering the bug requires an application that calls\nASN1_mbstring_copy() or ASN1_mbstring_ncopy() directly, or registers\na custom string type via ASN1_STRING_TABLE_add(), with\nattacker-controlled input on the order of half a gigabyte or more.\nFor these reasons this issue was assigned Low severity.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by\nthis issue, as the affected code is outside the OpenSSL FIPS module\nboundary.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -220,9 +220,9 @@
             },
             "CVE-2026-9076": {
                 "cve_id": "CVE-2026-9076",
-                "title": "openssl: OpenSSL: Denial of Service due to heap out-of-bounds read in CMS password-based decryption",
-                "description": "A flaw was found in OpenSSL. When processing attacker-supplied Cryptographic Message Syntax (CMS) data using password-based decryption, an attacker can choose a stream-mode Key Encryption Key (KEK) cipher. This can trigger a heap out-of-bounds read, potentially causing an application crash and leading to a Denial of Service (DoS). This vulnerability does not require password knowledge and can be exploited before authentication.",
-                "severity": "LOW",
+                "title": "Out-of-Bounds Read in CMS Password-Based Decryption",
+                "description": "Issue summary: When CMS password-based decryption (RFC 3211 / PWRI key unwrap)\nprocesses attacker-supplied CMS data, an attacker-chosen stream-mode KEK\ncipher can trigger a heap out-of-bounds read in kek_unwrap_key().\n\nImpact summary: A heap buffer over-read may trigger a crash which leads to\nDenial of Service for an application if the input buffer ends at a memory\npage boundary and the following page is unmapped. There is no information\ndisclosure as the over-read bytes are not revealed to the attacker.\n\nThe key unwrapping function performs a check-byte test as specified in the\nRFC that reads 7 bytes from a heap allocation that is based on the wrapped\nkey length from the message. There is a minimum length check based on the\nblock length of the wrapping cipher. However the cipher is selected from\nan OID carried in the attacker\u2019s PWRI keyEncryptionAlgorithm with no\nrequirement that the cipher be a block cipher. When an attacker selects\na stream-mode cipher the guard will be ineffective and the allocated buffer\ncontaining the unwrapped key can be too small to fit the check-bytes\nspecified in the RFC and a buffer over-read can happen.\n\nApplications calling CMS_decrypt() or CMS_decrypt_set1_password()\n(equivalently openssl cms -decrypt -pwri_password \u2026) on untrusted CMS\ndata are vulnerable to this issue. No password knowledge is required: the\nover-read happens during the unwrap attempt before any authentication\nsucceeds.\n\nThe over-read is limited to a few bytes and is not written to output, so\nthere is no information disclosure. Triggering a crash requires the\nallocation to border unmapped memory, which is unlikely with the normal\nallocator.\n\nThe FIPS modules are not affected by this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -241,12 +241,11 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "fixed": "1:3.5.7-12.rf",
-                        "identifier": "rf"
+                        "fixed": "3.5.4"
                     },
                     {
-                        "introduced": "1:3.5.6-11.rf",
-                        "fixed": "3.5.7",
+                        "introduced": "1:3.5.7-11.rf",
+                        "fixed": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     }
                 ]
@@ -381,9 +380,9 @@
             },
             "CVE-2026-34180": {
                 "cve_id": "CVE-2026-34180",
-                "title": "openssl: OpenSSL: Heap buffer over-read in ASN.1 decoding can lead to denial of service or information disclosure.",
-                "description": "A flaw was found in OpenSSL. An integer truncation vulnerability in the ASN.1 decoder can occur when processing a crafted DER-encoded ASN.1 structure with a primitive element exceeding 2 gigabytes. A remote attacker could exploit this to cause a heap buffer over-read. This may lead to an application crash, resulting in a Denial of Service (DoS), or potentially disclose sensitive information by loading memory contents beyond the input buffer. This issue primarily affects 64-bit Unix and Unix-like platforms.",
-                "severity": "LOW",
+                "title": "Heap Buffer Over-read in ASN.1 Content Parsing",
+                "description": "Issue summary: Parsing a crafted DER-encoded ASN.1 structure with a primitive\nelement whose content exceeds 2 gigabytes in length may cause a heap buffer\nover-read on 64-bit Unix and Unix-like platforms.\n\nImpact summary: The heap buffer over-read may crash the application (Denial of\nService) or to load into the decoded ASN.1 object contents of memory beyond the\nend of the input buffer.  More typically such ASN.1 elements would instead be\ntruncated.\n\nAn integer truncation in OpenSSL\u2019s ASN.1 decoder causes the content length of\nan ASN.1 primitive element to be mishandled when it exceeds 2 gigabytes. In the\nworst case the truncated length is treated as a request to scan the binary\ncontent for a terminating zero byte, possibly causing OpenSSL to read either\nless than or beyond the end of the allocated buffer.\n\nApplications that pass attacker-supplied data to d2i_X509(), d2i_PKCS7(), or\nany other d2i_* decoding function are affected. OpenSSL\u2019s own command-line\ntools are not vulnerable, as data read through the BIO layer is checked before\nit reaches the affected code. The issue only affects 64-bit Unix and Unix-like\nplatforms; 32-bit platforms and 64-bit Windows are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -467,9 +466,9 @@
             },
             "CVE-2026-42766": {
                 "cve_id": "CVE-2026-42766",
-                "title": "openssl: Possible NULL Dereference in Password-Based CMS Decryption",
-                "description": "A flaw was found in OpenSSL. A remote attacker could exploit a NULL pointer dereference vulnerability in the Cryptographic Message Syntax (CMS) decryption process by providing a specially crafted password-encrypted CMS message. This occurs because the keyDerivationAlgorithm field, which is optional, is dereferenced without proper validation. Successful exploitation leads to an application crash, resulting in a Denial of Service.",
-                "severity": "LOW",
+                "title": "Possible NULL Dereference in Password-Based CMS Decryption",
+                "description": "Issue summary: A specially crafted password-encrypted CMS message\ncan trigger a NULL pointer dereference during CMS decryption.\n\nImpact summary: This NULL pointer dereference leads to an application crash\nand a Denial of Service.\n\nThe CMS PasswordRecipientInfo.keyDerivationAlgorithm field is defined as\nOPTIONAL in the ASN.1 specification and may therefore be absent in specially\ncrafted inputs. During the password-based CMS decryption the OpenSSL\nCMS implementation dereferences this field without first checking whether it\nwas present.\n\nAn attacker who supplies such a CMS message to an application performing\npassword-based CMS decryption can trigger an application crash, leading to\na Denial of Service.\n\nApplications that process password-encrypted CMS messages may be affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
@@ -499,8 +498,8 @@
             },
             "CVE-2026-42768": {
                 "cve_id": "CVE-2026-42768",
-                "title": "openssl: Multi-RecipientInfo Bleichenbacher Oracle in CMS_decrypt() and PKCS7_decrypt()",
-                "description": "A flaw was found in OpenSSL's CMS_decrypt() and PKCS7_decrypt() functions. This vulnerability, a Bleichenbacher-style oracle, could allow a remote attacker to decrypt or sign messages using the victim's private RSA key. Exploitation requires the attacker to provide specially crafted CMS or S/MIME messages and observe the application's error codes or decryption output. While the attack is technically possible, the specific conditions required make it unlikely to be exploited in typical deployments.",
+                "title": "Multi-RecipientInfo Bleichenbacher Oracle in CMS_decrypt() and PKCS7_decrypt()",
+                "description": "Issue summary: The CMS_decrypt and PKCS7_decrypt functions are vulnerable to\nBleichenbacher-style attack when an attacker is able to provide the CMS or\nS/MIME messages and observe the error code and/or decryption output.\n\nImpact summary: The Bleichenbacher-style attack allows an attacker to use the\nvictim\u2019s vulnerable application as a way to decrypt or sign messages with the\nvictim\u2019s private RSA key.\n\nThe attack is possible in 2 variants.\n\nAn attacker who authors a message with two KTRI entries \u2014 the first one\nwrapping a real CEK under the victim\u2019s public key, the second with an\narbitrary probe ciphertext \u2014 obtains opportunity to iterate the 2nd KTRI to\nget a valid PKCS#1 v1.5 padding if the error code of the application is\navailable.\n\nThat is a Bleichenbacher oracle (Bleichenbacher, CRYPTO \u201898): an\nadaptive-chosen-ciphertext side channel from which the attacker decrypts any\nRSA ciphertext to the victim\u2019s key or forges any PKCS#1 v1.5 signature under\nit.\n\nAn attacker who authors a message and is able to compare both error code and\nthe result of the decryption, can mount a Bleichenbacher oracle.\n\nWe are not aware of any applications that provide a remote attacker\nan opportunity to mount an attack described in these scenarios. We consider\nthe existence of such application very unlikely, and for this reason this\nCVE has been evaluated as Low severity.\n\nTo avoid these attacks, when RSA PKCS#1 v1.5 Key Transport is in use, the\ninvoked EVP_PKEY_decrypt() will use the implicit rejection mechanism described\nin draft-irtf-cfrg-rsa-guidance. In previous OpenSSL releases the implicit\nrejection was explicitly disabled.\n\nThe implicit rejection mechanism always returns a plaintext value,\nthe symmetric key. This result is deterministic for the ciphertext and the\nprivate key.  The length of the decryption result can happen to match the\nlength of the key of the symmetric cipher that was used for the content\nencryption. When a certificate is not provided, the last RecipientInfo\nproducing a key that looks valid will be used. It may cause getting garbage\ncontent on decryption. As a proper way to deal with this a recipient\ncertificate has to be provided to identify the particular RecipientInfo for\ndecryption.\n\nThe FIPS modules in 4.0, 3.6, 3.5, and 3.4 are not affected by this issue, as\nCMS and S/MIME processing happens outside the OpenSSL FIPS module boundary.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -531,8 +530,8 @@
             },
             "CVE-2026-42770": {
                 "cve_id": "CVE-2026-42770",
-                "title": "openssl: FFC-DH Peer Validation Uses Attacker-Supplied q",
-                "description": "A flaw was found in OpenSSL. A malicious peer can exploit this vulnerability by presenting a specially crafted DHX (X9.42) peer key. Due to improper validation of the peer key's subgroup membership, an attacker can recover the victim's private key after a small number of key exchange attempts. This information disclosure can lead to unauthorized access or further compromise of affected systems.",
+                "title": "FFC-DH Peer Validation Uses Attacker-Supplied q",
+                "description": "Issue summary: When EVP_PKEY_derive_set_peer() is called with a DHX (X9.42)\npeer key, the peer key is not properly checked for the subgroup membership.\n\nImpact summary: A malicious peer which presents an X9.42 key carrying the\nvictim\u2019s p and g parameters, a forged q = r (a small prime factor of the\ncofactor (p\u22121)/q_local), and a public value Y of order r can recover the\nvictim\u2019s private key after a small number of key exchange attempts.\n\nWhen EVP_PKEY_derive_set_peer() is called with a DHX (X9.42) peer key, the\nsubgroup membership check Y^q \u2261 1 (mod p) is performed using the peer\u2019s\nown q parameter, not the local key\u2019s q. The peer\u2019s domain parameters are\nthen matched against the domain parameters of the private key, but the value\nof q is not compared.\n\nA malicious peer who presents an X9.42 key carrying the victim\u2019s p, g,\na forged q = r (a small prime factor of the cofactor), and a public\nvalue Y of order r passes all checks. The shared secret then takes only\nr distinct values, leaking priv mod r. Repeating for each small-prime\nfactor of the cofactor and combining via CRT recovers the full private\nkey (Lim\u2013Lee / small-subgroup-confinement attack).\n\nThe realistic attack surface is narrow: principally CMP deployments with\nlong-lived RA/CA DHX keys and bespoke enterprise or government applications\nusing X9.42 DHX static keys with interactive protocols and therefore this\nissue was assigned Low severity.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, 3.1.2 and 3.0 are affected by this\nissue.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -643,6 +642,24 @@
                     {
                         "introduced": "0",
                         "fixed": "3.5.4-10.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "3.5.4"
+                    }
+                ]
+            },
+            "CVE-2024-41996": {
+                "cve_id": "CVE-2024-41996",
+                "title": "Validating the order of the public keys in the Diffie-Hellman Key ...",
+                "description": "Validating the order of the public keys in the Diffie-Hellman Key Agreement Protocol, when an approved safe prime is used, allows remote attackers (from the client side) to trigger unnecessarily expensive server-side DHE modular-exponentiation calculations. The client may cause asymmetric resource consumption. The basic attack scenario is that the client must claim that it can only communicate with DHE, and the server must be configured to allow DHE and validate the order of the public key.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "fixed": "1:3.5.7-11.rf",
                         "identifier": "rf"
                     },
                     {
@@ -1017,9 +1034,9 @@
             },
             "CVE-2026-7383": {
                 "cve_id": "CVE-2026-7383",
-                "title": "openssl: OpenSSL: Heap buffer overflow due to signed integer overflow in Unicode output sizing",
-                "description": "A flaw was found in OpenSSL. A signed integer overflow vulnerability exists when sizing the destination buffer for Unicode output. This can lead to a heap buffer overflow, which may result in a crash or potentially allow an attacker to execute arbitrary code. Exploitation requires an application to directly call specific functions with a large amount of attacker-controlled input.",
-                "severity": "LOW",
+                "title": "Possible Heap Buffer Overflow in ASN.1 Multibyte String Conversion",
+                "description": "Issue summary: A signed integer overflow when sizing the destination\nbuffer for Unicode output in ASN1_mbstring_ncopy() can lead to a heap\nbuffer overflow.\n\nImpact summary: A heap buffer overflow may lead to a crash or possibly\nattacker controlled code execution or other undefined behaviour.\n\nIn ASN1_mbstring_copy() and ASN1_mbstring_ncopy() the destination\nsize for Unicode output is computed in a signed int: by left shift\nof the input character count for BMPSTRING (UTF-16) and\nUNIVERSALSTRING (UTF-32), and by summing per-character byte counts\nfor UTF8STRING. The calculation overflows when the input reaches\naround 2^30 characters. In the worst case (UNIVERSALSTRING at 2^30\ncharacters) the size wraps to zero, OPENSSL_malloc(1) is called, and\nthe subsequent character copy writes several gigabytes past the\none-byte allocation.\n\nX.509 certificate processing routes through ASN1_STRING_set_by_NID(),\nwhose DIRSTRING_TYPE mask excludes UNIVERSALSTRING and whose per-NID\nsize limits cap the input length; no network protocol or\ncertificate-handling path in OpenSSL exercises the overflow.\nTriggering the bug requires an application that calls\nASN1_mbstring_copy() or ASN1_mbstring_ncopy() directly, or registers\na custom string type via ASN1_STRING_TABLE_add(), with\nattacker-controlled input on the order of half a gigabyte or more.\nFor these reasons this issue was assigned Low severity.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by\nthis issue, as the affected code is outside the OpenSSL FIPS module\nboundary.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -1031,9 +1048,9 @@
             },
             "CVE-2026-9076": {
                 "cve_id": "CVE-2026-9076",
-                "title": "openssl: OpenSSL: Denial of Service due to heap out-of-bounds read in CMS password-based decryption",
-                "description": "A flaw was found in OpenSSL. When processing attacker-supplied Cryptographic Message Syntax (CMS) data using password-based decryption, an attacker can choose a stream-mode Key Encryption Key (KEK) cipher. This can trigger a heap out-of-bounds read, potentially causing an application crash and leading to a Denial of Service (DoS). This vulnerability does not require password knowledge and can be exploited before authentication.",
-                "severity": "LOW",
+                "title": "Out-of-Bounds Read in CMS Password-Based Decryption",
+                "description": "Issue summary: When CMS password-based decryption (RFC 3211 / PWRI key unwrap)\nprocesses attacker-supplied CMS data, an attacker-chosen stream-mode KEK\ncipher can trigger a heap out-of-bounds read in kek_unwrap_key().\n\nImpact summary: A heap buffer over-read may trigger a crash which leads to\nDenial of Service for an application if the input buffer ends at a memory\npage boundary and the following page is unmapped. There is no information\ndisclosure as the over-read bytes are not revealed to the attacker.\n\nThe key unwrapping function performs a check-byte test as specified in the\nRFC that reads 7 bytes from a heap allocation that is based on the wrapped\nkey length from the message. There is a minimum length check based on the\nblock length of the wrapping cipher. However the cipher is selected from\nan OID carried in the attacker\u2019s PWRI keyEncryptionAlgorithm with no\nrequirement that the cipher be a block cipher. When an attacker selects\na stream-mode cipher the guard will be ineffective and the allocated buffer\ncontaining the unwrapped key can be too small to fit the check-bytes\nspecified in the RFC and a buffer over-read can happen.\n\nApplications calling CMS_decrypt() or CMS_decrypt_set1_password()\n(equivalently openssl cms -decrypt -pwri_password \u2026) on untrusted CMS\ndata are vulnerable to this issue. No password knowledge is required: the\nover-read happens during the unwrap attempt before any authentication\nsucceeds.\n\nThe over-read is limited to a few bytes and is not written to output, so\nthere is no information disclosure. Triggering a crash requires the\nallocation to border unmapped memory, which is unlikely with the normal\nallocator.\n\nThe FIPS modules are not affected by this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -1052,12 +1069,11 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "fixed": "1:3.5.7-12.rf",
-                        "identifier": "rf"
+                        "fixed": "3.5.4"
                     },
                     {
-                        "introduced": "1:3.5.6-11.rf",
-                        "fixed": "3.5.7",
+                        "introduced": "1:3.5.7-11.rf",
+                        "fixed": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     }
                 ]
@@ -1192,9 +1208,9 @@
             },
             "CVE-2026-34180": {
                 "cve_id": "CVE-2026-34180",
-                "title": "openssl: OpenSSL: Heap buffer over-read in ASN.1 decoding can lead to denial of service or information disclosure.",
-                "description": "A flaw was found in OpenSSL. An integer truncation vulnerability in the ASN.1 decoder can occur when processing a crafted DER-encoded ASN.1 structure with a primitive element exceeding 2 gigabytes. A remote attacker could exploit this to cause a heap buffer over-read. This may lead to an application crash, resulting in a Denial of Service (DoS), or potentially disclose sensitive information by loading memory contents beyond the input buffer. This issue primarily affects 64-bit Unix and Unix-like platforms.",
-                "severity": "LOW",
+                "title": "Heap Buffer Over-read in ASN.1 Content Parsing",
+                "description": "Issue summary: Parsing a crafted DER-encoded ASN.1 structure with a primitive\nelement whose content exceeds 2 gigabytes in length may cause a heap buffer\nover-read on 64-bit Unix and Unix-like platforms.\n\nImpact summary: The heap buffer over-read may crash the application (Denial of\nService) or to load into the decoded ASN.1 object contents of memory beyond the\nend of the input buffer.  More typically such ASN.1 elements would instead be\ntruncated.\n\nAn integer truncation in OpenSSL\u2019s ASN.1 decoder causes the content length of\nan ASN.1 primitive element to be mishandled when it exceeds 2 gigabytes. In the\nworst case the truncated length is treated as a request to scan the binary\ncontent for a terminating zero byte, possibly causing OpenSSL to read either\nless than or beyond the end of the allocated buffer.\n\nApplications that pass attacker-supplied data to d2i_X509(), d2i_PKCS7(), or\nany other d2i_* decoding function are affected. OpenSSL\u2019s own command-line\ntools are not vulnerable, as data read through the BIO layer is checked before\nit reaches the affected code. The issue only affects 64-bit Unix and Unix-like\nplatforms; 32-bit platforms and 64-bit Windows are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -1278,9 +1294,9 @@
             },
             "CVE-2026-42766": {
                 "cve_id": "CVE-2026-42766",
-                "title": "openssl: Possible NULL Dereference in Password-Based CMS Decryption",
-                "description": "A flaw was found in OpenSSL. A remote attacker could exploit a NULL pointer dereference vulnerability in the Cryptographic Message Syntax (CMS) decryption process by providing a specially crafted password-encrypted CMS message. This occurs because the keyDerivationAlgorithm field, which is optional, is dereferenced without proper validation. Successful exploitation leads to an application crash, resulting in a Denial of Service.",
-                "severity": "LOW",
+                "title": "Possible NULL Dereference in Password-Based CMS Decryption",
+                "description": "Issue summary: A specially crafted password-encrypted CMS message\ncan trigger a NULL pointer dereference during CMS decryption.\n\nImpact summary: This NULL pointer dereference leads to an application crash\nand a Denial of Service.\n\nThe CMS PasswordRecipientInfo.keyDerivationAlgorithm field is defined as\nOPTIONAL in the ASN.1 specification and may therefore be absent in specially\ncrafted inputs. During the password-based CMS decryption the OpenSSL\nCMS implementation dereferences this field without first checking whether it\nwas present.\n\nAn attacker who supplies such a CMS message to an application performing\npassword-based CMS decryption can trigger an application crash, leading to\na Denial of Service.\n\nApplications that process password-encrypted CMS messages may be affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
@@ -1310,8 +1326,8 @@
             },
             "CVE-2026-42768": {
                 "cve_id": "CVE-2026-42768",
-                "title": "openssl: Multi-RecipientInfo Bleichenbacher Oracle in CMS_decrypt() and PKCS7_decrypt()",
-                "description": "A flaw was found in OpenSSL's CMS_decrypt() and PKCS7_decrypt() functions. This vulnerability, a Bleichenbacher-style oracle, could allow a remote attacker to decrypt or sign messages using the victim's private RSA key. Exploitation requires the attacker to provide specially crafted CMS or S/MIME messages and observe the application's error codes or decryption output. While the attack is technically possible, the specific conditions required make it unlikely to be exploited in typical deployments.",
+                "title": "Multi-RecipientInfo Bleichenbacher Oracle in CMS_decrypt() and PKCS7_decrypt()",
+                "description": "Issue summary: The CMS_decrypt and PKCS7_decrypt functions are vulnerable to\nBleichenbacher-style attack when an attacker is able to provide the CMS or\nS/MIME messages and observe the error code and/or decryption output.\n\nImpact summary: The Bleichenbacher-style attack allows an attacker to use the\nvictim\u2019s vulnerable application as a way to decrypt or sign messages with the\nvictim\u2019s private RSA key.\n\nThe attack is possible in 2 variants.\n\nAn attacker who authors a message with two KTRI entries \u2014 the first one\nwrapping a real CEK under the victim\u2019s public key, the second with an\narbitrary probe ciphertext \u2014 obtains opportunity to iterate the 2nd KTRI to\nget a valid PKCS#1 v1.5 padding if the error code of the application is\navailable.\n\nThat is a Bleichenbacher oracle (Bleichenbacher, CRYPTO \u201898): an\nadaptive-chosen-ciphertext side channel from which the attacker decrypts any\nRSA ciphertext to the victim\u2019s key or forges any PKCS#1 v1.5 signature under\nit.\n\nAn attacker who authors a message and is able to compare both error code and\nthe result of the decryption, can mount a Bleichenbacher oracle.\n\nWe are not aware of any applications that provide a remote attacker\nan opportunity to mount an attack described in these scenarios. We consider\nthe existence of such application very unlikely, and for this reason this\nCVE has been evaluated as Low severity.\n\nTo avoid these attacks, when RSA PKCS#1 v1.5 Key Transport is in use, the\ninvoked EVP_PKEY_decrypt() will use the implicit rejection mechanism described\nin draft-irtf-cfrg-rsa-guidance. In previous OpenSSL releases the implicit\nrejection was explicitly disabled.\n\nThe implicit rejection mechanism always returns a plaintext value,\nthe symmetric key. This result is deterministic for the ciphertext and the\nprivate key.  The length of the decryption result can happen to match the\nlength of the key of the symmetric cipher that was used for the content\nencryption. When a certificate is not provided, the last RecipientInfo\nproducing a key that looks valid will be used. It may cause getting garbage\ncontent on decryption. As a proper way to deal with this a recipient\ncertificate has to be provided to identify the particular RecipientInfo for\ndecryption.\n\nThe FIPS modules in 4.0, 3.6, 3.5, and 3.4 are not affected by this issue, as\nCMS and S/MIME processing happens outside the OpenSSL FIPS module boundary.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1342,8 +1358,8 @@
             },
             "CVE-2026-42770": {
                 "cve_id": "CVE-2026-42770",
-                "title": "openssl: FFC-DH Peer Validation Uses Attacker-Supplied q",
-                "description": "A flaw was found in OpenSSL. A malicious peer can exploit this vulnerability by presenting a specially crafted DHX (X9.42) peer key. Due to improper validation of the peer key's subgroup membership, an attacker can recover the victim's private key after a small number of key exchange attempts. This information disclosure can lead to unauthorized access or further compromise of affected systems.",
+                "title": "FFC-DH Peer Validation Uses Attacker-Supplied q",
+                "description": "Issue summary: When EVP_PKEY_derive_set_peer() is called with a DHX (X9.42)\npeer key, the peer key is not properly checked for the subgroup membership.\n\nImpact summary: A malicious peer which presents an X9.42 key carrying the\nvictim\u2019s p and g parameters, a forged q = r (a small prime factor of the\ncofactor (p\u22121)/q_local), and a public value Y of order r can recover the\nvictim\u2019s private key after a small number of key exchange attempts.\n\nWhen EVP_PKEY_derive_set_peer() is called with a DHX (X9.42) peer key, the\nsubgroup membership check Y^q \u2261 1 (mod p) is performed using the peer\u2019s\nown q parameter, not the local key\u2019s q. The peer\u2019s domain parameters are\nthen matched against the domain parameters of the private key, but the value\nof q is not compared.\n\nA malicious peer who presents an X9.42 key carrying the victim\u2019s p, g,\na forged q = r (a small prime factor of the cofactor), and a public\nvalue Y of order r passes all checks. The shared secret then takes only\nr distinct values, leaking priv mod r. Repeating for each small-prime\nfactor of the cofactor and combining via CRT recovers the full private\nkey (Lim\u2013Lee / small-subgroup-confinement attack).\n\nThe realistic attack surface is narrow: principally CMP deployments with\nlong-lived RA/CA DHX keys and bespoke enterprise or government applications\nusing X9.42 DHX static keys with interactive protocols and therefore this\nissue was assigned Low severity.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, 3.1.2 and 3.0 are affected by this\nissue.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -1454,6 +1470,24 @@
                     {
                         "introduced": "0",
                         "fixed": "3.5.4-10.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "3.5.4"
+                    }
+                ]
+            },
+            "CVE-2024-41996": {
+                "cve_id": "CVE-2024-41996",
+                "title": "Validating the order of the public keys in the Diffie-Hellman Key ...",
+                "description": "Validating the order of the public keys in the Diffie-Hellman Key Agreement Protocol, when an approved safe prime is used, allows remote attackers (from the client side) to trigger unnecessarily expensive server-side DHE modular-exponentiation calculations. The client may cause asymmetric resource consumption. The basic attack scenario is that the client must claim that it can only communicate with DHE, and the server must be configured to allow DHE and validate the order of the public key.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "fixed": "1:3.5.7-11.rf",
                         "identifier": "rf"
                     },
                     {
@@ -1828,9 +1862,9 @@
             },
             "CVE-2026-7383": {
                 "cve_id": "CVE-2026-7383",
-                "title": "openssl: OpenSSL: Heap buffer overflow due to signed integer overflow in Unicode output sizing",
-                "description": "A flaw was found in OpenSSL. A signed integer overflow vulnerability exists when sizing the destination buffer for Unicode output. This can lead to a heap buffer overflow, which may result in a crash or potentially allow an attacker to execute arbitrary code. Exploitation requires an application to directly call specific functions with a large amount of attacker-controlled input.",
-                "severity": "LOW",
+                "title": "Possible Heap Buffer Overflow in ASN.1 Multibyte String Conversion",
+                "description": "Issue summary: A signed integer overflow when sizing the destination\nbuffer for Unicode output in ASN1_mbstring_ncopy() can lead to a heap\nbuffer overflow.\n\nImpact summary: A heap buffer overflow may lead to a crash or possibly\nattacker controlled code execution or other undefined behaviour.\n\nIn ASN1_mbstring_copy() and ASN1_mbstring_ncopy() the destination\nsize for Unicode output is computed in a signed int: by left shift\nof the input character count for BMPSTRING (UTF-16) and\nUNIVERSALSTRING (UTF-32), and by summing per-character byte counts\nfor UTF8STRING. The calculation overflows when the input reaches\naround 2^30 characters. In the worst case (UNIVERSALSTRING at 2^30\ncharacters) the size wraps to zero, OPENSSL_malloc(1) is called, and\nthe subsequent character copy writes several gigabytes past the\none-byte allocation.\n\nX.509 certificate processing routes through ASN1_STRING_set_by_NID(),\nwhose DIRSTRING_TYPE mask excludes UNIVERSALSTRING and whose per-NID\nsize limits cap the input length; no network protocol or\ncertificate-handling path in OpenSSL exercises the overflow.\nTriggering the bug requires an application that calls\nASN1_mbstring_copy() or ASN1_mbstring_ncopy() directly, or registers\na custom string type via ASN1_STRING_TABLE_add(), with\nattacker-controlled input on the order of half a gigabyte or more.\nFor these reasons this issue was assigned Low severity.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by\nthis issue, as the affected code is outside the OpenSSL FIPS module\nboundary.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -1842,9 +1876,9 @@
             },
             "CVE-2026-9076": {
                 "cve_id": "CVE-2026-9076",
-                "title": "openssl: OpenSSL: Denial of Service due to heap out-of-bounds read in CMS password-based decryption",
-                "description": "A flaw was found in OpenSSL. When processing attacker-supplied Cryptographic Message Syntax (CMS) data using password-based decryption, an attacker can choose a stream-mode Key Encryption Key (KEK) cipher. This can trigger a heap out-of-bounds read, potentially causing an application crash and leading to a Denial of Service (DoS). This vulnerability does not require password knowledge and can be exploited before authentication.",
-                "severity": "LOW",
+                "title": "Out-of-Bounds Read in CMS Password-Based Decryption",
+                "description": "Issue summary: When CMS password-based decryption (RFC 3211 / PWRI key unwrap)\nprocesses attacker-supplied CMS data, an attacker-chosen stream-mode KEK\ncipher can trigger a heap out-of-bounds read in kek_unwrap_key().\n\nImpact summary: A heap buffer over-read may trigger a crash which leads to\nDenial of Service for an application if the input buffer ends at a memory\npage boundary and the following page is unmapped. There is no information\ndisclosure as the over-read bytes are not revealed to the attacker.\n\nThe key unwrapping function performs a check-byte test as specified in the\nRFC that reads 7 bytes from a heap allocation that is based on the wrapped\nkey length from the message. There is a minimum length check based on the\nblock length of the wrapping cipher. However the cipher is selected from\nan OID carried in the attacker\u2019s PWRI keyEncryptionAlgorithm with no\nrequirement that the cipher be a block cipher. When an attacker selects\na stream-mode cipher the guard will be ineffective and the allocated buffer\ncontaining the unwrapped key can be too small to fit the check-bytes\nspecified in the RFC and a buffer over-read can happen.\n\nApplications calling CMS_decrypt() or CMS_decrypt_set1_password()\n(equivalently openssl cms -decrypt -pwri_password \u2026) on untrusted CMS\ndata are vulnerable to this issue. No password knowledge is required: the\nover-read happens during the unwrap attempt before any authentication\nsucceeds.\n\nThe over-read is limited to a few bytes and is not written to output, so\nthere is no information disclosure. Triggering a crash requires the\nallocation to border unmapped memory, which is unlikely with the normal\nallocator.\n\nThe FIPS modules are not affected by this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -1863,12 +1897,11 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "fixed": "1:3.5.7-12.rf",
-                        "identifier": "rf"
+                        "fixed": "3.5.4"
                     },
                     {
-                        "introduced": "1:3.5.6-11.rf",
-                        "fixed": "3.5.7",
+                        "introduced": "1:3.5.7-11.rf",
+                        "fixed": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     }
                 ]
@@ -2003,9 +2036,9 @@
             },
             "CVE-2026-34180": {
                 "cve_id": "CVE-2026-34180",
-                "title": "openssl: OpenSSL: Heap buffer over-read in ASN.1 decoding can lead to denial of service or information disclosure.",
-                "description": "A flaw was found in OpenSSL. An integer truncation vulnerability in the ASN.1 decoder can occur when processing a crafted DER-encoded ASN.1 structure with a primitive element exceeding 2 gigabytes. A remote attacker could exploit this to cause a heap buffer over-read. This may lead to an application crash, resulting in a Denial of Service (DoS), or potentially disclose sensitive information by loading memory contents beyond the input buffer. This issue primarily affects 64-bit Unix and Unix-like platforms.",
-                "severity": "LOW",
+                "title": "Heap Buffer Over-read in ASN.1 Content Parsing",
+                "description": "Issue summary: Parsing a crafted DER-encoded ASN.1 structure with a primitive\nelement whose content exceeds 2 gigabytes in length may cause a heap buffer\nover-read on 64-bit Unix and Unix-like platforms.\n\nImpact summary: The heap buffer over-read may crash the application (Denial of\nService) or to load into the decoded ASN.1 object contents of memory beyond the\nend of the input buffer.  More typically such ASN.1 elements would instead be\ntruncated.\n\nAn integer truncation in OpenSSL\u2019s ASN.1 decoder causes the content length of\nan ASN.1 primitive element to be mishandled when it exceeds 2 gigabytes. In the\nworst case the truncated length is treated as a request to scan the binary\ncontent for a terminating zero byte, possibly causing OpenSSL to read either\nless than or beyond the end of the allocated buffer.\n\nApplications that pass attacker-supplied data to d2i_X509(), d2i_PKCS7(), or\nany other d2i_* decoding function are affected. OpenSSL\u2019s own command-line\ntools are not vulnerable, as data read through the BIO layer is checked before\nit reaches the affected code. The issue only affects 64-bit Unix and Unix-like\nplatforms; 32-bit platforms and 64-bit Windows are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -2089,9 +2122,9 @@
             },
             "CVE-2026-42766": {
                 "cve_id": "CVE-2026-42766",
-                "title": "openssl: Possible NULL Dereference in Password-Based CMS Decryption",
-                "description": "A flaw was found in OpenSSL. A remote attacker could exploit a NULL pointer dereference vulnerability in the Cryptographic Message Syntax (CMS) decryption process by providing a specially crafted password-encrypted CMS message. This occurs because the keyDerivationAlgorithm field, which is optional, is dereferenced without proper validation. Successful exploitation leads to an application crash, resulting in a Denial of Service.",
-                "severity": "LOW",
+                "title": "Possible NULL Dereference in Password-Based CMS Decryption",
+                "description": "Issue summary: A specially crafted password-encrypted CMS message\ncan trigger a NULL pointer dereference during CMS decryption.\n\nImpact summary: This NULL pointer dereference leads to an application crash\nand a Denial of Service.\n\nThe CMS PasswordRecipientInfo.keyDerivationAlgorithm field is defined as\nOPTIONAL in the ASN.1 specification and may therefore be absent in specially\ncrafted inputs. During the password-based CMS decryption the OpenSSL\nCMS implementation dereferences this field without first checking whether it\nwas present.\n\nAn attacker who supplies such a CMS message to an application performing\npassword-based CMS decryption can trigger an application crash, leading to\na Denial of Service.\n\nApplications that process password-encrypted CMS messages may be affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
@@ -2121,8 +2154,8 @@
             },
             "CVE-2026-42768": {
                 "cve_id": "CVE-2026-42768",
-                "title": "openssl: Multi-RecipientInfo Bleichenbacher Oracle in CMS_decrypt() and PKCS7_decrypt()",
-                "description": "A flaw was found in OpenSSL's CMS_decrypt() and PKCS7_decrypt() functions. This vulnerability, a Bleichenbacher-style oracle, could allow a remote attacker to decrypt or sign messages using the victim's private RSA key. Exploitation requires the attacker to provide specially crafted CMS or S/MIME messages and observe the application's error codes or decryption output. While the attack is technically possible, the specific conditions required make it unlikely to be exploited in typical deployments.",
+                "title": "Multi-RecipientInfo Bleichenbacher Oracle in CMS_decrypt() and PKCS7_decrypt()",
+                "description": "Issue summary: The CMS_decrypt and PKCS7_decrypt functions are vulnerable to\nBleichenbacher-style attack when an attacker is able to provide the CMS or\nS/MIME messages and observe the error code and/or decryption output.\n\nImpact summary: The Bleichenbacher-style attack allows an attacker to use the\nvictim\u2019s vulnerable application as a way to decrypt or sign messages with the\nvictim\u2019s private RSA key.\n\nThe attack is possible in 2 variants.\n\nAn attacker who authors a message with two KTRI entries \u2014 the first one\nwrapping a real CEK under the victim\u2019s public key, the second with an\narbitrary probe ciphertext \u2014 obtains opportunity to iterate the 2nd KTRI to\nget a valid PKCS#1 v1.5 padding if the error code of the application is\navailable.\n\nThat is a Bleichenbacher oracle (Bleichenbacher, CRYPTO \u201898): an\nadaptive-chosen-ciphertext side channel from which the attacker decrypts any\nRSA ciphertext to the victim\u2019s key or forges any PKCS#1 v1.5 signature under\nit.\n\nAn attacker who authors a message and is able to compare both error code and\nthe result of the decryption, can mount a Bleichenbacher oracle.\n\nWe are not aware of any applications that provide a remote attacker\nan opportunity to mount an attack described in these scenarios. We consider\nthe existence of such application very unlikely, and for this reason this\nCVE has been evaluated as Low severity.\n\nTo avoid these attacks, when RSA PKCS#1 v1.5 Key Transport is in use, the\ninvoked EVP_PKEY_decrypt() will use the implicit rejection mechanism described\nin draft-irtf-cfrg-rsa-guidance. In previous OpenSSL releases the implicit\nrejection was explicitly disabled.\n\nThe implicit rejection mechanism always returns a plaintext value,\nthe symmetric key. This result is deterministic for the ciphertext and the\nprivate key.  The length of the decryption result can happen to match the\nlength of the key of the symmetric cipher that was used for the content\nencryption. When a certificate is not provided, the last RecipientInfo\nproducing a key that looks valid will be used. It may cause getting garbage\ncontent on decryption. As a proper way to deal with this a recipient\ncertificate has to be provided to identify the particular RecipientInfo for\ndecryption.\n\nThe FIPS modules in 4.0, 3.6, 3.5, and 3.4 are not affected by this issue, as\nCMS and S/MIME processing happens outside the OpenSSL FIPS module boundary.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -2153,8 +2186,8 @@
             },
             "CVE-2026-42770": {
                 "cve_id": "CVE-2026-42770",
-                "title": "openssl: FFC-DH Peer Validation Uses Attacker-Supplied q",
-                "description": "A flaw was found in OpenSSL. A malicious peer can exploit this vulnerability by presenting a specially crafted DHX (X9.42) peer key. Due to improper validation of the peer key's subgroup membership, an attacker can recover the victim's private key after a small number of key exchange attempts. This information disclosure can lead to unauthorized access or further compromise of affected systems.",
+                "title": "FFC-DH Peer Validation Uses Attacker-Supplied q",
+                "description": "Issue summary: When EVP_PKEY_derive_set_peer() is called with a DHX (X9.42)\npeer key, the peer key is not properly checked for the subgroup membership.\n\nImpact summary: A malicious peer which presents an X9.42 key carrying the\nvictim\u2019s p and g parameters, a forged q = r (a small prime factor of the\ncofactor (p\u22121)/q_local), and a public value Y of order r can recover the\nvictim\u2019s private key after a small number of key exchange attempts.\n\nWhen EVP_PKEY_derive_set_peer() is called with a DHX (X9.42) peer key, the\nsubgroup membership check Y^q \u2261 1 (mod p) is performed using the peer\u2019s\nown q parameter, not the local key\u2019s q. The peer\u2019s domain parameters are\nthen matched against the domain parameters of the private key, but the value\nof q is not compared.\n\nA malicious peer who presents an X9.42 key carrying the victim\u2019s p, g,\na forged q = r (a small prime factor of the cofactor), and a public\nvalue Y of order r passes all checks. The shared secret then takes only\nr distinct values, leaking priv mod r. Repeating for each small-prime\nfactor of the cofactor and combining via CRT recovers the full private\nkey (Lim\u2013Lee / small-subgroup-confinement attack).\n\nThe realistic attack surface is narrow: principally CMP deployments with\nlong-lived RA/CA DHX keys and bespoke enterprise or government applications\nusing X9.42 DHX static keys with interactive protocols and therefore this\nissue was assigned Low severity.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, 3.1.2 and 3.0 are affected by this\nissue.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -2265,6 +2298,24 @@
                     {
                         "introduced": "0",
                         "fixed": "3.5.4-10.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "3.5.4"
+                    }
+                ]
+            },
+            "CVE-2024-41996": {
+                "cve_id": "CVE-2024-41996",
+                "title": "Validating the order of the public keys in the Diffie-Hellman Key ...",
+                "description": "Validating the order of the public keys in the Diffie-Hellman Key Agreement Protocol, when an approved safe prime is used, allows remote attackers (from the client side) to trigger unnecessarily expensive server-side DHE modular-exponentiation calculations. The client may cause asymmetric resource consumption. The basic attack scenario is that the client must claim that it can only communicate with DHE, and the server must be configured to allow DHE and validate the order of the public key.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "fixed": "1:3.5.7-11.rf",
                         "identifier": "rf"
                     },
                     {
@@ -2639,9 +2690,9 @@
             },
             "CVE-2026-7383": {
                 "cve_id": "CVE-2026-7383",
-                "title": "openssl: OpenSSL: Heap buffer overflow due to signed integer overflow in Unicode output sizing",
-                "description": "A flaw was found in OpenSSL. A signed integer overflow vulnerability exists when sizing the destination buffer for Unicode output. This can lead to a heap buffer overflow, which may result in a crash or potentially allow an attacker to execute arbitrary code. Exploitation requires an application to directly call specific functions with a large amount of attacker-controlled input.",
-                "severity": "LOW",
+                "title": "Possible Heap Buffer Overflow in ASN.1 Multibyte String Conversion",
+                "description": "Issue summary: A signed integer overflow when sizing the destination\nbuffer for Unicode output in ASN1_mbstring_ncopy() can lead to a heap\nbuffer overflow.\n\nImpact summary: A heap buffer overflow may lead to a crash or possibly\nattacker controlled code execution or other undefined behaviour.\n\nIn ASN1_mbstring_copy() and ASN1_mbstring_ncopy() the destination\nsize for Unicode output is computed in a signed int: by left shift\nof the input character count for BMPSTRING (UTF-16) and\nUNIVERSALSTRING (UTF-32), and by summing per-character byte counts\nfor UTF8STRING. The calculation overflows when the input reaches\naround 2^30 characters. In the worst case (UNIVERSALSTRING at 2^30\ncharacters) the size wraps to zero, OPENSSL_malloc(1) is called, and\nthe subsequent character copy writes several gigabytes past the\none-byte allocation.\n\nX.509 certificate processing routes through ASN1_STRING_set_by_NID(),\nwhose DIRSTRING_TYPE mask excludes UNIVERSALSTRING and whose per-NID\nsize limits cap the input length; no network protocol or\ncertificate-handling path in OpenSSL exercises the overflow.\nTriggering the bug requires an application that calls\nASN1_mbstring_copy() or ASN1_mbstring_ncopy() directly, or registers\na custom string type via ASN1_STRING_TABLE_add(), with\nattacker-controlled input on the order of half a gigabyte or more.\nFor these reasons this issue was assigned Low severity.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by\nthis issue, as the affected code is outside the OpenSSL FIPS module\nboundary.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -2653,9 +2704,9 @@
             },
             "CVE-2026-9076": {
                 "cve_id": "CVE-2026-9076",
-                "title": "openssl: OpenSSL: Denial of Service due to heap out-of-bounds read in CMS password-based decryption",
-                "description": "A flaw was found in OpenSSL. When processing attacker-supplied Cryptographic Message Syntax (CMS) data using password-based decryption, an attacker can choose a stream-mode Key Encryption Key (KEK) cipher. This can trigger a heap out-of-bounds read, potentially causing an application crash and leading to a Denial of Service (DoS). This vulnerability does not require password knowledge and can be exploited before authentication.",
-                "severity": "LOW",
+                "title": "Out-of-Bounds Read in CMS Password-Based Decryption",
+                "description": "Issue summary: When CMS password-based decryption (RFC 3211 / PWRI key unwrap)\nprocesses attacker-supplied CMS data, an attacker-chosen stream-mode KEK\ncipher can trigger a heap out-of-bounds read in kek_unwrap_key().\n\nImpact summary: A heap buffer over-read may trigger a crash which leads to\nDenial of Service for an application if the input buffer ends at a memory\npage boundary and the following page is unmapped. There is no information\ndisclosure as the over-read bytes are not revealed to the attacker.\n\nThe key unwrapping function performs a check-byte test as specified in the\nRFC that reads 7 bytes from a heap allocation that is based on the wrapped\nkey length from the message. There is a minimum length check based on the\nblock length of the wrapping cipher. However the cipher is selected from\nan OID carried in the attacker\u2019s PWRI keyEncryptionAlgorithm with no\nrequirement that the cipher be a block cipher. When an attacker selects\na stream-mode cipher the guard will be ineffective and the allocated buffer\ncontaining the unwrapped key can be too small to fit the check-bytes\nspecified in the RFC and a buffer over-read can happen.\n\nApplications calling CMS_decrypt() or CMS_decrypt_set1_password()\n(equivalently openssl cms -decrypt -pwri_password \u2026) on untrusted CMS\ndata are vulnerable to this issue. No password knowledge is required: the\nover-read happens during the unwrap attempt before any authentication\nsucceeds.\n\nThe over-read is limited to a few bytes and is not written to output, so\nthere is no information disclosure. Triggering a crash requires the\nallocation to border unmapped memory, which is unlikely with the normal\nallocator.\n\nThe FIPS modules are not affected by this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -2674,12 +2725,11 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "fixed": "1:3.5.7-12.rf",
-                        "identifier": "rf"
+                        "fixed": "3.5.4"
                     },
                     {
-                        "introduced": "1:3.5.6-11.rf",
-                        "fixed": "3.5.7",
+                        "introduced": "1:3.5.7-11.rf",
+                        "fixed": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     }
                 ]
@@ -2814,9 +2864,9 @@
             },
             "CVE-2026-34180": {
                 "cve_id": "CVE-2026-34180",
-                "title": "openssl: OpenSSL: Heap buffer over-read in ASN.1 decoding can lead to denial of service or information disclosure.",
-                "description": "A flaw was found in OpenSSL. An integer truncation vulnerability in the ASN.1 decoder can occur when processing a crafted DER-encoded ASN.1 structure with a primitive element exceeding 2 gigabytes. A remote attacker could exploit this to cause a heap buffer over-read. This may lead to an application crash, resulting in a Denial of Service (DoS), or potentially disclose sensitive information by loading memory contents beyond the input buffer. This issue primarily affects 64-bit Unix and Unix-like platforms.",
-                "severity": "LOW",
+                "title": "Heap Buffer Over-read in ASN.1 Content Parsing",
+                "description": "Issue summary: Parsing a crafted DER-encoded ASN.1 structure with a primitive\nelement whose content exceeds 2 gigabytes in length may cause a heap buffer\nover-read on 64-bit Unix and Unix-like platforms.\n\nImpact summary: The heap buffer over-read may crash the application (Denial of\nService) or to load into the decoded ASN.1 object contents of memory beyond the\nend of the input buffer.  More typically such ASN.1 elements would instead be\ntruncated.\n\nAn integer truncation in OpenSSL\u2019s ASN.1 decoder causes the content length of\nan ASN.1 primitive element to be mishandled when it exceeds 2 gigabytes. In the\nworst case the truncated length is treated as a request to scan the binary\ncontent for a terminating zero byte, possibly causing OpenSSL to read either\nless than or beyond the end of the allocated buffer.\n\nApplications that pass attacker-supplied data to d2i_X509(), d2i_PKCS7(), or\nany other d2i_* decoding function are affected. OpenSSL\u2019s own command-line\ntools are not vulnerable, as data read through the BIO layer is checked before\nit reaches the affected code. The issue only affects 64-bit Unix and Unix-like\nplatforms; 32-bit platforms and 64-bit Windows are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -2900,9 +2950,9 @@
             },
             "CVE-2026-42766": {
                 "cve_id": "CVE-2026-42766",
-                "title": "openssl: Possible NULL Dereference in Password-Based CMS Decryption",
-                "description": "A flaw was found in OpenSSL. A remote attacker could exploit a NULL pointer dereference vulnerability in the Cryptographic Message Syntax (CMS) decryption process by providing a specially crafted password-encrypted CMS message. This occurs because the keyDerivationAlgorithm field, which is optional, is dereferenced without proper validation. Successful exploitation leads to an application crash, resulting in a Denial of Service.",
-                "severity": "LOW",
+                "title": "Possible NULL Dereference in Password-Based CMS Decryption",
+                "description": "Issue summary: A specially crafted password-encrypted CMS message\ncan trigger a NULL pointer dereference during CMS decryption.\n\nImpact summary: This NULL pointer dereference leads to an application crash\nand a Denial of Service.\n\nThe CMS PasswordRecipientInfo.keyDerivationAlgorithm field is defined as\nOPTIONAL in the ASN.1 specification and may therefore be absent in specially\ncrafted inputs. During the password-based CMS decryption the OpenSSL\nCMS implementation dereferences this field without first checking whether it\nwas present.\n\nAn attacker who supplies such a CMS message to an application performing\npassword-based CMS decryption can trigger an application crash, leading to\na Denial of Service.\n\nApplications that process password-encrypted CMS messages may be affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
@@ -2932,8 +2982,8 @@
             },
             "CVE-2026-42768": {
                 "cve_id": "CVE-2026-42768",
-                "title": "openssl: Multi-RecipientInfo Bleichenbacher Oracle in CMS_decrypt() and PKCS7_decrypt()",
-                "description": "A flaw was found in OpenSSL's CMS_decrypt() and PKCS7_decrypt() functions. This vulnerability, a Bleichenbacher-style oracle, could allow a remote attacker to decrypt or sign messages using the victim's private RSA key. Exploitation requires the attacker to provide specially crafted CMS or S/MIME messages and observe the application's error codes or decryption output. While the attack is technically possible, the specific conditions required make it unlikely to be exploited in typical deployments.",
+                "title": "Multi-RecipientInfo Bleichenbacher Oracle in CMS_decrypt() and PKCS7_decrypt()",
+                "description": "Issue summary: The CMS_decrypt and PKCS7_decrypt functions are vulnerable to\nBleichenbacher-style attack when an attacker is able to provide the CMS or\nS/MIME messages and observe the error code and/or decryption output.\n\nImpact summary: The Bleichenbacher-style attack allows an attacker to use the\nvictim\u2019s vulnerable application as a way to decrypt or sign messages with the\nvictim\u2019s private RSA key.\n\nThe attack is possible in 2 variants.\n\nAn attacker who authors a message with two KTRI entries \u2014 the first one\nwrapping a real CEK under the victim\u2019s public key, the second with an\narbitrary probe ciphertext \u2014 obtains opportunity to iterate the 2nd KTRI to\nget a valid PKCS#1 v1.5 padding if the error code of the application is\navailable.\n\nThat is a Bleichenbacher oracle (Bleichenbacher, CRYPTO \u201898): an\nadaptive-chosen-ciphertext side channel from which the attacker decrypts any\nRSA ciphertext to the victim\u2019s key or forges any PKCS#1 v1.5 signature under\nit.\n\nAn attacker who authors a message and is able to compare both error code and\nthe result of the decryption, can mount a Bleichenbacher oracle.\n\nWe are not aware of any applications that provide a remote attacker\nan opportunity to mount an attack described in these scenarios. We consider\nthe existence of such application very unlikely, and for this reason this\nCVE has been evaluated as Low severity.\n\nTo avoid these attacks, when RSA PKCS#1 v1.5 Key Transport is in use, the\ninvoked EVP_PKEY_decrypt() will use the implicit rejection mechanism described\nin draft-irtf-cfrg-rsa-guidance. In previous OpenSSL releases the implicit\nrejection was explicitly disabled.\n\nThe implicit rejection mechanism always returns a plaintext value,\nthe symmetric key. This result is deterministic for the ciphertext and the\nprivate key.  The length of the decryption result can happen to match the\nlength of the key of the symmetric cipher that was used for the content\nencryption. When a certificate is not provided, the last RecipientInfo\nproducing a key that looks valid will be used. It may cause getting garbage\ncontent on decryption. As a proper way to deal with this a recipient\ncertificate has to be provided to identify the particular RecipientInfo for\ndecryption.\n\nThe FIPS modules in 4.0, 3.6, 3.5, and 3.4 are not affected by this issue, as\nCMS and S/MIME processing happens outside the OpenSSL FIPS module boundary.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -2964,8 +3014,8 @@
             },
             "CVE-2026-42770": {
                 "cve_id": "CVE-2026-42770",
-                "title": "openssl: FFC-DH Peer Validation Uses Attacker-Supplied q",
-                "description": "A flaw was found in OpenSSL. A malicious peer can exploit this vulnerability by presenting a specially crafted DHX (X9.42) peer key. Due to improper validation of the peer key's subgroup membership, an attacker can recover the victim's private key after a small number of key exchange attempts. This information disclosure can lead to unauthorized access or further compromise of affected systems.",
+                "title": "FFC-DH Peer Validation Uses Attacker-Supplied q",
+                "description": "Issue summary: When EVP_PKEY_derive_set_peer() is called with a DHX (X9.42)\npeer key, the peer key is not properly checked for the subgroup membership.\n\nImpact summary: A malicious peer which presents an X9.42 key carrying the\nvictim\u2019s p and g parameters, a forged q = r (a small prime factor of the\ncofactor (p\u22121)/q_local), and a public value Y of order r can recover the\nvictim\u2019s private key after a small number of key exchange attempts.\n\nWhen EVP_PKEY_derive_set_peer() is called with a DHX (X9.42) peer key, the\nsubgroup membership check Y^q \u2261 1 (mod p) is performed using the peer\u2019s\nown q parameter, not the local key\u2019s q. The peer\u2019s domain parameters are\nthen matched against the domain parameters of the private key, but the value\nof q is not compared.\n\nA malicious peer who presents an X9.42 key carrying the victim\u2019s p, g,\na forged q = r (a small prime factor of the cofactor), and a public\nvalue Y of order r passes all checks. The shared secret then takes only\nr distinct values, leaking priv mod r. Repeating for each small-prime\nfactor of the cofactor and combining via CRT recovers the full private\nkey (Lim\u2013Lee / small-subgroup-confinement attack).\n\nThe realistic attack surface is narrow: principally CMP deployments with\nlong-lived RA/CA DHX keys and bespoke enterprise or government applications\nusing X9.42 DHX static keys with interactive protocols and therefore this\nissue was assigned Low severity.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, 3.1.2 and 3.0 are affected by this\nissue.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -3076,6 +3126,24 @@
                     {
                         "introduced": "0",
                         "fixed": "3.5.4-10.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "3.5.4"
+                    }
+                ]
+            },
+            "CVE-2024-41996": {
+                "cve_id": "CVE-2024-41996",
+                "title": "Validating the order of the public keys in the Diffie-Hellman Key ...",
+                "description": "Validating the order of the public keys in the Diffie-Hellman Key Agreement Protocol, when an approved safe prime is used, allows remote attackers (from the client side) to trigger unnecessarily expensive server-side DHE modular-exponentiation calculations. The client may cause asymmetric resource consumption. The basic attack scenario is that the client must claim that it can only communicate with DHE, and the server must be configured to allow DHE and validate the order of the public key.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "fixed": "1:3.5.7-11.rf",
                         "identifier": "rf"
                     },
                     {
@@ -3450,9 +3518,9 @@
             },
             "CVE-2026-7383": {
                 "cve_id": "CVE-2026-7383",
-                "title": "openssl: OpenSSL: Heap buffer overflow due to signed integer overflow in Unicode output sizing",
-                "description": "A flaw was found in OpenSSL. A signed integer overflow vulnerability exists when sizing the destination buffer for Unicode output. This can lead to a heap buffer overflow, which may result in a crash or potentially allow an attacker to execute arbitrary code. Exploitation requires an application to directly call specific functions with a large amount of attacker-controlled input.",
-                "severity": "LOW",
+                "title": "Possible Heap Buffer Overflow in ASN.1 Multibyte String Conversion",
+                "description": "Issue summary: A signed integer overflow when sizing the destination\nbuffer for Unicode output in ASN1_mbstring_ncopy() can lead to a heap\nbuffer overflow.\n\nImpact summary: A heap buffer overflow may lead to a crash or possibly\nattacker controlled code execution or other undefined behaviour.\n\nIn ASN1_mbstring_copy() and ASN1_mbstring_ncopy() the destination\nsize for Unicode output is computed in a signed int: by left shift\nof the input character count for BMPSTRING (UTF-16) and\nUNIVERSALSTRING (UTF-32), and by summing per-character byte counts\nfor UTF8STRING. The calculation overflows when the input reaches\naround 2^30 characters. In the worst case (UNIVERSALSTRING at 2^30\ncharacters) the size wraps to zero, OPENSSL_malloc(1) is called, and\nthe subsequent character copy writes several gigabytes past the\none-byte allocation.\n\nX.509 certificate processing routes through ASN1_STRING_set_by_NID(),\nwhose DIRSTRING_TYPE mask excludes UNIVERSALSTRING and whose per-NID\nsize limits cap the input length; no network protocol or\ncertificate-handling path in OpenSSL exercises the overflow.\nTriggering the bug requires an application that calls\nASN1_mbstring_copy() or ASN1_mbstring_ncopy() directly, or registers\na custom string type via ASN1_STRING_TABLE_add(), with\nattacker-controlled input on the order of half a gigabyte or more.\nFor these reasons this issue was assigned Low severity.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by\nthis issue, as the affected code is outside the OpenSSL FIPS module\nboundary.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -3464,9 +3532,9 @@
             },
             "CVE-2026-9076": {
                 "cve_id": "CVE-2026-9076",
-                "title": "openssl: OpenSSL: Denial of Service due to heap out-of-bounds read in CMS password-based decryption",
-                "description": "A flaw was found in OpenSSL. When processing attacker-supplied Cryptographic Message Syntax (CMS) data using password-based decryption, an attacker can choose a stream-mode Key Encryption Key (KEK) cipher. This can trigger a heap out-of-bounds read, potentially causing an application crash and leading to a Denial of Service (DoS). This vulnerability does not require password knowledge and can be exploited before authentication.",
-                "severity": "LOW",
+                "title": "Out-of-Bounds Read in CMS Password-Based Decryption",
+                "description": "Issue summary: When CMS password-based decryption (RFC 3211 / PWRI key unwrap)\nprocesses attacker-supplied CMS data, an attacker-chosen stream-mode KEK\ncipher can trigger a heap out-of-bounds read in kek_unwrap_key().\n\nImpact summary: A heap buffer over-read may trigger a crash which leads to\nDenial of Service for an application if the input buffer ends at a memory\npage boundary and the following page is unmapped. There is no information\ndisclosure as the over-read bytes are not revealed to the attacker.\n\nThe key unwrapping function performs a check-byte test as specified in the\nRFC that reads 7 bytes from a heap allocation that is based on the wrapped\nkey length from the message. There is a minimum length check based on the\nblock length of the wrapping cipher. However the cipher is selected from\nan OID carried in the attacker\u2019s PWRI keyEncryptionAlgorithm with no\nrequirement that the cipher be a block cipher. When an attacker selects\na stream-mode cipher the guard will be ineffective and the allocated buffer\ncontaining the unwrapped key can be too small to fit the check-bytes\nspecified in the RFC and a buffer over-read can happen.\n\nApplications calling CMS_decrypt() or CMS_decrypt_set1_password()\n(equivalently openssl cms -decrypt -pwri_password \u2026) on untrusted CMS\ndata are vulnerable to this issue. No password knowledge is required: the\nover-read happens during the unwrap attempt before any authentication\nsucceeds.\n\nThe over-read is limited to a few bytes and is not written to output, so\nthere is no information disclosure. Triggering a crash requires the\nallocation to border unmapped memory, which is unlikely with the normal\nallocator.\n\nThe FIPS modules are not affected by this issue.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -3485,12 +3553,11 @@
                 "events": [
                     {
                         "introduced": "0",
-                        "fixed": "1:3.5.7-12.rf",
-                        "identifier": "rf"
+                        "fixed": "3.5.4"
                     },
                     {
-                        "introduced": "1:3.5.6-11.rf",
-                        "fixed": "3.5.7",
+                        "introduced": "1:3.5.7-11.rf",
+                        "fixed": "1:3.5.7-12.rf",
                         "identifier": "rf"
                     }
                 ]
@@ -3625,9 +3692,9 @@
             },
             "CVE-2026-34180": {
                 "cve_id": "CVE-2026-34180",
-                "title": "openssl: OpenSSL: Heap buffer over-read in ASN.1 decoding can lead to denial of service or information disclosure.",
-                "description": "A flaw was found in OpenSSL. An integer truncation vulnerability in the ASN.1 decoder can occur when processing a crafted DER-encoded ASN.1 structure with a primitive element exceeding 2 gigabytes. A remote attacker could exploit this to cause a heap buffer over-read. This may lead to an application crash, resulting in a Denial of Service (DoS), or potentially disclose sensitive information by loading memory contents beyond the input buffer. This issue primarily affects 64-bit Unix and Unix-like platforms.",
-                "severity": "LOW",
+                "title": "Heap Buffer Over-read in ASN.1 Content Parsing",
+                "description": "Issue summary: Parsing a crafted DER-encoded ASN.1 structure with a primitive\nelement whose content exceeds 2 gigabytes in length may cause a heap buffer\nover-read on 64-bit Unix and Unix-like platforms.\n\nImpact summary: The heap buffer over-read may crash the application (Denial of\nService) or to load into the decoded ASN.1 object contents of memory beyond the\nend of the input buffer.  More typically such ASN.1 elements would instead be\ntruncated.\n\nAn integer truncation in OpenSSL\u2019s ASN.1 decoder causes the content length of\nan ASN.1 primitive element to be mishandled when it exceeds 2 gigabytes. In the\nworst case the truncated length is treated as a request to scan the binary\ncontent for a terminating zero byte, possibly causing OpenSSL to read either\nless than or beyond the end of the allocated buffer.\n\nApplications that pass attacker-supplied data to d2i_X509(), d2i_PKCS7(), or\nany other d2i_* decoding function are affected. OpenSSL\u2019s own command-line\ntools are not vulnerable, as data read through the BIO layer is checked before\nit reaches the affected code. The issue only affects 64-bit Unix and Unix-like\nplatforms; 32-bit platforms and 64-bit Windows are not affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4 and 3.0 are not affected by this issue,\nas the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "HIGH",
                 "status": "fixed",
                 "events": [
                     {
@@ -3711,9 +3778,9 @@
             },
             "CVE-2026-42766": {
                 "cve_id": "CVE-2026-42766",
-                "title": "openssl: Possible NULL Dereference in Password-Based CMS Decryption",
-                "description": "A flaw was found in OpenSSL. A remote attacker could exploit a NULL pointer dereference vulnerability in the Cryptographic Message Syntax (CMS) decryption process by providing a specially crafted password-encrypted CMS message. This occurs because the keyDerivationAlgorithm field, which is optional, is dereferenced without proper validation. Successful exploitation leads to an application crash, resulting in a Denial of Service.",
-                "severity": "LOW",
+                "title": "Possible NULL Dereference in Password-Based CMS Decryption",
+                "description": "Issue summary: A specially crafted password-encrypted CMS message\ncan trigger a NULL pointer dereference during CMS decryption.\n\nImpact summary: This NULL pointer dereference leads to an application crash\nand a Denial of Service.\n\nThe CMS PasswordRecipientInfo.keyDerivationAlgorithm field is defined as\nOPTIONAL in the ASN.1 specification and may therefore be absent in specially\ncrafted inputs. During the password-based CMS decryption the OpenSSL\nCMS implementation dereferences this field without first checking whether it\nwas present.\n\nAn attacker who supplies such a CMS message to an application performing\npassword-based CMS decryption can trigger an application crash, leading to\na Denial of Service.\n\nApplications that process password-encrypted CMS messages may be affected.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this\nissue, as the affected code is outside the OpenSSL FIPS module boundary.",
+                "severity": "MEDIUM",
                 "status": "fixed",
                 "events": [
                     {
@@ -3743,8 +3810,8 @@
             },
             "CVE-2026-42768": {
                 "cve_id": "CVE-2026-42768",
-                "title": "openssl: Multi-RecipientInfo Bleichenbacher Oracle in CMS_decrypt() and PKCS7_decrypt()",
-                "description": "A flaw was found in OpenSSL's CMS_decrypt() and PKCS7_decrypt() functions. This vulnerability, a Bleichenbacher-style oracle, could allow a remote attacker to decrypt or sign messages using the victim's private RSA key. Exploitation requires the attacker to provide specially crafted CMS or S/MIME messages and observe the application's error codes or decryption output. While the attack is technically possible, the specific conditions required make it unlikely to be exploited in typical deployments.",
+                "title": "Multi-RecipientInfo Bleichenbacher Oracle in CMS_decrypt() and PKCS7_decrypt()",
+                "description": "Issue summary: The CMS_decrypt and PKCS7_decrypt functions are vulnerable to\nBleichenbacher-style attack when an attacker is able to provide the CMS or\nS/MIME messages and observe the error code and/or decryption output.\n\nImpact summary: The Bleichenbacher-style attack allows an attacker to use the\nvictim\u2019s vulnerable application as a way to decrypt or sign messages with the\nvictim\u2019s private RSA key.\n\nThe attack is possible in 2 variants.\n\nAn attacker who authors a message with two KTRI entries \u2014 the first one\nwrapping a real CEK under the victim\u2019s public key, the second with an\narbitrary probe ciphertext \u2014 obtains opportunity to iterate the 2nd KTRI to\nget a valid PKCS#1 v1.5 padding if the error code of the application is\navailable.\n\nThat is a Bleichenbacher oracle (Bleichenbacher, CRYPTO \u201898): an\nadaptive-chosen-ciphertext side channel from which the attacker decrypts any\nRSA ciphertext to the victim\u2019s key or forges any PKCS#1 v1.5 signature under\nit.\n\nAn attacker who authors a message and is able to compare both error code and\nthe result of the decryption, can mount a Bleichenbacher oracle.\n\nWe are not aware of any applications that provide a remote attacker\nan opportunity to mount an attack described in these scenarios. We consider\nthe existence of such application very unlikely, and for this reason this\nCVE has been evaluated as Low severity.\n\nTo avoid these attacks, when RSA PKCS#1 v1.5 Key Transport is in use, the\ninvoked EVP_PKEY_decrypt() will use the implicit rejection mechanism described\nin draft-irtf-cfrg-rsa-guidance. In previous OpenSSL releases the implicit\nrejection was explicitly disabled.\n\nThe implicit rejection mechanism always returns a plaintext value,\nthe symmetric key. This result is deterministic for the ciphertext and the\nprivate key.  The length of the decryption result can happen to match the\nlength of the key of the symmetric cipher that was used for the content\nencryption. When a certificate is not provided, the last RecipientInfo\nproducing a key that looks valid will be used. It may cause getting garbage\ncontent on decryption. As a proper way to deal with this a recipient\ncertificate has to be provided to identify the particular RecipientInfo for\ndecryption.\n\nThe FIPS modules in 4.0, 3.6, 3.5, and 3.4 are not affected by this issue, as\nCMS and S/MIME processing happens outside the OpenSSL FIPS module boundary.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -3775,8 +3842,8 @@
             },
             "CVE-2026-42770": {
                 "cve_id": "CVE-2026-42770",
-                "title": "openssl: FFC-DH Peer Validation Uses Attacker-Supplied q",
-                "description": "A flaw was found in OpenSSL. A malicious peer can exploit this vulnerability by presenting a specially crafted DHX (X9.42) peer key. Due to improper validation of the peer key's subgroup membership, an attacker can recover the victim's private key after a small number of key exchange attempts. This information disclosure can lead to unauthorized access or further compromise of affected systems.",
+                "title": "FFC-DH Peer Validation Uses Attacker-Supplied q",
+                "description": "Issue summary: When EVP_PKEY_derive_set_peer() is called with a DHX (X9.42)\npeer key, the peer key is not properly checked for the subgroup membership.\n\nImpact summary: A malicious peer which presents an X9.42 key carrying the\nvictim\u2019s p and g parameters, a forged q = r (a small prime factor of the\ncofactor (p\u22121)/q_local), and a public value Y of order r can recover the\nvictim\u2019s private key after a small number of key exchange attempts.\n\nWhen EVP_PKEY_derive_set_peer() is called with a DHX (X9.42) peer key, the\nsubgroup membership check Y^q \u2261 1 (mod p) is performed using the peer\u2019s\nown q parameter, not the local key\u2019s q. The peer\u2019s domain parameters are\nthen matched against the domain parameters of the private key, but the value\nof q is not compared.\n\nA malicious peer who presents an X9.42 key carrying the victim\u2019s p, g,\na forged q = r (a small prime factor of the cofactor), and a public\nvalue Y of order r passes all checks. The shared secret then takes only\nr distinct values, leaking priv mod r. Repeating for each small-prime\nfactor of the cofactor and combining via CRT recovers the full private\nkey (Lim\u2013Lee / small-subgroup-confinement attack).\n\nThe realistic attack surface is narrow: principally CMP deployments with\nlong-lived RA/CA DHX keys and bespoke enterprise or government applications\nusing X9.42 DHX static keys with interactive protocols and therefore this\nissue was assigned Low severity.\n\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, 3.1.2 and 3.0 are affected by this\nissue.",
                 "severity": "LOW",
                 "status": "fixed",
                 "events": [
@@ -3887,6 +3954,24 @@
                     {
                         "introduced": "0",
                         "fixed": "3.5.4-10.rf",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "0",
+                        "fixed": "3.5.4"
+                    }
+                ]
+            },
+            "CVE-2024-41996": {
+                "cve_id": "CVE-2024-41996",
+                "title": "Validating the order of the public keys in the Diffie-Hellman Key ...",
+                "description": "Validating the order of the public keys in the Diffie-Hellman Key Agreement Protocol, when an approved safe prime is used, allows remote attackers (from the client side) to trigger unnecessarily expensive server-side DHE modular-exponentiation calculations. The client may cause asymmetric resource consumption. The basic attack scenario is that the client must claim that it can only communicate with DHE, and the server must be configured to allow DHE and validate the order of the public key.",
+                "severity": "HIGH",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "fixed": "1:3.5.7-11.rf",
                         "identifier": "rf"
                     },
                     {
