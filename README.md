@@ -6,7 +6,7 @@ RapidFort provides **validated, research-backed security advisory data** for all
 - Integrate **per-package advisory data** seamlessly into their scanning workflow
 - **Eliminate false positives** by excluding vulnerabilities that do not apply to RapidFort Curated Images
 
-The repository contains a structured JSON database of per-package CVE advisories covering **Alpine Linux**, **Ubuntu**, **Red Hat**, and **Oracle Linux** distributions.
+The repository contains a structured JSON database of per-package CVE advisories covering **Alpine Linux**, **Ubuntu**, **Debian**, **Red Hat**, **Oracle Linux**, **AlmaLinux**, and **Rocky Linux** distributions.
 
 ---
 
@@ -16,11 +16,14 @@ The repository contains a structured JSON database of per-package CVE advisories
 OS/
 ├── alpine/    # Alpine Linux advisory files
 ├── ubuntu/    # Ubuntu advisory files
+├── debian/    # Debian advisory files
 ├── redhat/    # Red Hat advisory files
-└── oracle/    # Oracle Linux advisory files
+├── oracle/    # Oracle Linux advisory files
+├── alma/      # AlmaLinux advisory files
+└── rocky/     # Rocky Linux advisory files
 ```
 
-Each advisory file covers a single source package and follows the naming convention:
+Each advisory file covers a single package and follows the naming convention:
 
 ```
 OS/{os_name}/{package_name}_advisory.json
@@ -30,10 +33,27 @@ OS/{os_name}/{package_name}_advisory.json
 
 ```
 OS/ubuntu/openssl_advisory.json
+OS/debian/openssl_advisory.json
 OS/alpine/busybox_advisory.json
 OS/redhat/zlib_advisory.json
 OS/oracle/glibc_advisory.json
+OS/alma/ImageMagick-libs_advisory.json
+OS/rocky/openssl-libs_advisory.json
 ```
+
+### Package Name Granularity
+
+The package name used in the filename differs by package format:
+
+| Package Format | Distributions | Keyed By | Example |
+|---|---|---|---|
+| apk | Alpine Linux | Source package | `openssl_advisory.json` (not `libcrypto3`) |
+| dpkg | Ubuntu, Debian | Source package | `glibc_advisory.json` (not `libc6`) |
+| rpm | Red Hat, Oracle Linux, AlmaLinux, Rocky Linux | Binary package | `openssl_advisory.json` **and** `openssl-libs_advisory.json` |
+
+For rpm-based distributions, each binary subpackage has its own advisory file. Look up the advisory using the binary package name reported by `rpm -qa`, not the source package it was built from.
+
+Package names prefixed with `rf-` (e.g. `rf-python3`, `rf-chromium`) are RapidFort-rebuilt packages.
 
 ---
 
@@ -43,21 +63,38 @@ OS/oracle/glibc_advisory.json
 
 | Distribution | Supported Releases | Package Format |
 |---|---|---|
-| **Alpine Linux** | 3.20, 3.21, 3.22 | apk |
+| **Alpine Linux** | 3.20, 3.21, 3.22, 3.23, 3.24 | apk |
 | **Ubuntu** | focal (20.04), jammy (22.04), noble (24.04) | dpkg |
+| **Debian** | bookworm (12), trixie (13), forky (14) | dpkg |
 | **Red Hat** | 5, 6, 7, 8, 9, 10 | rpm |
 | **Oracle Linux** | 6, 7, 8, 9, 10 | rpm |
+| **AlmaLinux** | 8, 9, 10 | rpm |
+| **Rocky Linux** | 8, 9, 10 | rpm |
 
 ### Stream Identifiers
 
-Red Hat, Oracle Linux, and Ubuntu advisory events include an `identifier` field to disambiguate between package streams under the same release key:
+Advisory events for every distribution **except Alpine Linux** include an `identifier` field to disambiguate between package streams under the same release key:
 
 | Prefix | Stream | Examples |
 |---|---|---|
-| `el` | RHEL / CentOS / Oracle Linux | `el6`, `el7`, `el8`, `el9`, `el10` |
+| `el` | RHEL / CentOS / Oracle Linux / AlmaLinux / Rocky Linux | `el6`, `el7`, `el8`, `el9`, `el10` |
 | `fc` | Fedora | `fc39`, `fc40`, `fc41`, `fc42`, `fc43` |
 | `ubuntu` | Ubuntu archive | `ubuntu` |
+| `debian` | Debian archive | `debian` |
 | `rf` | RapidFort-rebuilt package | `rf` |
+
+Which identifiers appear depends on the distribution:
+
+| Distribution | Identifiers Present |
+|---|---|
+| Alpine Linux | *none — the field is absent* |
+| Ubuntu | `ubuntu`, `rf` |
+| Debian | `debian`, `rf` |
+| Red Hat | `el5`–`el10`, `fc18`–`fc46`, `rf` |
+| Oracle Linux | `el2`, `el4`–`el10`, `fc3`–`fc46`, `rf` |
+| AlmaLinux, Rocky Linux | `el8`, `el9`, `el10`, `fc18`–`fc46`, `rf` |
+
+> **Important:** In the rpm-based distributions, Fedora (`fc*`) events typically **outnumber** the `el*` events within the same release key. Filtering on `identifier` is required for correct results — see [Identifier Matching](#identifier-matching).
 
 ---
 
@@ -93,8 +130,8 @@ Each advisory file is a JSON object with the following structure:
 
 | Field | Type | Description |
 |---|---|---|
-| `package_name` | string | Distribution source package name |
-| `advisory` | object | Keyed by OS release identifier (e.g. `"3.21"`, `"22.04"`, `"9"`) |
+| `package_name` | string | Distribution package name — source package for apk/dpkg, binary package for rpm |
+| `advisory` | object | Keyed by OS release identifier (e.g. `"3.21"`, `"22.04"`, `"12"`, `"9"`) |
 
 ### CVE Entry Fields
 
@@ -103,7 +140,7 @@ Each advisory file is a JSON object with the following structure:
 | `cve_id` | string | CVE identifier (matches the parent object key) |
 | `title` | string | Short vulnerability summary |
 | `description` | string | Full vulnerability description |
-| `severity` | string | One of `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`, `UNKNOWN` |
+| `severity` | string | One of `LOW`, `MEDIUM`, `HIGH`, `CRITICAL`, `UNKNOWN`, or an empty string |
 | `status` | string | `"open"` (no fix available) or `"fixed"` (patch exists) |
 | `events` | array | Version range entries describing affected and fixed versions |
 
@@ -113,16 +150,21 @@ Each advisory file is a JSON object with the following structure:
 |---|---|---|---|
 | `introduced` | string | Yes | Version where the vulnerability was introduced. `"0"` means all versions are affected. |
 | `fixed` | string | No | Version that resolves the vulnerability. Absent when no fix is available. |
-| `identifier` | string | No | **Red Hat, Oracle Linux, and Ubuntu only.** Package stream tag (e.g. `el9`, `fc41`, `ubuntu`, `rf`) used to disambiguate when a release key maps to multiple package streams. |
+| `identifier` | string | No | **All distributions except Alpine.** Package stream tag (e.g. `el9`, `fc41`, `ubuntu`, `debian`, `rf`) used to disambiguate when a release key maps to multiple package streams. |
 
 ### Release Key Format by OS
 
 | OS | Release Key Examples | Description |
 |---|---|---|
-| Alpine | `"3.20"`, `"3.21"`, `"3.22"` | Alpine minor version |
+| Alpine | `"3.20"`, `"3.21"`, `"3.22"`, `"3.23"`, `"3.24"` | Alpine minor version |
 | Ubuntu | `"20.04"`, `"22.04"`, `"24.04"` | Ubuntu version number |
+| Debian | `"12"`, `"13"`, `"14"` | Major release number |
 | Red Hat | `"5"`, `"6"`, `"7"`, `"8"`, `"9"`, `"10"` | Major release number |
 | Oracle Linux | `"6"`, `"7"`, `"8"`, `"9"`, `"10"` | Major release number |
+| AlmaLinux | `"8"`, `"9"`, `"10"` | Major release number |
+| Rocky Linux | `"8"`, `"9"`, `"10"` | Major release number |
+
+**Legacy release keys:** a small number of Red Hat and Oracle Linux files carry `el`-prefixed release keys for end-of-life releases — `"el4"` in Red Hat, and `"el4"` / `"el5"` in Oracle Linux. Consumers that parse release keys as integers must tolerate these.
 
 ---
 
@@ -130,7 +172,7 @@ Each advisory file is a JSON object with the following structure:
 
 ### Step 1: Identify the OS and Release
 
-Determine the operating system and release version of the target system being scanned (e.g. Alpine 3.21, Ubuntu 22.04, Red Hat 9, Oracle Linux 9).
+Determine the operating system and release version of the target system being scanned (e.g. Alpine 3.21, Ubuntu 22.04, Debian 12, Red Hat 9, Oracle Linux 9, AlmaLinux 9, Rocky Linux 9).
 
 ### Step 2: Locate the Advisory File
 
@@ -144,10 +186,15 @@ OS/{os_name}/{package_name}_advisory.json
 
 ```
 OS/ubuntu/openssl_advisory.json
+OS/debian/dovecot_advisory.json
 OS/alpine/busybox_advisory.json
 OS/redhat/yelp_advisory.json
 OS/oracle/glibc_advisory.json
+OS/alma/389-ds-base-libs_advisory.json
+OS/rocky/chromium-common_advisory.json
 ```
+
+For rpm-based distributions, use the binary package name — see [Package Name Granularity](#package-name-granularity).
 
 ### Step 3: Load and Navigate the Advisory
 
@@ -189,12 +236,15 @@ installed_version >= fixed_version -->  not affected
 
 #### Identifier Matching
 
-For Red Hat, Oracle Linux, and Ubuntu advisories, events may include an `identifier` field. When present, **only evaluate events whose `identifier` matches the target system's stream**:
+For every distribution except Alpine, events may include an `identifier` field. When present, **only evaluate events whose `identifier` matches the target system's stream**:
 
 - On RHEL 9, evaluate only events with `identifier = "el9"`
-- On Oracle Linux 9, evaluate only events with `identifier = "el9"`
+- On Oracle Linux 9, AlmaLinux 9, or Rocky Linux 9, evaluate only events with `identifier = "el9"`
 - On Fedora 41, evaluate only events with `identifier = "fc41"`
 - On Ubuntu, evaluate only events with `identifier = "ubuntu"` for archive packages, or `identifier = "rf"` for RapidFort-rebuilt packages
+- On Debian, evaluate only events with `identifier = "debian"` for archive packages, or `identifier = "rf"` for RapidFort-rebuilt packages
+
+Skipping this filter causes substantial over-reporting on rpm-based distributions, because a single release key aggregates events from many streams. For example, within the `"9"` release key of a Red Hat advisory, Fedora `fc43` events commonly outnumber the applicable `el9` events by roughly two to one — none of which apply to a RHEL 9 target.
 
 ```json
 {
@@ -217,6 +267,16 @@ Ubuntu example — the same CVE tracked separately in the Ubuntu archive and in 
 }
 ```
 
+Debian example — the Debian archive fix, tracked under the `debian` identifier:
+
+```json
+{
+  "events": [
+    { "introduced": "2:3.87.1-1+deb12u1", "fixed": "2:3.87.1-1+deb12u4", "identifier": "debian" }
+  ]
+}
+```
+
 ---
 
 ## Severity Levels
@@ -228,6 +288,7 @@ Ubuntu example — the same CVE tracked separately in the Ubuntu archive and in 
 | `MEDIUM` | Exploitation requires specific conditions but could impact confidentiality or integrity |
 | `LOW` | Limited impact; exploitation is difficult or consequences are minimal |
 | `UNKNOWN` | Severity has not been assessed by the upstream source |
+| `""` | Empty string — no severity was published by the upstream source. Treat the same as `UNKNOWN`. |
 
 ---
 
@@ -239,12 +300,17 @@ Version strings are OS-specific. Consumers must use the appropriate version comp
 |---|---|---|
 | Alpine | `{version}-r{revision}` | `1.3.1-r1` |
 | Ubuntu | `{epoch}:{upstream}-{debian}{ubuntu}` | `1:1.2.11.dfsg-2ubuntu9.2` |
+| Debian | `{epoch}:{upstream}-{debian}` | `2:3.87.1-1+deb12u4` |
 | Red Hat | `{epoch}:{version}-{release}.{dist}` | `2:42.2-5.fc40` |
 | Oracle Linux | `{epoch}:{version}-{release}.{dist}` | `2:1.2.11-40.el9` |
+| AlmaLinux | `{epoch}:{version}-{release}.{dist}` | `1:2.3.3op2-39.el9_8` |
+| Rocky Linux | `{epoch}:{version}-{release}.{dist}` | `0:4.10.0-110.el9_8.2` |
 
 **Notes:**
 - The epoch prefix (e.g. `1:`, `2:`) is significant for version ordering and must not be ignored.
-- An `introduced` value of `"0"` is a sentinel meaning "all versions from the beginning," not a literal version string.
+- The epoch prefix is **not always present**. In the rpm-based distributions many versions are written without one (e.g. `4.10.0-110.el9_8.3`); treat a missing epoch as `0`.
+- Debian security updates carry a `+deb{release}u{revision}` suffix (e.g. `2:3.87.1-1+deb12u4`), but plain Debian revisions without the suffix are the more common form. Standard dpkg version comparison handles both.
+- An `introduced` value of `"0"` is a sentinel meaning "all versions from the beginning," not a literal version string. Epoch-qualified forms of the same sentinel also occur — `"0:0"` and, less commonly, values such as `"32:0"` — and carry the same meaning within that epoch.
 
 ---
 
@@ -252,6 +318,7 @@ Version strings are OS-specific. Consumers must use the appropriate version comp
 
 A small number of packages (typically third-party or vendor-provided) have minor schema differences:
 
-- Some Ubuntu packages (e.g. `kong`, `mongodb-org`) use a `summary` field instead of `description`.
 - The `title` field may be an empty string for packages where the upstream source does not provide a short summary.
-- The `severity` field may be `"UNKNOWN"` when no CVSS score is available from the upstream source.
+- The `severity` field may be `"UNKNOWN"` or an empty string when no CVSS score is available from the upstream source.
+- A release key may map to an empty object when a package is tracked for a release but has no advisories against it. A small number of Ubuntu packages (e.g. `kong`) have empty objects for every release key. Consumers should treat this as "no known vulnerabilities," not as a malformed file.
+- Debian advisories are occasionally keyed by a Debian Security Advisory identifier rather than a CVE — `DSA-*` (e.g. `DSA-6197-2`) or `DLA-*`. The `cve_id` field still mirrors the parent key. Consumers that assume a `CVE-` prefix should fall back to treating the key as an opaque advisory ID.
