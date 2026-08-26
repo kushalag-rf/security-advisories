@@ -714,20 +714,6 @@
                     }
                 ]
             },
-            "CVE-2026-46113": {
-                "cve_id": "CVE-2026-46113",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: x86: Fix shadow paging use-after-free due to unexpected GFN\n\nThe shadow MMU computes GFNs for direct shadow pages using sp->gfn plus\nthe SPTE index. This assumption breaks for shadow paging if the guest\npage tables are modified between VM entries (similar to commit\naad885e77496, \"KVM: x86/mmu: Drop/zap existing present SPTE even\nwhen creating an MMIO SPTE\", 2026-03-27).  The flow is as follows:\n\n- a PDE is installed for a 2MB mapping, and a page in that area is\n  accessed.  KVM creates a kvm_mmu_page consisting of 512 4KB pages;\n  the kvm_mmu_page is marked by FNAME(fetch) as direct-mapped because\n  the guest's mapping is a huge page (and thus contiguous).\n\n- the PDE mapping is changed from outside the guest.\n\n- the guest accesses another page in the same 2MB area.  KVM installs\n  a new leaf SPTE and rmap entry; the SPTE uses the \"correct\" GFN\n  (i.e. based on the new mapping, as changed in the previous step) but\n  that GFN is outside of the [sp->gfn, sp->gfn + 511] range; therefore\n  the rmap entry cannot be found and removed when the kvm_mmu_page\n  is zapped.\n\n- the memslot that covers the first 2MB mapping is deleted, and the\n  kvm_mmu_page for the now-invalid GPA is zapped.  However, rmap_remove()\n  only looks at the [sp->gfn, sp->gfn + 511] range established in step 1,\n  and fails to find the rmap entry that was recorded by step 3.\n\n- any operation that causes an rmap walk for the same page accessed\n  by step 3 then walks a stale rmap and dereferences a freed kvm_mmu_page.\n  This includes dirty logging or MMU notifier invalidations (e.g., from\n  MADV_DONTNEED).\n\nThe underlying issue is that KVM's walking of shadow PTEs assumes that\nif a SPTE is present when KVM wants to install a non-leaf SPTE, then the\nexisting kvm_mmu_page must be for the correct gfn.  Because the only way\nfor the gfn to be wrong is if KVM messed up and failed to zap a SPTE...\nwhich shouldn't happen, but *actually* only happens in response to a\nguest write.\n\nThat bug dates back literally forever, as even the first version of KVM\nassumes that the GFN matches and walks into the \"wrong\" shadow page.\nHowever, that was only an imprecision until 2032a93d66fa (\"KVM: MMU:\nDon't allocate gfns page for direct mmu pages\") came along.\n\nFix it by checking for a target gfn mismatch and zapping the existing\nSPTE.  That way the old SP and rmap entries are gone, KVM installs\nthe rmap in the right location, and everyone is happy.",
-                "severity": "HIGH",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "6.12.0-211.7.1.el10_2",
-                        "fixed": "0:6.12.0-211.32.1.el10_2",
-                        "identifier": "el10"
-                    }
-                ]
-            },
             "CVE-2026-46116": {
                 "cve_id": "CVE-2026-46116",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -42730,6 +42716,40 @@
                     }
                 ]
             },
+            "CVE-2026-64562": {
+                "cve_id": "CVE-2026-64562",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: nVMX: Hide shadow VMCS right after VMCLEAR\n\nfree_nested() frees the shadow VMCS while vmcs01 still points to it. But\nbecause it is asynchronous with respect to loaded_vmcs_clear(), the vCPU\nmight migrate before the pointer is cleared and __loaded_vmcs_clear()\nmay then execute VMCLEAR.\n\nThe VMCS needs to stay attached until its explicit VMCLEAR completes, but\nthen it can be hidden and the page safely freed.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64563": {
+                "cve_id": "CVE-2026-64563",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nrhashtable: clear stale iter->p on table restart\n\nrhashtable_walk_start_check() has two restart paths when resuming a walk.\nWhen iter->walker.tbl is valid, it re-validates iter->p against the table\nand sets iter->p = NULL if the object is gone.  When iter->walker.tbl is\nNULL (table was freed during resize), it resets slot and skip but forgets\nto clear iter->p.\n\nrhashtable_walk_next() then dereferences the stale iter->p, reading\nfreed memory.  This is a use-after-free.\n\nAny caller that does multi-fragment rhashtable walks across\nwalk_stop/walk_start boundaries is affected.  Concrete cases include\nnetlink_diag (__netlink_diag_dump in net/netlink/diag.c) and TIPC\n(tipc_nl_sk_walk in net/tipc/socket.c).\n\nCrash stack (netlink_diag):\n  BUG: KASAN: slab-use-after-free in rhashtable_walk_next+0x365/0x3c0\n  Read of size 8 at addr ffff88801a9d2438 (freed kmalloc-2k, offset 1080)\n  Call Trace:\n   rhashtable_walk_next+0x365/0x3c0 (lib/rhashtable.c:1016)\n   __netlink_diag_dump+0x160/0x760 (net/netlink/diag.c:122)\n   netlink_diag_dump+0xc2/0x240\n   netlink_dump+0x5bc/0x1270\n   netlink_recvmsg+0x7a3/0x980\n   sock_recvmsg+0x1bc/0x200\n   __sys_recvfrom+0x1d4/0x2c0",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el10"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-64564": {
                 "cve_id": "CVE-2026-64564",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -59494,10 +59514,11 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nrxrpc: fix oversized RESPONSE authenticator length check\n\nrxgk_verify_response() decodes auth_len from the packet and is supposed\nto verify that it fits in the remaining bytes. The existing check is\ninverted, so oversized RESPONSE authenticators are accepted and passed\nto rxgk_decrypt_skb(), which can later reach skb_to_sgvec() with an\nimpossible length and hit BUG_ON(len).\n\nDecoded from the original latest-net reproduction logs with\nscripts/decode_stacktrace.sh:\n\nRIP: __skb_to_sgvec()\n  [net/core/skbuff.c:5285 (discriminator 1)]\nCall Trace:\n skb_to_sgvec() [net/core/skbuff.c:5305]\n rxgk_decrypt_skb() [net/rxrpc/rxgk_common.h:81]\n rxgk_verify_response() [net/rxrpc/rxgk.c:1268]\n rxrpc_process_connection()\n   [net/rxrpc/conn_event.c:266 net/rxrpc/conn_event.c:364\n    net/rxrpc/conn_event.c:386]\n process_one_work() [kernel/workqueue.c:3281]\n worker_thread()\n   [kernel/workqueue.c:3353 kernel/workqueue.c:3440]\n kthread() [kernel/kthread.c:436]\n ret_from_fork() [arch/x86/kernel/process.c:164]\n\nReject authenticator lengths that exceed the remaining packet payload.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0",
+                        "introduced": "6.12.0-211.7.1.el10_2",
+                        "fixed": "0:6.12.0-211.40.1.el10_2",
                         "identifier": "el10"
                     }
                 ]
@@ -66851,11 +66872,6 @@
                 "severity": "HIGH",
                 "status": "fixed",
                 "events": [
-                    {
-                        "introduced": "5.14.0-687.5.1.el9_8",
-                        "fixed": "5.14.0-687.25.1.el9_8",
-                        "identifier": "el9"
-                    },
                     {
                         "introduced": "5.14.0-687.5.1.el9_8",
                         "fixed": "5.14.0-687.25.1.el9_8",
@@ -108702,6 +108718,40 @@
                     }
                 ]
             },
+            "CVE-2026-64562": {
+                "cve_id": "CVE-2026-64562",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nKVM: nVMX: Hide shadow VMCS right after VMCLEAR\n\nfree_nested() frees the shadow VMCS while vmcs01 still points to it. But\nbecause it is asynchronous with respect to loaded_vmcs_clear(), the vCPU\nmight migrate before the pointer is cleared and __loaded_vmcs_clear()\nmay then execute VMCLEAR.\n\nThe VMCS needs to stay attached until its explicit VMCLEAR completes, but\nthen it can be hidden and the page safely freed.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
+            "CVE-2026-64563": {
+                "cve_id": "CVE-2026-64563",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nrhashtable: clear stale iter->p on table restart\n\nrhashtable_walk_start_check() has two restart paths when resuming a walk.\nWhen iter->walker.tbl is valid, it re-validates iter->p against the table\nand sets iter->p = NULL if the object is gone.  When iter->walker.tbl is\nNULL (table was freed during resize), it resets slot and skip but forgets\nto clear iter->p.\n\nrhashtable_walk_next() then dereferences the stale iter->p, reading\nfreed memory.  This is a use-after-free.\n\nAny caller that does multi-fragment rhashtable walks across\nwalk_stop/walk_start boundaries is affected.  Concrete cases include\nnetlink_diag (__netlink_diag_dump in net/netlink/diag.c) and TIPC\n(tipc_nl_sk_walk in net/tipc/socket.c).\n\nCrash stack (netlink_diag):\n  BUG: KASAN: slab-use-after-free in rhashtable_walk_next+0x365/0x3c0\n  Read of size 8 at addr ffff88801a9d2438 (freed kmalloc-2k, offset 1080)\n  Call Trace:\n   rhashtable_walk_next+0x365/0x3c0 (lib/rhashtable.c:1016)\n   __netlink_diag_dump+0x160/0x760 (net/netlink/diag.c:122)\n   netlink_diag_dump+0xc2/0x240\n   netlink_dump+0x5bc/0x1270\n   netlink_recvmsg+0x7a3/0x980\n   sock_recvmsg+0x1bc/0x200\n   __sys_recvfrom+0x1d4/0x2c0",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    },
+                    {
+                        "introduced": "6.17.1-300.fc43",
+                        "identifier": "fc43"
+                    }
+                ]
+            },
             "CVE-2026-64564": {
                 "cve_id": "CVE-2026-64564",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -128343,19 +128393,6 @@
                 "cve_id": "CVE-2022-49907",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnet: mdio: fix undefined behavior in bit shift for __mdiobus_register\n\nShifting signed 32-bit value by 31 bits is undefined, so changing\nsignificant bit to unsigned. The UBSAN warning calltrace like below:\n\nUBSAN: shift-out-of-bounds in drivers/net/phy/mdio_bus.c:586:27\nleft shift of 1 by 31 places cannot be represented in type 'int'\nCall Trace:\n <TASK>\n dump_stack_lvl+0x7d/0xa5\n dump_stack+0x15/0x1b\n ubsan_epilogue+0xe/0x4e\n __ubsan_handle_shift_out_of_bounds+0x1e7/0x20c\n __mdiobus_register+0x49d/0x4e0\n fixed_mdio_bus_init+0xd8/0x12d\n do_one_initcall+0x76/0x430\n kernel_init_freeable+0x3b3/0x422\n kernel_init+0x24/0x1e0\n ret_from_fork+0x1f/0x30\n </TASK>",
-                "severity": "HIGH",
-                "status": "open",
-                "events": [
-                    {
-                        "introduced": "0",
-                        "identifier": "el9"
-                    }
-                ]
-            },
-            "CVE-2022-49910": {
-                "cve_id": "CVE-2022-49910",
-                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
-                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nBluetooth: L2CAP: Fix use-after-free caused by l2cap_reassemble_sdu\n\nFix the race condition between the following two flows that run in\nparallel:\n\n1. l2cap_reassemble_sdu -> chan->ops->recv (l2cap_sock_recv_cb) ->\n   __sock_queue_rcv_skb.\n\n2. bt_sock_recvmsg -> skb_recv_datagram, skb_free_datagram.\n\nAn SKB can be queued by the first flow and immediately dequeued and\nfreed by the second flow, therefore the callers of l2cap_reassemble_sdu\ncan't use the SKB after that function returns. However, some places\ncontinue accessing struct l2cap_ctrl that resides in the SKB's CB for a\nshort time after l2cap_reassemble_sdu returns, leading to a\nuse-after-free condition (the stack trace is below, line numbers for\nkernel 5.19.8).\n\nFix it by keeping a local copy of struct l2cap_ctrl.\n\nBUG: KASAN: use-after-free in l2cap_rx_state_recv (net/bluetooth/l2cap_core.c:6906) bluetooth\nRead of size 1 at addr ffff88812025f2f0 by task kworker/u17:3/43169\n\nWorkqueue: hci0 hci_rx_work [bluetooth]\nCall Trace:\n <TASK>\n dump_stack_lvl (lib/dump_stack.c:107 (discriminator 4))\n print_report.cold (mm/kasan/report.c:314 mm/kasan/report.c:429)\n ? l2cap_rx_state_recv (net/bluetooth/l2cap_core.c:6906) bluetooth\n kasan_report (mm/kasan/report.c:162 mm/kasan/report.c:493)\n ? l2cap_rx_state_recv (net/bluetooth/l2cap_core.c:6906) bluetooth\n l2cap_rx_state_recv (net/bluetooth/l2cap_core.c:6906) bluetooth\n l2cap_rx (net/bluetooth/l2cap_core.c:7236 net/bluetooth/l2cap_core.c:7271) bluetooth\n ret_from_fork (arch/x86/entry/entry_64.S:306)\n </TASK>\n\nAllocated by task 43169:\n kasan_save_stack (mm/kasan/common.c:39)\n __kasan_slab_alloc (mm/kasan/common.c:45 mm/kasan/common.c:436 mm/kasan/common.c:469)\n kmem_cache_alloc_node (mm/slab.h:750 mm/slub.c:3243 mm/slub.c:3293)\n __alloc_skb (net/core/skbuff.c:414)\n l2cap_recv_frag (./include/net/bluetooth/bluetooth.h:425 net/bluetooth/l2cap_core.c:8329) bluetooth\n l2cap_recv_acldata (net/bluetooth/l2cap_core.c:8442) bluetooth\n hci_rx_work (net/bluetooth/hci_core.c:3642 net/bluetooth/hci_core.c:3832) bluetooth\n process_one_work (kernel/workqueue.c:2289)\n worker_thread (./include/linux/list.h:292 kernel/workqueue.c:2437)\n kthread (kernel/kthread.c:376)\n ret_from_fork (arch/x86/entry/entry_64.S:306)\n\nFreed by task 27920:\n kasan_save_stack (mm/kasan/common.c:39)\n kasan_set_track (mm/kasan/common.c:45)\n kasan_set_free_info (mm/kasan/generic.c:372)\n ____kasan_slab_free (mm/kasan/common.c:368 mm/kasan/common.c:328)\n slab_free_freelist_hook (mm/slub.c:1780)\n kmem_cache_free (mm/slub.c:3536 mm/slub.c:3553)\n skb_free_datagram (./include/net/sock.h:1578 ./include/net/sock.h:1639 net/core/datagram.c:323)\n bt_sock_recvmsg (net/bluetooth/af_bluetooth.c:295) bluetooth\n l2cap_sock_recvmsg (net/bluetooth/l2cap_sock.c:1212) bluetooth\n sock_read_iter (net/socket.c:1087)\n new_sync_read (./include/linux/fs.h:2052 fs/read_write.c:401)\n vfs_read (fs/read_write.c:482)\n ksys_read (fs/read_write.c:620)\n do_syscall_64 (arch/x86/entry/common.c:50 arch/x86/entry/common.c:80)\n entry_SYSCALL_64_after_hwframe (arch/x86/entry/entry_64.S:120)",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [

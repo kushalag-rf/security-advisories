@@ -1517,30 +1517,6 @@
                     }
                 ]
             },
-            "CVE-2026-75803": {
-                "cve_id": "CVE-2026-75803",
-                "title": "AEAD Forgeries with Empty Ciphertext When Using EVP_Cipher()",
-                "description": "AEAD Forgeries with Empty Ciphertext When Using EVP_Cipher()",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:0",
-                        "fixed": "0:3.5.0-10rfubu+rf.0",
-                        "identifier": "rf"
-                    },
-                    {
-                        "introduced": "0:3.0.2-0ubuntu1",
-                        "fixed": "0:3.0.13-1rfubuntu3.1~rf.1",
-                        "identifier": "rf"
-                    },
-                    {
-                        "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
-                        "identifier": "rf"
-                    }
-                ]
-            },
             "CVE-2026-9076": {
                 "cve_id": "CVE-2026-9076",
                 "title": "Issue summary: When CMS password-based decryption (RFC 3211 / PWR ...",
@@ -1565,6 +1541,25 @@
                     }
                 ]
             },
+            "CVE-2026-75803": {
+                "cve_id": "CVE-2026-75803",
+                "title": "Issue summary: ChaCha20-Poly1305 and AES-OCB decryption with an e ...",
+                "description": "Issue summary: ChaCha20-Poly1305 and AES-OCB decryption with an empty\nciphertext can report success without verifying the supplied authentication\ntag when the operation is finalized by calling the EVP_Cipher() function.\n\nImpact summary: Applications calling EVP_Cipher() on an empty ciphertext and\nexpecting the call to check the AEAD tag may accept forged messages.\n\nCWE: CWE-354 (Improper Validation of Integrity Check Value)\n\nDescription: The EVP_Cipher() API call for AEAD ciphers behaves like a one\nshot encryption and decryption call. It also verifies the AEAD tag after the\ndecryption operation. However for AES-OCB and ChaCha20-Poly1305 ciphers\nit skipped the AEAD tag verification when an empty ciphertext was passed to\nthe function. The callers of this function might believe that a successful\nreturn indicates a valid AEAD tag for these ciphers, even when that has not\ntruly been validated in this case.\n\nFIPS impact: no\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this CVE\nas the affected algorithms are not FIPS approved and thus not implemented\nin the FIPS module.",
+                "severity": "LOW",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:0",
+                        "fixed": "0:3.5.0-10rfubu+rf.0",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "0:3.5.6-10rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "identifier": "rf"
+                    }
+                ]
+            },
             "CVE-2026-54874": {
                 "cve_id": "CVE-2026-54874",
                 "title": "Excessive Memory Use Buffering DTLS Records for a Future Epoch",
@@ -1573,7 +1568,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -1587,7 +1582,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -1601,7 +1596,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -1615,7 +1610,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -1792,7 +1787,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.5.0-10rfubu+rf.0",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -1803,11 +1798,15 @@
                 "title": "QUIC Server May Trigger Double Free When Processing INITIAL Packet",
                 "description": "Issue summary: QUIC server may double free QRX (QUIC record layer RX) object\nwhen channel creation fails for initial packet.\n\nImpact summary: Double free leads to heap corruption, which typically results in\ntermination of QUIC server process, leading to Denial of Service. There is so\nfar no evidence that this double free is exploitable for remote code execution,\nthus it is considered highly improbable.\n\nCWE: CWE-415: Double Free\n\nDescription: In order to validate initial packet, OpenSSL QUIC stack default\npacket handler (port_default_packet_handler()) creates a so-called QRX object.\nIf the initial packet validates successfully with QRX object, the default packet\nhandler proceeds to channel (connection object) creation. The QRX object used\nfor packet validation is passed to port_bind_channel(), so it becomes part of\nthe newly created connection. If port_bind_channel() fails, then it also frees\nthe QRX object. Once port_bind_channel() returns, the port_default_packet_handler()\ndetects the failure and proceeds to the error branch, where the same QRX object is\nfreed for the second time.\n\nThe failure in port_bind_channel() function can be induced with a relatively\nlow effort by a malformed (non RFC 9000 compliant) INITIAL packet. If the packet\ncarries DCID (destination connection ID) which is shorter than 8 bytes, then\nport_bind_channel() jumps to the error path after ossl_quic_lcidm_enrol_odcid()\ndetects that the DCID has invalid length.\n\nFIPS impact: no\nThe FIPS module is not affected, as the QUIC implementation is outside of\nthe OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
+                        "introduced": "0:0",
+                        "fixed": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "identifier": "rf"
+                    },
+                    {
                         "introduced": "0:3.5.0-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
                 ]
@@ -1820,7 +1819,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.5.0-10rfubu+rf.0",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -1834,7 +1833,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.5.0-10rfubu+rf.0",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -3431,30 +3430,6 @@
                     }
                 ]
             },
-            "CVE-2026-75803": {
-                "cve_id": "CVE-2026-75803",
-                "title": "AEAD Forgeries with Empty Ciphertext When Using EVP_Cipher()",
-                "description": "AEAD Forgeries with Empty Ciphertext When Using EVP_Cipher()",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:0",
-                        "fixed": "0:3.5.0-10rfubu+rf.0",
-                        "identifier": "rf"
-                    },
-                    {
-                        "introduced": "0:3.0.2-0ubuntu1",
-                        "fixed": "0:3.0.13-1rfubuntu3.1~rf.1",
-                        "identifier": "rf"
-                    },
-                    {
-                        "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
-                        "identifier": "rf"
-                    }
-                ]
-            },
             "CVE-2026-9076": {
                 "cve_id": "CVE-2026-9076",
                 "title": "Issue summary: When CMS password-based decryption (RFC 3211 / PWR ...",
@@ -3479,6 +3454,25 @@
                     }
                 ]
             },
+            "CVE-2026-75803": {
+                "cve_id": "CVE-2026-75803",
+                "title": "Issue summary: ChaCha20-Poly1305 and AES-OCB decryption with an e ...",
+                "description": "Issue summary: ChaCha20-Poly1305 and AES-OCB decryption with an empty\nciphertext can report success without verifying the supplied authentication\ntag when the operation is finalized by calling the EVP_Cipher() function.\n\nImpact summary: Applications calling EVP_Cipher() on an empty ciphertext and\nexpecting the call to check the AEAD tag may accept forged messages.\n\nCWE: CWE-354 (Improper Validation of Integrity Check Value)\n\nDescription: The EVP_Cipher() API call for AEAD ciphers behaves like a one\nshot encryption and decryption call. It also verifies the AEAD tag after the\ndecryption operation. However for AES-OCB and ChaCha20-Poly1305 ciphers\nit skipped the AEAD tag verification when an empty ciphertext was passed to\nthe function. The callers of this function might believe that a successful\nreturn indicates a valid AEAD tag for these ciphers, even when that has not\ntruly been validated in this case.\n\nFIPS impact: no\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this CVE\nas the affected algorithms are not FIPS approved and thus not implemented\nin the FIPS module.",
+                "severity": "LOW",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:0",
+                        "fixed": "0:3.5.0-10rfubu+rf.0",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "0:3.5.6-10rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "identifier": "rf"
+                    }
+                ]
+            },
             "CVE-2026-54874": {
                 "cve_id": "CVE-2026-54874",
                 "title": "Excessive Memory Use Buffering DTLS Records for a Future Epoch",
@@ -3487,7 +3481,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -3501,7 +3495,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -3515,7 +3509,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -3529,7 +3523,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -3706,7 +3700,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.5.0-10rfubu+rf.0",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -3717,11 +3711,15 @@
                 "title": "QUIC Server May Trigger Double Free When Processing INITIAL Packet",
                 "description": "Issue summary: QUIC server may double free QRX (QUIC record layer RX) object\nwhen channel creation fails for initial packet.\n\nImpact summary: Double free leads to heap corruption, which typically results in\ntermination of QUIC server process, leading to Denial of Service. There is so\nfar no evidence that this double free is exploitable for remote code execution,\nthus it is considered highly improbable.\n\nCWE: CWE-415: Double Free\n\nDescription: In order to validate initial packet, OpenSSL QUIC stack default\npacket handler (port_default_packet_handler()) creates a so-called QRX object.\nIf the initial packet validates successfully with QRX object, the default packet\nhandler proceeds to channel (connection object) creation. The QRX object used\nfor packet validation is passed to port_bind_channel(), so it becomes part of\nthe newly created connection. If port_bind_channel() fails, then it also frees\nthe QRX object. Once port_bind_channel() returns, the port_default_packet_handler()\ndetects the failure and proceeds to the error branch, where the same QRX object is\nfreed for the second time.\n\nThe failure in port_bind_channel() function can be induced with a relatively\nlow effort by a malformed (non RFC 9000 compliant) INITIAL packet. If the packet\ncarries DCID (destination connection ID) which is shorter than 8 bytes, then\nport_bind_channel() jumps to the error path after ossl_quic_lcidm_enrol_odcid()\ndetects that the DCID has invalid length.\n\nFIPS impact: no\nThe FIPS module is not affected, as the QUIC implementation is outside of\nthe OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
+                        "introduced": "0:0",
+                        "fixed": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "identifier": "rf"
+                    },
+                    {
                         "introduced": "0:3.5.0-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
                 ]
@@ -3734,7 +3732,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.5.0-10rfubu+rf.0",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -3748,7 +3746,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.5.0-10rfubu+rf.0",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -5345,30 +5343,6 @@
                     }
                 ]
             },
-            "CVE-2026-75803": {
-                "cve_id": "CVE-2026-75803",
-                "title": "AEAD Forgeries with Empty Ciphertext When Using EVP_Cipher()",
-                "description": "AEAD Forgeries with Empty Ciphertext When Using EVP_Cipher()",
-                "severity": "MEDIUM",
-                "status": "fixed",
-                "events": [
-                    {
-                        "introduced": "0:0",
-                        "fixed": "0:3.5.0-10rfubu+rf.0",
-                        "identifier": "rf"
-                    },
-                    {
-                        "introduced": "0:3.0.2-0ubuntu1",
-                        "fixed": "0:3.0.13-1rfubuntu3.1~rf.1",
-                        "identifier": "rf"
-                    },
-                    {
-                        "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
-                        "identifier": "rf"
-                    }
-                ]
-            },
             "CVE-2026-9076": {
                 "cve_id": "CVE-2026-9076",
                 "title": "Issue summary: When CMS password-based decryption (RFC 3211 / PWR ...",
@@ -5393,6 +5367,25 @@
                     }
                 ]
             },
+            "CVE-2026-75803": {
+                "cve_id": "CVE-2026-75803",
+                "title": "Issue summary: ChaCha20-Poly1305 and AES-OCB decryption with an e ...",
+                "description": "Issue summary: ChaCha20-Poly1305 and AES-OCB decryption with an empty\nciphertext can report success without verifying the supplied authentication\ntag when the operation is finalized by calling the EVP_Cipher() function.\n\nImpact summary: Applications calling EVP_Cipher() on an empty ciphertext and\nexpecting the call to check the AEAD tag may accept forged messages.\n\nCWE: CWE-354 (Improper Validation of Integrity Check Value)\n\nDescription: The EVP_Cipher() API call for AEAD ciphers behaves like a one\nshot encryption and decryption call. It also verifies the AEAD tag after the\ndecryption operation. However for AES-OCB and ChaCha20-Poly1305 ciphers\nit skipped the AEAD tag verification when an empty ciphertext was passed to\nthe function. The callers of this function might believe that a successful\nreturn indicates a valid AEAD tag for these ciphers, even when that has not\ntruly been validated in this case.\n\nFIPS impact: no\nThe FIPS modules in 4.0, 3.6, 3.5, 3.4, and 3.0 are not affected by this CVE\nas the affected algorithms are not FIPS approved and thus not implemented\nin the FIPS module.",
+                "severity": "LOW",
+                "status": "fixed",
+                "events": [
+                    {
+                        "introduced": "0:0",
+                        "fixed": "0:3.5.0-10rfubu+rf.0",
+                        "identifier": "rf"
+                    },
+                    {
+                        "introduced": "0:3.5.6-10rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "identifier": "rf"
+                    }
+                ]
+            },
             "CVE-2026-54874": {
                 "cve_id": "CVE-2026-54874",
                 "title": "Excessive Memory Use Buffering DTLS Records for a Future Epoch",
@@ -5401,7 +5394,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -5415,7 +5408,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -5429,7 +5422,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -5443,7 +5436,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -5620,7 +5613,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.5.0-10rfubu+rf.0",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -5631,11 +5624,15 @@
                 "title": "QUIC Server May Trigger Double Free When Processing INITIAL Packet",
                 "description": "Issue summary: QUIC server may double free QRX (QUIC record layer RX) object\nwhen channel creation fails for initial packet.\n\nImpact summary: Double free leads to heap corruption, which typically results in\ntermination of QUIC server process, leading to Denial of Service. There is so\nfar no evidence that this double free is exploitable for remote code execution,\nthus it is considered highly improbable.\n\nCWE: CWE-415: Double Free\n\nDescription: In order to validate initial packet, OpenSSL QUIC stack default\npacket handler (port_default_packet_handler()) creates a so-called QRX object.\nIf the initial packet validates successfully with QRX object, the default packet\nhandler proceeds to channel (connection object) creation. The QRX object used\nfor packet validation is passed to port_bind_channel(), so it becomes part of\nthe newly created connection. If port_bind_channel() fails, then it also frees\nthe QRX object. Once port_bind_channel() returns, the port_default_packet_handler()\ndetects the failure and proceeds to the error branch, where the same QRX object is\nfreed for the second time.\n\nThe failure in port_bind_channel() function can be induced with a relatively\nlow effort by a malformed (non RFC 9000 compliant) INITIAL packet. If the packet\ncarries DCID (destination connection ID) which is shorter than 8 bytes, then\nport_bind_channel() jumps to the error path after ossl_quic_lcidm_enrol_odcid()\ndetects that the DCID has invalid length.\n\nFIPS impact: no\nThe FIPS module is not affected, as the QUIC implementation is outside of\nthe OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
+                        "introduced": "0:0",
+                        "fixed": "0:3.0.13-1rfubuntu3.1~rf.1",
+                        "identifier": "rf"
+                    },
+                    {
                         "introduced": "0:3.5.0-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
                 ]
@@ -5648,7 +5645,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.5.0-10rfubu+rf.0",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
@@ -5662,7 +5659,7 @@
                 "status": "fixed",
                 "events": [
                     {
-                        "introduced": "0:3.5.0-10rfubu+rf.0",
+                        "introduced": "0:0",
                         "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     }
