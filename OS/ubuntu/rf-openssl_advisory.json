@@ -1517,7 +1517,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -1546,7 +1546,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -1575,7 +1575,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -1604,7 +1604,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -1657,7 +1657,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.8-10rfubu+rf.0",
                         "identifier": "rf"
                     }
                 ]
@@ -1854,17 +1854,16 @@
                 "title": "Unbounded Memory Growth in QUIC Server Incoming Channel Queue",
                 "description": "Issue summary: When an OpenSSL QUIC server (Listener SSL object) processes\nvalid QUIC Initial packets for unknown destination connection IDs, it\ncan allocate and queue new incoming channels without enforcing any limit.\n\nImpact summary: A remote peer that can make many Initial packets reach the\nserver listener faster than the application accepts connections, can cause the\nmemory allocated to store the per-channel state to grow without any limits,\npotentially making the QUIC listener unavailable and causing Denial of Service.\n\nCWE: CWE-770: Allocation of Resources Without Limits or Throttling\n\nDescription: The function that handles inbound QUIC packets uses\nConnection-Id from the packet header to find an existing connection\n(QUIC channel). If no existing connection is found and the packet\ntype is INITIAL, the function treats the packet as a new connection. It\nallocates a new channel object and inserts it into a queue where it\nwaits to be accepted by the local application with SSL_accept(3ossl).\nThe memory occupied by these initial channel objects may grow\nwithout bounds if the application is not able to call SSL_accept()\nfrequently enough to serve these inbound connection requests.\n\nThe issue is present since OpenSSL 3.5 when the QUIC server implementation\nwas added.\n\nThe fix introduces a limit for pending connections. The default limit is set\nto 256 pending connections (waiting to be accepted by the local application).\nApplications may change the default by calling SSL_set_value_uint(3ossl).\n\nFIPS impact: no\nThe FIPS module is not affected as the QUIC implementation is outside of\nthe OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "0:0",
-                        "fixed": "0:3.5.0-10rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     },
                     {
-                        "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
-                        "identifier": "rf"
+                        "introduced": "0:3.5.5-1ubuntu4",
+                        "identifier": "ubuntu"
                     }
                 ]
             },
@@ -1882,7 +1881,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -1892,7 +1891,7 @@
                 "title": "QUIC Server May Trigger Double Free When Processing INITIAL Packet",
                 "description": "Issue summary: QUIC server may double free QRX (QUIC record layer RX) object\nwhen channel creation fails for initial packet.\n\nImpact summary: Double free leads to heap corruption, which typically results in\ntermination of QUIC server process, leading to Denial of Service. There is so\nfar no evidence that this double free is exploitable for remote code execution,\nthus it is considered highly improbable.\n\nCWE: CWE-415: Double Free\n\nDescription: In order to validate initial packet, OpenSSL QUIC stack default\npacket handler (port_default_packet_handler()) creates a so-called QRX object.\nIf the initial packet validates successfully with QRX object, the default packet\nhandler proceeds to channel (connection object) creation. The QRX object used\nfor packet validation is passed to port_bind_channel(), so it becomes part of\nthe newly created connection. If port_bind_channel() fails, then it also frees\nthe QRX object. Once port_bind_channel() returns, the port_default_packet_handler()\ndetects the failure and proceeds to the error branch, where the same QRX object is\nfreed for the second time.\n\nThe failure in port_bind_channel() function can be induced with a relatively\nlow effort by a malformed (non RFC 9000 compliant) INITIAL packet. If the packet\ncarries DCID (destination connection ID) which is shorter than 8 bytes, then\nport_bind_channel() jumps to the error path after ossl_quic_lcidm_enrol_odcid()\ndetects that the DCID has invalid length.\n\nFIPS impact: no\nThe FIPS module is not affected, as the QUIC implementation is outside of\nthe OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
                         "introduced": "0:0",
@@ -1901,6 +1900,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
+                        "fixed": "0:3.5.8-10rfubu+rf.0",
                         "identifier": "rf"
                     }
                 ]
@@ -1919,7 +1919,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -1938,7 +1938,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -1993,7 +1993,7 @@
                 "events": [
                     {
                         "introduced": "0:0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -3515,7 +3515,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -3544,7 +3544,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -3573,7 +3573,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -3602,7 +3602,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -3655,7 +3655,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.8-10rfubu+rf.0",
                         "identifier": "rf"
                     }
                 ]
@@ -3852,17 +3852,16 @@
                 "title": "Unbounded Memory Growth in QUIC Server Incoming Channel Queue",
                 "description": "Issue summary: When an OpenSSL QUIC server (Listener SSL object) processes\nvalid QUIC Initial packets for unknown destination connection IDs, it\ncan allocate and queue new incoming channels without enforcing any limit.\n\nImpact summary: A remote peer that can make many Initial packets reach the\nserver listener faster than the application accepts connections, can cause the\nmemory allocated to store the per-channel state to grow without any limits,\npotentially making the QUIC listener unavailable and causing Denial of Service.\n\nCWE: CWE-770: Allocation of Resources Without Limits or Throttling\n\nDescription: The function that handles inbound QUIC packets uses\nConnection-Id from the packet header to find an existing connection\n(QUIC channel). If no existing connection is found and the packet\ntype is INITIAL, the function treats the packet as a new connection. It\nallocates a new channel object and inserts it into a queue where it\nwaits to be accepted by the local application with SSL_accept(3ossl).\nThe memory occupied by these initial channel objects may grow\nwithout bounds if the application is not able to call SSL_accept()\nfrequently enough to serve these inbound connection requests.\n\nThe issue is present since OpenSSL 3.5 when the QUIC server implementation\nwas added.\n\nThe fix introduces a limit for pending connections. The default limit is set\nto 256 pending connections (waiting to be accepted by the local application).\nApplications may change the default by calling SSL_set_value_uint(3ossl).\n\nFIPS impact: no\nThe FIPS module is not affected as the QUIC implementation is outside of\nthe OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "0:0",
-                        "fixed": "0:3.5.0-10rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     },
                     {
-                        "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
-                        "identifier": "rf"
+                        "introduced": "0:3.5.5-1ubuntu4",
+                        "identifier": "ubuntu"
                     }
                 ]
             },
@@ -3880,7 +3879,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -3890,7 +3889,7 @@
                 "title": "QUIC Server May Trigger Double Free When Processing INITIAL Packet",
                 "description": "Issue summary: QUIC server may double free QRX (QUIC record layer RX) object\nwhen channel creation fails for initial packet.\n\nImpact summary: Double free leads to heap corruption, which typically results in\ntermination of QUIC server process, leading to Denial of Service. There is so\nfar no evidence that this double free is exploitable for remote code execution,\nthus it is considered highly improbable.\n\nCWE: CWE-415: Double Free\n\nDescription: In order to validate initial packet, OpenSSL QUIC stack default\npacket handler (port_default_packet_handler()) creates a so-called QRX object.\nIf the initial packet validates successfully with QRX object, the default packet\nhandler proceeds to channel (connection object) creation. The QRX object used\nfor packet validation is passed to port_bind_channel(), so it becomes part of\nthe newly created connection. If port_bind_channel() fails, then it also frees\nthe QRX object. Once port_bind_channel() returns, the port_default_packet_handler()\ndetects the failure and proceeds to the error branch, where the same QRX object is\nfreed for the second time.\n\nThe failure in port_bind_channel() function can be induced with a relatively\nlow effort by a malformed (non RFC 9000 compliant) INITIAL packet. If the packet\ncarries DCID (destination connection ID) which is shorter than 8 bytes, then\nport_bind_channel() jumps to the error path after ossl_quic_lcidm_enrol_odcid()\ndetects that the DCID has invalid length.\n\nFIPS impact: no\nThe FIPS module is not affected, as the QUIC implementation is outside of\nthe OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
                         "introduced": "0:0",
@@ -3899,6 +3898,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
+                        "fixed": "0:3.5.8-10rfubu+rf.0",
                         "identifier": "rf"
                     }
                 ]
@@ -3917,7 +3917,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -3936,7 +3936,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -3991,7 +3991,7 @@
                 "events": [
                     {
                         "introduced": "0:0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -5513,7 +5513,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -5542,7 +5542,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -5571,7 +5571,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -5600,7 +5600,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -5653,7 +5653,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.8-10rfubu+rf.0",
                         "identifier": "rf"
                     }
                 ]
@@ -5850,17 +5850,16 @@
                 "title": "Unbounded Memory Growth in QUIC Server Incoming Channel Queue",
                 "description": "Issue summary: When an OpenSSL QUIC server (Listener SSL object) processes\nvalid QUIC Initial packets for unknown destination connection IDs, it\ncan allocate and queue new incoming channels without enforcing any limit.\n\nImpact summary: A remote peer that can make many Initial packets reach the\nserver listener faster than the application accepts connections, can cause the\nmemory allocated to store the per-channel state to grow without any limits,\npotentially making the QUIC listener unavailable and causing Denial of Service.\n\nCWE: CWE-770: Allocation of Resources Without Limits or Throttling\n\nDescription: The function that handles inbound QUIC packets uses\nConnection-Id from the packet header to find an existing connection\n(QUIC channel). If no existing connection is found and the packet\ntype is INITIAL, the function treats the packet as a new connection. It\nallocates a new channel object and inserts it into a queue where it\nwaits to be accepted by the local application with SSL_accept(3ossl).\nThe memory occupied by these initial channel objects may grow\nwithout bounds if the application is not able to call SSL_accept()\nfrequently enough to serve these inbound connection requests.\n\nThe issue is present since OpenSSL 3.5 when the QUIC server implementation\nwas added.\n\nThe fix introduces a limit for pending connections. The default limit is set\nto 256 pending connections (waiting to be accepted by the local application).\nApplications may change the default by calling SSL_set_value_uint(3ossl).\n\nFIPS impact: no\nThe FIPS module is not affected as the QUIC implementation is outside of\nthe OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "fixed",
+                "status": "open",
                 "events": [
                     {
                         "introduced": "0:0",
-                        "fixed": "0:3.5.0-10rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.0",
                         "identifier": "rf"
                     },
                     {
-                        "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
-                        "identifier": "rf"
+                        "introduced": "0:3.5.5-1ubuntu4",
+                        "identifier": "ubuntu"
                     }
                 ]
             },
@@ -5878,7 +5877,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -5888,7 +5887,7 @@
                 "title": "QUIC Server May Trigger Double Free When Processing INITIAL Packet",
                 "description": "Issue summary: QUIC server may double free QRX (QUIC record layer RX) object\nwhen channel creation fails for initial packet.\n\nImpact summary: Double free leads to heap corruption, which typically results in\ntermination of QUIC server process, leading to Denial of Service. There is so\nfar no evidence that this double free is exploitable for remote code execution,\nthus it is considered highly improbable.\n\nCWE: CWE-415: Double Free\n\nDescription: In order to validate initial packet, OpenSSL QUIC stack default\npacket handler (port_default_packet_handler()) creates a so-called QRX object.\nIf the initial packet validates successfully with QRX object, the default packet\nhandler proceeds to channel (connection object) creation. The QRX object used\nfor packet validation is passed to port_bind_channel(), so it becomes part of\nthe newly created connection. If port_bind_channel() fails, then it also frees\nthe QRX object. Once port_bind_channel() returns, the port_default_packet_handler()\ndetects the failure and proceeds to the error branch, where the same QRX object is\nfreed for the second time.\n\nThe failure in port_bind_channel() function can be induced with a relatively\nlow effort by a malformed (non RFC 9000 compliant) INITIAL packet. If the packet\ncarries DCID (destination connection ID) which is shorter than 8 bytes, then\nport_bind_channel() jumps to the error path after ossl_quic_lcidm_enrol_odcid()\ndetects that the DCID has invalid length.\n\nFIPS impact: no\nThe FIPS module is not affected, as the QUIC implementation is outside of\nthe OpenSSL FIPS module boundary.",
                 "severity": "HIGH",
-                "status": "open",
+                "status": "fixed",
                 "events": [
                     {
                         "introduced": "0:0",
@@ -5897,6 +5896,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
+                        "fixed": "0:3.5.8-10rfubu+rf.0",
                         "identifier": "rf"
                     }
                 ]
@@ -5915,7 +5915,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -5934,7 +5934,7 @@
                     },
                     {
                         "introduced": "0:3.5.6-10rfubu+rf.0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
@@ -5989,7 +5989,7 @@
                 "events": [
                     {
                         "introduced": "0:0",
-                        "fixed": "0:3.5.7-11rfubu+rf.0",
+                        "fixed": "0:3.5.7-11rfubu+rf.99",
                         "identifier": "rf"
                     }
                 ]
