@@ -68304,6 +68304,123 @@
                     }
                 ]
             },
+            "CVE-2026-80930": {
+                "cve_id": "CVE-2026-80930",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntpm: tpm_i2c_nuvoton: disable IRQ on wait timeout\n\ni2c_nuvoton_wait_for_stat() enables the IRQ before waiting for the\ninterrupt handler to report a status change. If the wait times out, or is\ninterrupted before the handler runs, the function returns without\nbalancing the enable_irq() call.\n\nDisable the IRQ before leaving the failed wait path. Also preserve an\ninterrupted wait's original error code instead of converting it to\n-ETIMEDOUT inside the helper.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-80932": {
+                "cve_id": "CVE-2026-80932",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: flush works in dependency order\n\nvirtio_vsock_remove() stops the virtqueues and then flushes each work\nitem before freeing the enclosing virtio_vsock.  The current order does\nnot account for dependencies between those items: tx_work may queue\nsend_pkt_work, and send_pkt_work may queue rx_work.\n\nIn particular, send_pkt_work can set restart_rx and release tx_lock.\nThe remove path can then stop the queues and flush rx_work before\nsend_pkt_work queues it.  Although the later send_pkt_work flush waits\nfor that producer to finish, nothing waits for the newly queued rx_work,\nso kfree(vsock) can race with it.\n\nKASAN reported:\n\n  BUG: KASAN: slab-use-after-free in\n  virtio_transport_rx_work+0x487/0x4b0\n  Read of size 8 at addr ffff888114c2b008 by task kworker/1:1/47\n  Workqueue: virtio_vsock virtio_transport_rx_work\n  Call Trace:\n   virtio_transport_rx_work+0x487/0x4b0\n   process_one_work+0x688/0x1120\n   worker_thread+0x45b/0xd10\n  Allocated by task 1:\n   virtio_vsock_probe+0xef/0x6b0\n  Freed by task 84:\n   kfree+0x131/0x3c0\n   virtio_vsock_remove+0xd1/0x100\n\nFlush the works in producer-to-consumer order.  virtio_vsock_vqs_del()\nhas already disabled the queue callbacks and cleared the run flags, so\nafter tx_work and send_pkt_work are drained, no source remains that can\nqueue rx_work after its flush.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-80936": {
+                "cve_id": "CVE-2026-80936",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: mt76: mt7925: cancel mlo_pm_work on stop\n\nmt7925 queues mlo_pm_work with a 5 second delay during multi-link\npower-save setup and never cancels it on the stop path. If the device is\ntorn down inside that window, the work outlives the teardown and its timer\nfires afterwards, trying to queue onto the workqueue that is already gone:\n\n  workqueue: cannot queue mt7925_mlo_pm_work [mt7925_common] on wq phy0\n  WARNING: kernel/workqueue.c:2283 at __queue_work+0x59/0xa0, CPU#1: swapper/1/0\n   call_timer_fn+0x2a/0x140\n   __run_timers+0x203/0x330\n   run_timer_softirq+0x86/0xf0\n\nmt7921 already has its own stop callback, so add one for mt7925 that\ncancels the work before calling mt792x_stop(). mt7925_ops backs both the\nPCIe and USB drivers, so this covers both.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-80939": {
+                "cve_id": "CVE-2026-80939",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: rtw89: pci: add .shutdown callback to stop rfkill polling on reboot\n\nSince the hardware rfkill polling was introduced, arm64 platforms can\npanic with an asynchronous SError during warm reboot:\n\n  SError Interrupt on CPU8, code 0x00000000be000011 -- SError\n  Workqueue: events_power_efficient rfkill_poll [rfkill]\n    rtw89_pci_ops_read8+0x94/0x160 [rtw89_pci]\n    rtw89_core_rfkill_poll+0x50/0x1e0 [rtw89_core]\n    rtw89_ops_rfkill_poll+0x40/0x68 [rtw89_core]\n    ieee80211_rfkill_poll+0x3c/0x70 [mac80211]\n    cfg80211_rfkill_poll+0x40/0x2a0 [cfg80211]\n    rfkill_poll+0x30/0x88 [rfkill]\n  Kernel panic - not syncing: Asynchronous SError Interrupt\n\nOn the reboot path the kernel only runs device_shutdown(), which calls\neach driver's .shutdown callback; .remove is not invoked.  The rtw89 PCI\ndriver had no .shutdown callback, so nothing stopped the rfkill polling\nwork while the platform was tearing the PCIe link down.  Once the link\nis gone, the next MMIO read from the poll handler targets a\nnon-responding device and is reported as a fatal asynchronous SError on\narm64.\n\nAdd rtw89_pci_shutdown(), wired to all rtw89 PCI device drivers, which\nsets a new RTW89_FLAG_SHUTDOWN flag (mirroring the USB\nRTW89_FLAG_UNPLUGGED pattern).  When the flag is set,\nrtw89_ops_rfkill_poll() returns early, so no MMIO read is issued to the\nchip after shutdown begins and the SError no longer occurs.\n\nThis does not call the full .remove path from .shutdown, to keep the\nshutdown handler minimal and avoid running the non-idempotent teardown\ntwice.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-80940": {
+                "cve_id": "CVE-2026-80940",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: rtw88: pci: fix resource leak on failed NAPI setup\n\nrtw_pci_probe() allocates PCI resources through\nrtw_pci_setup_resource() before it sets up NAPI. If\nrtw_pci_napi_init() fails, the error path jumps straight to\nerr_pci_declaim and skips rtw_pci_destroy(), leaving the PCI\nresources allocated by rtw_pci_setup_resource() behind.\n\nAdd a dedicated cleanup label for the NAPI setup failure path so probe\ndestroys the PCI resources.\n\nThe bug was first flagged by an experimental analysis tool we are\ndeveloping for kernel memory-management bugs while analyzing current\nmainline kernels. The tool is still under development and is not yet\npublicly available. Manual inspection confirms that the bug is still\npresent in v7.1-rc7.\n\nAn x86_64 allyesconfig build showed no new warnings. As we do not have a\nsuitable rtw88 PCI board to test with, no runtime testing was able to be\nperformed.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-80941": {
+                "cve_id": "CVE-2026-80941",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: rtw88: Fix potential memory leak in rtw_txq_push_skb()\n\nThe skb passed to the rtw_hci_tx_write() is expected to be freed when\nthe function fails, but the error path in rtw_txq_push_skb() does not\nfree the skb before returning. This can lead to a memory leak in\nrtw_txq_push() where a dequeued skb is passed to rtw_txq_push_skb().",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-80944": {
+                "cve_id": "CVE-2026-80944",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: mwifiex: Detach sync cmd buffer on interrupted wait\n\nmwifiex synchronous commands keep the caller-provided data buffer in\ncmd_node->data_buf. Several callers pass stack-allocated objects there.\n\nIf wait_event_interruptible_timeout() is interrupted, the caller can\nreturn and release that stack object while the firmware command is still\nthe current command. A late firmware response then reaches the normal\nresponse handler, which can copy data through cmd_node->data_buf into the\nstale stack address.\n\nThis fixes a stack corruption observed during repeated association and\ndisassociation cycles. The panic trace showed the command wait being\ninterrupted immediately before a bad pointer dereference:\n\n  cmd_wait_q terminated: -512\n  Unable to handle kernel paging request at virtual address 002c583837384662\n  Kernel panic - not syncing: stack-protector: Kernel stack is corrupted\n  ...\n  Tainted: [M]=MACHINE_CHECK\n\nThe fault address decodes as little-endian ASCII:\n\n  0x002c583837384662 -> \"bF878X,\\0\"\n\nwhich is a fragment of the VERSION_EXT firmware string exposed as\ndebugfs \"verext\":\n\n  w8997o-V4, RF878X, FP92, 16.92.21.p153.7\n\nThe same runs also showed corrupted control data containing:\n\n  0x2400372e333531 -> \"153.7\\0$\"\n\nwhich is the tail of the same VERSION_EXT string. This points at a late\nVERSION_EXT response writing through a stale stack-backed data_buf after\nthe interrupted wait returned.\n\nAfter cancelling pending commands on an interrupted or timed-out wait,\ndetach the caller-owned data buffer from the still-current command. This\npreserves the existing command cancellation behaviour while preventing a\nlate response from writing through a pointer whose lifetime ended with the\nwaiting caller.\n\nTested on an i.MX8MP board using an 88W8997.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-80945": {
+                "cve_id": "CVE-2026-80945",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ncrypto: iaa - unmap dst before software fallback on decompress\n\nOn a hardware analytics error, decompress retries through the software\nfallback, which writes req->dst with the CPU while it is still mapped\nDMA_FROM_DEVICE. With SWIOTLB active the later dma_unmap_sg() copies the\nstale bounce buffer over req->dst, corrupting the result.\n\nUnmap before the fallback runs. The async path unmaps inline; the sync\npath signals the retry with -EAGAIN so iaa_comp_adecompress() runs the\nfallback after unmapping.",
+                "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-80973": {
+                "cve_id": "CVE-2026-80973",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: 6fire: bound the MIDI event length from the device\n\nusb6fire_comm_receiver_handler() forwards a MIDI event using a length\nbyte the device supplies, with no bound and no check that the transfer\ndelivered that many bytes:\n\n\tif (!urb->status) {\n\t\tif (rt->receiver_buffer[0] == 0x10) /* midi in event */\n\t\t\tif (midi_rt)\n\t\t\t\tmidi_rt->in_received(midi_rt,\n\t\t\t\t\t\trt->receiver_buffer + 2,\n\t\t\t\t\t\trt->receiver_buffer[1]);\n\t}\n\nreceiver_buffer is a 64-byte kzalloc() buffer (COMM_RECEIVER_BUFSIZE), so\nonly 62 bytes follow the two-byte header.  receiver_buffer[1] is a u8 the\ndevice chooses, so a device that answers with 0x10 and a length of 0xFF\nmakes snd_rawmidi_receive() read 255 bytes starting two bytes into a\n64-byte object.  The bytes past the buffer are handed to userspace\nthrough the rawmidi read path.\n\nurb->actual_length is not consulted either, so a short transfer leaves\nboth the type byte and the length byte at their previous values and the\nhandler acts on stale data.\n\nThe receiver URB is submitted from usb6fire_comm_init() at probe, so the\nread happens on plug with no user action; forwarding to userspace also\nneeds a MIDI input substream open, since usb6fire_midi_in_received()\nonly calls snd_rawmidi_receive() when rt->in is set.\n\nKASAN on 7.2.0-rc5 (arm64), single packet from an emulated device:\n\n  BUG: KASAN: slab-out-of-bounds in snd_rawmidi_receive\n  Read of size 255 at addr ffff000009f64682 by task bash/183\n   __asan_memcpy\n   snd_rawmidi_receive\n   usb6fire_midi_in_received [snd_usb_6fire]\n   usb6fire_comm_receiver_handler [snd_usb_6fire]\n  Allocated by task 11:\n   usb6fire_comm_init [snd_usb_6fire]\n   usb6fire_chip_probe [snd_usb_6fire]\n  The buggy address is located 2 bytes inside of\n   allocated 64-byte region [ffff000009f64680, ffff000009f646c0)\n\nReject the event when the length exceeds the bytes that follow the\nheader, and require the transfer to have delivered the header plus that\nmany bytes.  The receiver URB is submitted with a 64-byte\ntransfer_buffer_length, so a genuine device cannot deliver an event\nlonger than those 62 bytes and nothing valid is dropped.\n\nDiscovered by XBOW, triaged by Baul Lee <baul.lee@xbow.com>",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
             "CVE-2026-81000": {
                 "cve_id": "CVE-2026-81000",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -68317,10 +68434,62 @@
                     }
                 ]
             },
+            "CVE-2026-89476": {
+                "cve_id": "CVE-2026-89476",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: fix stream->outcnt underflow on duplicate RECONF responses\n\nA cached RECONF chunk may contain more than one request parameter.  A\nduplicate response can therefore find and process the same ADD_OUT request\nagain while another parameter is still outstanding, rolling back outcnt\ntwice and possibly underflowing it.\n\nTrack outstanding request types as bits and clear each bit after its first\nresponse.  Later responses for the same request are then ignored.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-89510": {
+                "cve_id": "CVE-2026-89510",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nRDMA/cxgb4: Cancel reg_work before freeing device on remove\n\nc4iw_uld_state_change() queues reg_work to register the RDMA device.\nc4iw_remove() can free ctx->dev while this work is pending or running,\nleaving c4iw_register_device() accessing the freed device.\n\nCancel reg_work before removing the device.  The registration work can\ntear down ctx->dev when registration fails, so do not unregister or\ndeallocate it again in that case.\n\nThis issue was found by an in-house static analysis tool.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
             "CVE-2026-89534": {
                 "cve_id": "CVE-2026-89534",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsvcrdma: Clear sc_cm_id when ADDR_CHANGE replacement fails\n\nWhen svc_rdma_listen_handler() handles RDMA_CM_EVENT_ADDR_CHANGE,\nit creates a replacement listener cm_id and returns 1, telling\nthe CM core to destroy the old one. If the replacement allocation\nfails, sc_cm_id still points at the old cm_id that the CM core is\nabout to destroy. Any subsequent dereference of sc_cm_id --\nsuch as svc_rdma_detach()'s rdma_disconnect() call -- is a\nuse-after-free.\n\nNULL sc_cm_id on the failure path and guard svc_rdma_detach()'s\nrdma_disconnect() call against NULL so that the listener can\nbe torn down safely when the server shuts down.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-89543": {
+                "cve_id": "CVE-2026-89543",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsunrpc: fix use-after-free in __rpc_clnt_handle_event and __rpc_clnt_remove_pipedir\n\nNormal client creation goes through rpc_setup_pipedir(), which records\nclnt->pipefs_sb, but the mount-event path in __rpc_clnt_handle_event()\ncalls rpc_setup_pipedir_sb() directly and never refreshes that field.\nThe umount path also removes the directory without clearing\nclnt->pipefs_sb.\n\nAfter a late pipefs mount or any remount, rpc_clnt_remove_pipedir()\ncompares the current superblock against a stale pipefs_sb pointer and\nskips cleanup, leaving pipefs dentries whose inode private data still\npoints at a freed rpc_clnt, leading to a potential use-after-free during\nsubsequent rpc_info_open() or rpc_show_info() calls.\n\nFix this by properly updating clnt->pipefs_sb upon mount events and\nclearing it during unmount or failure paths.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-89547": {
+                "cve_id": "CVE-2026-89547",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nSUNRPC: Check svc pool percpu counter allocation\n\n__svc_create() initializes three per-pool percpu_counter stats and\nignores every return value. On SMP, percpu_counter_init() fails when\n__alloc_percpu_gfp() cannot satisfy the allocation, leaving the failed\ncounter with fbc->counters == NULL and its embedded raw_spinlock_t,\nlist_head, and count never initialized. __svc_create() returns the\nhalf-constructed svc_serv to nfsd, lockd, or the NFS callback service\nanyway.\n\nOnce that service is live, the hot-path increments in\nsvc_xprt_enqueue(), svc_handle_xprt(), and\nsvc_pool_wake_idle_thread() reach a counter whose backing pointer is\nNULL. The pointer is a per-cpu offset, so the access does not fault:\nit resolves to offset zero of the current CPU's per-cpu area and\nsilently corrupts whatever variable lives there. A\n/proc/fs/nfsd/pool_stats read walks the same NULL per-cpu storage and\nreturns garbage, and on CONFIG_DEBUG_SPINLOCK or lockdep it splats on\nthe never-initialized lock.\n\nCreating the broken service requires a percpu allocation failure during\nRPC server startup, so it is reachable only by a local administrator\nunder memory pressure or fault injection; a remote peer cannot induce\nthe bad state on its own.\n\nCheck each percpu_counter_init() return value in __svc_create() and\nfail when an allocation fails, unwinding the counters already set up\nin the current pool and in every pool initialized before it. A\ndiscrete percpu_counter_destroy() per counter at teardown frees each\nper-cpu allocation exactly once.",
                 "severity": "HIGH",
                 "status": "open",
                 "events": [
@@ -68348,6 +68517,19 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nhugetlb: only adjust reservation during unmapping if mapcount is 0\n\nSince df7a6d1f6405, __unmap_hugepage_range can adjust reservations.  In\nthe case of folio mapped in both a parent and a child, if the parent\nunmaps the range first, the reservation adjustment will result in an\nunderflow of the reserved count.  Once the child unmaps the range, the\ncount is restored.  Change __unmap_hugepage_range() to check the mapcount\nbefore adjusting the reservation.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-89598": {
+                "cve_id": "CVE-2026-89598",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfbdev: ssd1307fb: defer I2C transfers from damage callbacks\n\nThe fbdev damage callbacks may run from fbcon while printk has disabled\npreemption.  They currently update the display synchronously, which enters\nthe sleeping I2C transfer path from atomic context.\n\nA complete report from an RK3566 system follows:\n\n  [  258.129004] watchdog: watchdog0: watchdog did not stop!\n  [  258.129067] BUG: scheduling while atomic: systemd/1/0x00000003\n  [  258.129076] Modules linked in: algif_hash algif_skcipher af_alg bnep\n  binfmt_misc lz4hc lz4 zram snd_soc_hdmi_codec brcmfmac_wcc hci_uart\n  fb_ssd1306(C) fbtft(C) btqca btrtl btintel btsdio snd_soc_simple_card\n  motorcomm pwm_fan snd_soc_simple_card_utils ssd130x_spi nls_iso8859_1\n  ssd130x btbcm drm_shmem_helper display_connector brcmfmac ssd1307fb\n  brcmutil bluetooth cfg80211 rfkill snd_soc_rockchip_i2s_tdm\n  snd_soc_rk817 hantro_vpu snd_soc_core snd_compress snd_pcm_dmaengine\n  v4l2_vp9 snd_pcm v4l2_h264 rockchip_rga snd_timer rk_crypto2\n  spi_rockchip_sfc videobuf2_dma_contig snd sm3_generic v4l2_mem2mem\n  videobuf2_dma_sg dwmac_rk sm3 soundcore videobuf2_memops videobuf2_v4l2\n  stmmac_platform dw_hdmi_cec videodev videobuf2_common dw_hdmi_i2s_audio\n  stmmac rk817_charger pcs_xpcs mc cpufreq_dt sch_fq_codel ip_tables\n  x_tables autofs4\n  [  258.129215] Preemption disabled at:\n  [  258.129216] [<ffff80008012f96c>] vprintk_emit+0x11c/0x340\n  [  258.129234] CPU: 0 PID: 1 Comm: systemd Tainted: G         C\n  6.6.0-rc5-rockchip-rk356x #4\n  [  258.129239] Hardware name: Rockchip RK3566 OPi 3B (DT)\n  [  258.129243] Call trace:\n  [  258.129245]  dump_backtrace+0xa0/0x128\n  [  258.129252]  show_stack+0x20/0x38\n  [  258.129256]  dump_stack_lvl+0x60/0xb0\n  [  258.129265]  dump_stack+0x18/0x28\n  [  258.129269]  __schedule_bug+0xa0/0xc8\n  [  258.129274]  __schedule+0x9ac/0xd30\n  [  258.129279]  schedule+0x60/0x100\n  [  258.129282]  schedule_timeout+0x194/0x338\n  [  258.129289]  rk3x_i2c_xfer_common.isra.0+0x384/0x498\n  [  258.129296]  rk3x_i2c_xfer+0x20/0x60\n  [  258.129300]  __i2c_transfer+0x194/0x648\n  [  258.129308]  i2c_transfer+0x9c/0x130\n  [  258.129313]  i2c_transfer_buffer_flags+0x64/0x98\n  [  258.129318]  ssd1307fb_update_rect+0x42c/0x560 [ssd1307fb]\n  [  258.129334]  ssd1307fb_defio_imageblit+0x34/0x50 [ssd1307fb]\n  [  258.129343]  soft_cursor+0x13c/0x210\n  [  258.129350]  bit_cursor+0x2dc/0x550\n  [  258.129354]  fbcon_cursor+0xec/0x108\n  [  258.129359]  hide_cursor+0x44/0xc8\n  [  258.129365]  vt_console_print+0x398/0x3b0\n  [  258.129370]  console_flush_all.isra.0+0x17c/0x410\n  [  258.129377]  console_unlock+0x4c/0x100\n  [  258.129382]  vprintk_emit+0x1c8/0x340\n  [  258.129386]  vprintk_default+0x40/0x58\n  [  258.129389]  vprintk+0xb8/0xd0\n  [  258.129392]  _printk+0x68/0x98\n  [  258.129398]  watchdog_release+0x170/0x230\n  [  258.129404]  __fput+0xbc/0x288\n  [  258.129409]  __fput_sync+0x58/0x70\n  [  258.129413]  __arm64_sys_close+0x40/0x90\n  [  258.129419]  invoke_syscall+0x4c/0x118\n  [  258.129426]  el0_svc_common.constprop.0+0x48/0xf0\n  [  258.129432]  do_el0_svc+0x24/0x38\n  [  258.129437]  el0_svc+0x48/0x100\n  [  258.129443]  el0t_64_sync_handler+0xc0/0xc8\n  [  258.129448]  el0t_64_sync+0x190/0x198\n  [  258.573087] ------------[ cut here ]------------\n  [  258.573098] DEBUG_LOCKS_WARN_ON(val > preempt_count())\n  [  258.573111] WARNING: CPU: 0 PID: 1 at kernel/sched/core.c:5871\n  preempt_count_sub+0x9c/0x148\n  [  258.573130] Modules linked in: algif_hash algif_skcipher af_alg bnep\n  binfmt_misc lz4hc lz4 zram snd_soc_hdmi_codec brcmfmac_wcc hci_uart\n  fb_ssd1306(C) fbtft(C) btqca btrtl btintel btsdio snd_soc_simple_card\n  motorcomm pwm_fan snd_soc_simple_card_utils ssd130x_spi nls_iso8859_1\n  ssd130x btbcm drm_shmem_helper display_connector brcmfmac ssd1307fb\n  brcmutil bluetooth cfg80211 rfkill snd_soc_rockchip_i2s_tdm\n  snd_soc_rk817 hantro_vpu snd_soc_core snd_compress snd_pcm_dmaengine\n  v4l2_vp\n---truncated---",
+                "severity": "LOW",
                 "status": "open",
                 "events": [
                     {
@@ -68400,6 +68582,19 @@
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnfsd: fix fcache_disposal UAF by inlining dispose state into nfsd_net\n\nnfsd_file_dispose_list_delayed() defers fput() to nfsd service threads\nvia a per-net freeme queue, preventing the shrinker and GC worker from\nbearing the cost of closing files (see ffb402596147).  However, the\nqueue lives in a separately-allocated struct nfsd_fcache_disposal that\nis freed by nfsd_free_fcache_disposal_net() during per-net teardown.\nThe global shrinker, laundrette, and fsnotify callbacks can still be\ninside nfsd_file_dispose_list_delayed() dereferencing that pointer,\ncausing a use-after-free.\n\nInline the spinlock and freeme list directly into struct nfsd_net (as\nfcache_dispose_lock and fcache_dispose_list), eliminating the separately\nallocated struct nfsd_fcache_disposal entirely.  These fields now have\nthe same lifetime as the net namespace itself, so there is no dangling\npointer to chase.\n\nnfsd_file_cache_start_net() now just initializes the inline fields and\ncannot fail due to allocation.  nfsd_file_cache_shutdown_net() drains\nthe inline list directly instead of freeing a separate struct.  The\nalloc/free helpers are removed.",
                 "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el9"
+                    }
+                ]
+            },
+            "CVE-2026-89693": {
+                "cve_id": "CVE-2026-89693",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nnfsd: check nfsd4_acl_to_attr() return value in nfsd4_create()\n\nnfsd4_create() stores the return value of nfsd4_acl_to_attr() in\nstatus, but the switch(create->cr_type) block unconditionally\noverwrites it in every branch. ACL translation errors are silently\ndiscarded, and the CREATE proceeds without the requested ACL.\n\nAdd an early exit check after nfsd4_acl_to_attr(), matching the\npattern already used in nfsd4_setattr().\n\n[ cel: prefer NFS4ERR_BADTYPE over NFS4ERR_ATTRNOTSUPP ]",
+                "severity": "MEDIUM",
                 "status": "open",
                 "events": [
                     {
@@ -107150,6 +107345,71 @@
                     }
                 ]
             },
+            "CVE-2026-80930": {
+                "cve_id": "CVE-2026-80930",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\ntpm: tpm_i2c_nuvoton: disable IRQ on wait timeout\n\ni2c_nuvoton_wait_for_stat() enables the IRQ before waiting for the\ninterrupt handler to report a status change. If the wait times out, or is\ninterrupted before the handler runs, the function returns without\nbalancing the enable_irq() call.\n\nDisable the IRQ before leaving the failed wait path. Also preserve an\ninterrupted wait's original error code instead of converting it to\n-ETIMEDOUT inside the helper.",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
+            "CVE-2026-80932": {
+                "cve_id": "CVE-2026-80932",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nvsock/virtio: flush works in dependency order\n\nvirtio_vsock_remove() stops the virtqueues and then flushes each work\nitem before freeing the enclosing virtio_vsock.  The current order does\nnot account for dependencies between those items: tx_work may queue\nsend_pkt_work, and send_pkt_work may queue rx_work.\n\nIn particular, send_pkt_work can set restart_rx and release tx_lock.\nThe remove path can then stop the queues and flush rx_work before\nsend_pkt_work queues it.  Although the later send_pkt_work flush waits\nfor that producer to finish, nothing waits for the newly queued rx_work,\nso kfree(vsock) can race with it.\n\nKASAN reported:\n\n  BUG: KASAN: slab-use-after-free in\n  virtio_transport_rx_work+0x487/0x4b0\n  Read of size 8 at addr ffff888114c2b008 by task kworker/1:1/47\n  Workqueue: virtio_vsock virtio_transport_rx_work\n  Call Trace:\n   virtio_transport_rx_work+0x487/0x4b0\n   process_one_work+0x688/0x1120\n   worker_thread+0x45b/0xd10\n  Allocated by task 1:\n   virtio_vsock_probe+0xef/0x6b0\n  Freed by task 84:\n   kfree+0x131/0x3c0\n   virtio_vsock_remove+0xd1/0x100\n\nFlush the works in producer-to-consumer order.  virtio_vsock_vqs_del()\nhas already disabled the queue callbacks and cleared the run flags, so\nafter tx_work and send_pkt_work are drained, no source remains that can\nqueue rx_work after its flush.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
+            "CVE-2026-80941": {
+                "cve_id": "CVE-2026-80941",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: rtw88: Fix potential memory leak in rtw_txq_push_skb()\n\nThe skb passed to the rtw_hci_tx_write() is expected to be freed when\nthe function fails, but the error path in rtw_txq_push_skb() does not\nfree the skb before returning. This can lead to a memory leak in\nrtw_txq_push() where a dequeued skb is passed to rtw_txq_push_skb().",
+                "severity": "LOW",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
+            "CVE-2026-80944": {
+                "cve_id": "CVE-2026-80944",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nwifi: mwifiex: Detach sync cmd buffer on interrupted wait\n\nmwifiex synchronous commands keep the caller-provided data buffer in\ncmd_node->data_buf. Several callers pass stack-allocated objects there.\n\nIf wait_event_interruptible_timeout() is interrupted, the caller can\nreturn and release that stack object while the firmware command is still\nthe current command. A late firmware response then reaches the normal\nresponse handler, which can copy data through cmd_node->data_buf into the\nstale stack address.\n\nThis fixes a stack corruption observed during repeated association and\ndisassociation cycles. The panic trace showed the command wait being\ninterrupted immediately before a bad pointer dereference:\n\n  cmd_wait_q terminated: -512\n  Unable to handle kernel paging request at virtual address 002c583837384662\n  Kernel panic - not syncing: stack-protector: Kernel stack is corrupted\n  ...\n  Tainted: [M]=MACHINE_CHECK\n\nThe fault address decodes as little-endian ASCII:\n\n  0x002c583837384662 -> \"bF878X,\\0\"\n\nwhich is a fragment of the VERSION_EXT firmware string exposed as\ndebugfs \"verext\":\n\n  w8997o-V4, RF878X, FP92, 16.92.21.p153.7\n\nThe same runs also showed corrupted control data containing:\n\n  0x2400372e333531 -> \"153.7\\0$\"\n\nwhich is the tail of the same VERSION_EXT string. This points at a late\nVERSION_EXT response writing through a stale stack-backed data_buf after\nthe interrupted wait returned.\n\nAfter cancelling pending commands on an interrupted or timed-out wait,\ndetach the caller-owned data buffer from the still-current command. This\npreserves the existing command cancellation behaviour while preventing a\nlate response from writing through a pointer whose lifetime ended with the\nwaiting caller.\n\nTested on an i.MX8MP board using an 88W8997.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
+            "CVE-2026-80973": {
+                "cve_id": "CVE-2026-80973",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nALSA: 6fire: bound the MIDI event length from the device\n\nusb6fire_comm_receiver_handler() forwards a MIDI event using a length\nbyte the device supplies, with no bound and no check that the transfer\ndelivered that many bytes:\n\n\tif (!urb->status) {\n\t\tif (rt->receiver_buffer[0] == 0x10) /* midi in event */\n\t\t\tif (midi_rt)\n\t\t\t\tmidi_rt->in_received(midi_rt,\n\t\t\t\t\t\trt->receiver_buffer + 2,\n\t\t\t\t\t\trt->receiver_buffer[1]);\n\t}\n\nreceiver_buffer is a 64-byte kzalloc() buffer (COMM_RECEIVER_BUFSIZE), so\nonly 62 bytes follow the two-byte header.  receiver_buffer[1] is a u8 the\ndevice chooses, so a device that answers with 0x10 and a length of 0xFF\nmakes snd_rawmidi_receive() read 255 bytes starting two bytes into a\n64-byte object.  The bytes past the buffer are handed to userspace\nthrough the rawmidi read path.\n\nurb->actual_length is not consulted either, so a short transfer leaves\nboth the type byte and the length byte at their previous values and the\nhandler acts on stale data.\n\nThe receiver URB is submitted from usb6fire_comm_init() at probe, so the\nread happens on plug with no user action; forwarding to userspace also\nneeds a MIDI input substream open, since usb6fire_midi_in_received()\nonly calls snd_rawmidi_receive() when rt->in is set.\n\nKASAN on 7.2.0-rc5 (arm64), single packet from an emulated device:\n\n  BUG: KASAN: slab-out-of-bounds in snd_rawmidi_receive\n  Read of size 255 at addr ffff000009f64682 by task bash/183\n   __asan_memcpy\n   snd_rawmidi_receive\n   usb6fire_midi_in_received [snd_usb_6fire]\n   usb6fire_comm_receiver_handler [snd_usb_6fire]\n  Allocated by task 11:\n   usb6fire_comm_init [snd_usb_6fire]\n   usb6fire_chip_probe [snd_usb_6fire]\n  The buggy address is located 2 bytes inside of\n   allocated 64-byte region [ffff000009f64680, ffff000009f646c0)\n\nReject the event when the length exceeds the bytes that follow the\nheader, and require the transfer to have delivered the header plus that\nmany bytes.  The receiver URB is submitted with a 64-byte\ntransfer_buffer_length, so a genuine device cannot deliver an event\nlonger than those 62 bytes and nothing valid is dropped.\n\nDiscovered by XBOW, triaged by Baul Lee <baul.lee@xbow.com>",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
             "CVE-2026-81000": {
                 "cve_id": "CVE-2026-81000",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
@@ -107163,11 +107423,63 @@
                     }
                 ]
             },
+            "CVE-2026-89476": {
+                "cve_id": "CVE-2026-89476",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsctp: fix stream->outcnt underflow on duplicate RECONF responses\n\nA cached RECONF chunk may contain more than one request parameter.  A\nduplicate response can therefore find and process the same ADD_OUT request\nagain while another parameter is still outstanding, rolling back outcnt\ntwice and possibly underflowing it.\n\nTrack outstanding request types as bits and clear each bit after its first\nresponse.  Later responses for the same request are then ignored.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
+            "CVE-2026-89510": {
+                "cve_id": "CVE-2026-89510",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nRDMA/cxgb4: Cancel reg_work before freeing device on remove\n\nc4iw_uld_state_change() queues reg_work to register the RDMA device.\nc4iw_remove() can free ctx->dev while this work is pending or running,\nleaving c4iw_register_device() accessing the freed device.\n\nCancel reg_work before removing the device.  The registration work can\ntear down ctx->dev when registration fails, so do not unregister or\ndeallocate it again in that case.\n\nThis issue was found by an in-house static analysis tool.",
+                "severity": "HIGH",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
+            "CVE-2026-89543": {
+                "cve_id": "CVE-2026-89543",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nsunrpc: fix use-after-free in __rpc_clnt_handle_event and __rpc_clnt_remove_pipedir\n\nNormal client creation goes through rpc_setup_pipedir(), which records\nclnt->pipefs_sb, but the mount-event path in __rpc_clnt_handle_event()\ncalls rpc_setup_pipedir_sb() directly and never refreshes that field.\nThe umount path also removes the directory without clearing\nclnt->pipefs_sb.\n\nAfter a late pipefs mount or any remount, rpc_clnt_remove_pipedir()\ncompares the current superblock against a stale pipefs_sb pointer and\nskips cleanup, leaving pipefs dentries whose inode private data still\npoints at a freed rpc_clnt, leading to a potential use-after-free during\nsubsequent rpc_info_open() or rpc_show_info() calls.\n\nFix this by properly updating clnt->pipefs_sb upon mount events and\nclearing it during unmount or failure paths.",
+                "severity": "MEDIUM",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
             "CVE-2026-89555": {
                 "cve_id": "CVE-2026-89555",
                 "title": "In the Linux kernel, the following vulnerability has been resolve ...",
                 "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nmpls: reload header after pskb_may_pull()\n\nmpls_select_multipath() calls mpls_multipath_hash() to choose a nexthop\nwhen an MPLS route has multiple nexthops.  While walking the MPLS label\nstack, the hash routine caches hdr for the current label.  After finding\nthe bottom-of-stack label, it calls pskb_may_pull() before reading the\ninner IP header.\n\nIf an skb is constructed with the inner IP header in nonlinear data and\ninsufficient tailroom in the linear head, pskb_may_pull() calls\npskb_expand_head() to replace the skb head and free the old one.  This\nleaves hdr pointing to freed memory.  The IPv6 path can invalidate hdr\nagain when it performs a second pull for the larger header.\n\nThe issue was found through static analysis.  A reproducer sending a legal\nGeneve packet through a bareudp/MPLS multipath setup triggered the same\nKASAN report in 2 of 2 unpatched runs:\n\n  BUG: KASAN: slab-use-after-free in mpls_select_multipath\n  Read of size 1 at addr ffff88800ecc6e20 by task ksoftirqd/1/23\n\n  Call Trace:\n   mpls_select_multipath\n   mpls_forward\n   __netif_receive_skb_list_core\n   netif_receive_skb_list_internal\n   napi_complete_done\n   gro_cell_poll\n   __napi_poll\n   net_rx_action\n\n  Freed by task 23:\n   kfree\n   pskb_expand_head\n   __pskb_pull_tail\n   mpls_select_multipath\n\nReload hdr from the current skb head after each successful pull before\nderiving the inner IPv4 or IPv6 header pointer.",
                 "severity": "CRITICAL",
+                "status": "open",
+                "events": [
+                    {
+                        "introduced": "0",
+                        "identifier": "el8"
+                    }
+                ]
+            },
+            "CVE-2026-89598": {
+                "cve_id": "CVE-2026-89598",
+                "title": "In the Linux kernel, the following vulnerability has been resolve ...",
+                "description": "In the Linux kernel, the following vulnerability has been resolved:\n\nfbdev: ssd1307fb: defer I2C transfers from damage callbacks\n\nThe fbdev damage callbacks may run from fbcon while printk has disabled\npreemption.  They currently update the display synchronously, which enters\nthe sleeping I2C transfer path from atomic context.\n\nA complete report from an RK3566 system follows:\n\n  [  258.129004] watchdog: watchdog0: watchdog did not stop!\n  [  258.129067] BUG: scheduling while atomic: systemd/1/0x00000003\n  [  258.129076] Modules linked in: algif_hash algif_skcipher af_alg bnep\n  binfmt_misc lz4hc lz4 zram snd_soc_hdmi_codec brcmfmac_wcc hci_uart\n  fb_ssd1306(C) fbtft(C) btqca btrtl btintel btsdio snd_soc_simple_card\n  motorcomm pwm_fan snd_soc_simple_card_utils ssd130x_spi nls_iso8859_1\n  ssd130x btbcm drm_shmem_helper display_connector brcmfmac ssd1307fb\n  brcmutil bluetooth cfg80211 rfkill snd_soc_rockchip_i2s_tdm\n  snd_soc_rk817 hantro_vpu snd_soc_core snd_compress snd_pcm_dmaengine\n  v4l2_vp9 snd_pcm v4l2_h264 rockchip_rga snd_timer rk_crypto2\n  spi_rockchip_sfc videobuf2_dma_contig snd sm3_generic v4l2_mem2mem\n  videobuf2_dma_sg dwmac_rk sm3 soundcore videobuf2_memops videobuf2_v4l2\n  stmmac_platform dw_hdmi_cec videodev videobuf2_common dw_hdmi_i2s_audio\n  stmmac rk817_charger pcs_xpcs mc cpufreq_dt sch_fq_codel ip_tables\n  x_tables autofs4\n  [  258.129215] Preemption disabled at:\n  [  258.129216] [<ffff80008012f96c>] vprintk_emit+0x11c/0x340\n  [  258.129234] CPU: 0 PID: 1 Comm: systemd Tainted: G         C\n  6.6.0-rc5-rockchip-rk356x #4\n  [  258.129239] Hardware name: Rockchip RK3566 OPi 3B (DT)\n  [  258.129243] Call trace:\n  [  258.129245]  dump_backtrace+0xa0/0x128\n  [  258.129252]  show_stack+0x20/0x38\n  [  258.129256]  dump_stack_lvl+0x60/0xb0\n  [  258.129265]  dump_stack+0x18/0x28\n  [  258.129269]  __schedule_bug+0xa0/0xc8\n  [  258.129274]  __schedule+0x9ac/0xd30\n  [  258.129279]  schedule+0x60/0x100\n  [  258.129282]  schedule_timeout+0x194/0x338\n  [  258.129289]  rk3x_i2c_xfer_common.isra.0+0x384/0x498\n  [  258.129296]  rk3x_i2c_xfer+0x20/0x60\n  [  258.129300]  __i2c_transfer+0x194/0x648\n  [  258.129308]  i2c_transfer+0x9c/0x130\n  [  258.129313]  i2c_transfer_buffer_flags+0x64/0x98\n  [  258.129318]  ssd1307fb_update_rect+0x42c/0x560 [ssd1307fb]\n  [  258.129334]  ssd1307fb_defio_imageblit+0x34/0x50 [ssd1307fb]\n  [  258.129343]  soft_cursor+0x13c/0x210\n  [  258.129350]  bit_cursor+0x2dc/0x550\n  [  258.129354]  fbcon_cursor+0xec/0x108\n  [  258.129359]  hide_cursor+0x44/0xc8\n  [  258.129365]  vt_console_print+0x398/0x3b0\n  [  258.129370]  console_flush_all.isra.0+0x17c/0x410\n  [  258.129377]  console_unlock+0x4c/0x100\n  [  258.129382]  vprintk_emit+0x1c8/0x340\n  [  258.129386]  vprintk_default+0x40/0x58\n  [  258.129389]  vprintk+0xb8/0xd0\n  [  258.129392]  _printk+0x68/0x98\n  [  258.129398]  watchdog_release+0x170/0x230\n  [  258.129404]  __fput+0xbc/0x288\n  [  258.129409]  __fput_sync+0x58/0x70\n  [  258.129413]  __arm64_sys_close+0x40/0x90\n  [  258.129419]  invoke_syscall+0x4c/0x118\n  [  258.129426]  el0_svc_common.constprop.0+0x48/0xf0\n  [  258.129432]  do_el0_svc+0x24/0x38\n  [  258.129437]  el0_svc+0x48/0x100\n  [  258.129443]  el0t_64_sync_handler+0xc0/0xc8\n  [  258.129448]  el0t_64_sync+0x190/0x198\n  [  258.573087] ------------[ cut here ]------------\n  [  258.573098] DEBUG_LOCKS_WARN_ON(val > preempt_count())\n  [  258.573111] WARNING: CPU: 0 PID: 1 at kernel/sched/core.c:5871\n  preempt_count_sub+0x9c/0x148\n  [  258.573130] Modules linked in: algif_hash algif_skcipher af_alg bnep\n  binfmt_misc lz4hc lz4 zram snd_soc_hdmi_codec brcmfmac_wcc hci_uart\n  fb_ssd1306(C) fbtft(C) btqca btrtl btintel btsdio snd_soc_simple_card\n  motorcomm pwm_fan snd_soc_simple_card_utils ssd130x_spi nls_iso8859_1\n  ssd130x btbcm drm_shmem_helper display_connector brcmfmac ssd1307fb\n  brcmutil bluetooth cfg80211 rfkill snd_soc_rockchip_i2s_tdm\n  snd_soc_rk817 hantro_vpu snd_soc_core snd_compress snd_pcm_dmaengine\n  v4l2_vp\n---truncated---",
+                "severity": "LOW",
                 "status": "open",
                 "events": [
                     {
